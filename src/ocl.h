@@ -11,7 +11,9 @@ Please give feedback to the authors if improvement is realized. It is distribute
 
 #include <string>
 #include <vector>
+#include <map>
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 #include <fstream>
 
@@ -19,6 +21,13 @@ namespace ocl
 {
 
 //#define ocl_debug	1
+//#define ocl_profile	1
+
+#ifdef ocl_profile
+#define	_executeKernel	_executeKernelP
+#else
+#define	_executeKernel	_executeKernelN
+#endif
 
 class oclObject
 {
@@ -89,6 +98,7 @@ protected:
 		return (res == CL_SUCCESS);
 	}
 
+protected:
 	static void oclFatal(const cl_int res)
 	{
 		if (!oclError(res))
@@ -143,6 +153,7 @@ public:
 		}
 	}
 
+public:
 	virtual ~Engine()
 	{
 #if ocl_debug
@@ -150,6 +161,7 @@ public:
 #endif
 	}
 
+public:
 	void displayDevices() const
 	{
 		for (size_t i = 0, n = _devices.size(); i < n; ++i)
@@ -159,6 +171,7 @@ public:
 		std::cout << std::endl;
 	}
 
+public:
 	cl_platform_id getPlatform(const size_t d) const { return _devices[d].platform_id; }
 	cl_device_id getDevice(const size_t d) const { return _devices[d].device_id; }
 };
@@ -170,7 +183,11 @@ private:
 	const size_t _d;
 	const cl_platform_id _platform;
 	const cl_device_id _device;
+#ifdef ocl_profile
+	bool _selfTuning = true;
+#else
 	bool _selfTuning = false;
+#endif
 	size_t _syncCount = 0;
 	cl_ulong _localMemSize = 0;
 	size_t _maxWorkGroupSize = 0;
@@ -180,9 +197,21 @@ private:
 	cl_program _program = nullptr;
 	size_t _size = 0, _size_blk = 0;
 	cl_mem _x = nullptr, _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr = nullptr, _bp = nullptr, _ibp = nullptr, _err = nullptr;
-	cl_kernel _sub_ntt4 = nullptr, _ntt4 = nullptr, _intt4 = nullptr, _square2 = nullptr, _square4 = nullptr;
+	cl_kernel _sub_ntt4 = nullptr, _ntt4 = nullptr, _intt4 = nullptr;
+	cl_kernel _square8 = nullptr, _square16 = nullptr, _square32 = nullptr, _square64 = nullptr;
+	cl_kernel _square128 = nullptr, _square256 = nullptr,_square512 = nullptr, _square1024 = nullptr;
 	cl_kernel _poly2int0 = nullptr, _poly2int1 = nullptr, _split0 = nullptr, _split4_i = nullptr, _split4_01 = nullptr, _split4_10 = nullptr;
 	cl_kernel _split2 = nullptr, _split2_10 = nullptr, _split_o = nullptr, _split_o_10 = nullptr, _split_f = nullptr;
+	struct Profile
+	{
+		std::string name;
+		size_t count;
+		cl_ulong time;
+
+		Profile() {}
+		Profile(const std::string & name) : name(name), count(0), time(0.0) {}
+	};
+	std::map<cl_kernel, Profile> _profileMap;
 
 public:
 	Device(const Engine & engine, const size_t d) : _engine(engine), _d(d), _platform(engine.getPlatform(d)), _device(engine.getDevice(d))
@@ -202,6 +231,7 @@ public:
 		cl_ulong memCacheSize; oclFatal(clGetDeviceInfo(_device, CL_DEVICE_GLOBAL_MEM_CACHE_SIZE, sizeof(memCacheSize), &memCacheSize, nullptr));
 		cl_uint memCacheLineSize; oclFatal(clGetDeviceInfo(_device, CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE, sizeof(memCacheLineSize), &memCacheLineSize, nullptr));
 		oclFatal(clGetDeviceInfo(_device, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(_localMemSize), &_localMemSize, nullptr));
+		cl_ulong memConstSize; oclFatal(clGetDeviceInfo(_device, CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE, sizeof(memConstSize), &memConstSize, nullptr));
 		oclFatal(clGetDeviceInfo(_device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(_maxWorkGroupSize), &_maxWorkGroupSize, nullptr));
 		oclFatal(clGetDeviceInfo(_device, CL_DEVICE_PROFILING_TIMER_RESOLUTION, sizeof(_timerResolution), &_timerResolution, nullptr));
 
@@ -210,7 +240,7 @@ public:
 
 		std::cout << computeUnits << " computeUnits @ " << maxClockFrequency << " MHz, memSize = " << (memSize >> 20) << " MB, cacheSize = "
 			<< (memCacheSize >> 10) << " kB, cacheLineSize = " << memCacheLineSize << " B, localMemSize = " << (_localMemSize >> 10)
-			<< " kB, maxWorkGroupSize = " << _maxWorkGroupSize << "." << std::endl << std::endl;
+			<< " kB, constMemSize = " << (memConstSize >> 10) << " kB, maxWorkGroupSize = " << _maxWorkGroupSize << "." << std::endl << std::endl;
 		
 		const cl_context_properties contextProperties[3] = { CL_CONTEXT_PLATFORM, (cl_context_properties)_platform, 0 };
 		cl_int err_cc;
@@ -221,6 +251,7 @@ public:
 		oclFatal(err_ccq);
 	}
 
+public:
 	virtual ~Device()
 	{
 #if ocl_debug
@@ -230,6 +261,23 @@ public:
 		oclFatal(clReleaseContext(_context));
 	}
 
+public:
+	void displayProfiles() const
+	{
+		cl_ulong time = 0;
+		for (auto it : _profileMap) time += it.second.time;
+		for (auto it : _profileMap)
+		{
+			const Profile & profile = it.second;
+			if (profile.count != 0)
+			{
+				std::cout << "- " << profile.name << ": " << profile.count << ", " << std::setprecision(3)
+					<< profile.time * 100.0 / time << " %, " << profile.time << " (" << (profile.time / profile.count) << ")" << std::endl;
+			}
+		}
+	}
+
+public:
 	void loadProgram(const std::string & programSrc)
 	{
 #if ocl_debug
@@ -275,6 +323,7 @@ public:
 #endif	
 	}
 
+public:
 	void clearProgram()
 	{
 #if ocl_debug
@@ -284,6 +333,7 @@ public:
 		_program = nullptr;
 	}
 
+public:
 	void allocMemory(const size_t size)
 	{
 #if ocl_debug
@@ -300,6 +350,7 @@ public:
 		_err = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_int));
 	}
 
+public:
 	void releaseMemory()
 	{
 #if ocl_debug
@@ -319,6 +370,18 @@ public:
 		}
 	}
 
+private:
+	inline cl_kernel _createSquareKernel(const char * const kernelName)
+	{
+		cl_kernel kernel = _createKernel(kernelName);
+		_setKernelArg(kernel, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(kernel, 1, sizeof(cl_mem), &_r1ir1);
+		_setKernelArg(kernel, 2, sizeof(cl_mem), &_r2);
+		_setKernelArg(kernel, 3, sizeof(cl_mem), &_ir2);
+		return kernel;
+	}
+
+public:
 	void createKernels(const cl_uint2 norm, const cl_uint blk, const cl_uint e, const cl_int s, const cl_uint d, const cl_uint d_inv, const cl_int d_shift)
 	{
 #if ocl_debug
@@ -341,11 +404,14 @@ public:
 		_setKernelArg(_intt4, 1, sizeof(cl_mem), &_r1ir1);
 		_setKernelArg(_intt4, 2, sizeof(cl_mem), &_ir2);
 
-		_square2 = _createKernel("square2");
-		_setKernelArg(_square2, 0, sizeof(cl_mem), &_x);
-
-		_square4 = _createKernel("square4");
-		_setKernelArg(_square4, 0, sizeof(cl_mem), &_x);
+		_square8 = _createSquareKernel("square8");
+		_square16 = _createSquareKernel("square16");
+		_square32 = _createSquareKernel("square32");
+		_square64 = _createSquareKernel("square64");
+		_square128 = _createSquareKernel("square128");
+		_square256 = _createSquareKernel("square256");
+		_square512 = _createSquareKernel("square512");
+		_square1024 = _createSquareKernel("square1024");
 
 		_poly2int0 = _createKernel("poly2int0");
 		_setKernelArg(_poly2int0, 0, sizeof(cl_mem), &_x);
@@ -413,6 +479,7 @@ public:
 		_setKernelArg(_split_f, 3, sizeof(cl_int), &s);
 	}
 
+public:
 	void releaseKernels()
 	{
 #if ocl_debug
@@ -423,8 +490,14 @@ public:
 		_releaseKernel(_sub_ntt4);
 		_releaseKernel(_ntt4);
 		_releaseKernel(_intt4);
-		_releaseKernel(_square2);
-		_releaseKernel(_square4);
+		_releaseKernel(_square8);
+		_releaseKernel(_square16);
+		_releaseKernel(_square32);
+		_releaseKernel(_square64);
+		_releaseKernel(_square128);
+		_releaseKernel(_square256);
+		_releaseKernel(_square512);
+		_releaseKernel(_square1024);
 		_releaseKernel(_poly2int0);
 		_releaseKernel(_poly2int1);
 		_releaseKernel(_split0);
@@ -439,18 +512,21 @@ public:
 
 	}
 
+public:
 	void readMemory_x(cl_uint2 * const ptr)
 	{
 		_sync();
 		oclFatal(clEnqueueReadBuffer(_queue, _x, CL_TRUE, 0, sizeof(cl_uint2) * _size, ptr, 0, nullptr, nullptr));
 	}
 
+public:
 	void writeMemory_x(const cl_uint2 * const ptr)
 	{
 		_sync();
 		oclFatal(clEnqueueWriteBuffer(_queue, _x, CL_TRUE, 0, sizeof(cl_uint2) * _size, ptr, 0, nullptr, nullptr));
 	}
 
+public:
 	void writeMemory_r(const cl_uint4 * const ptr_r1ir1, const cl_uint2 * const ptr_r2, const cl_uint2 * const ptr_ir2)
 	{
 		_sync();
@@ -459,6 +535,7 @@ public:
 		oclFatal(clEnqueueWriteBuffer(_queue, _ir2, CL_TRUE, 0, sizeof(cl_uint2) * _size, ptr_ir2, 0, nullptr, nullptr));
 	}
 
+public:
 	void writeMemory_bp(const cl_uint * const ptr_bp, const cl_uint * const ptr_ibp)
 	{
 		_sync();
@@ -466,24 +543,35 @@ public:
 		oclFatal(clEnqueueWriteBuffer(_queue, _ibp, CL_TRUE, 0, sizeof(cl_uint) * _size / 2, ptr_ibp, 0, nullptr, nullptr));
 	}
 
+public:
 	void readMemory_err(cl_int * const ptr)
 	{
 		_sync();
 		oclFatal(clEnqueueReadBuffer(_queue, _err, CL_TRUE, 0, sizeof(cl_int), ptr, 0, nullptr, nullptr));
 	}
 
+public:
 	void writeMemory_err(const cl_int * const ptr)
 	{
 		_sync();
 		oclFatal(clEnqueueWriteBuffer(_queue, _err, CL_TRUE, 0, sizeof(cl_int), ptr, 0, nullptr, nullptr));
 	}
 
+private:
+	inline void _square(cl_kernel kernel, const cl_uint rindex, const size_t size)
+	{
+		_setKernelArg(kernel, 4, sizeof(cl_uint), &rindex);
+		_executeKernel(kernel, _size / 4, size / 4);
+	}
+
+public:
 	void sub_ntt4(const cl_uint rindex)
 	{
 		_setKernelArg(_sub_ntt4, 3, sizeof(cl_uint), &rindex);
 		_executeKernel(_sub_ntt4, _size / 4);
 	}
 
+public:
 	void ntt4(const cl_uint m, const cl_uint rindex)
 	{
 		_setKernelArg(_ntt4, 3, sizeof(cl_uint), &m);
@@ -491,6 +579,7 @@ public:
 		_executeKernel(_ntt4, _size / 4);
 	}
 
+public:
 	void intt4(const cl_uint m, const cl_uint rindex)
 	{
 		_setKernelArg(_intt4, 3, sizeof(cl_uint), &m);
@@ -498,33 +587,47 @@ public:
 		_executeKernel(_intt4, _size / 4);
 	}
 
-	void square2() { _executeKernel(_square2, _size / 4); }
-	void square4() { _executeKernel(_square4, _size / 4); }
+public:
+	void square8(const cl_uint rindex) { _square(_square8, rindex, 8); }
+	void square16(const cl_uint rindex) { _square(_square16, rindex, 16); }
+	void square32(const cl_uint rindex) { _square(_square32, rindex, 32); }
+	void square64(const cl_uint rindex) { _square(_square64, rindex, 64); }
+	void square128(const cl_uint rindex) { _square(_square128, rindex, 128); }
+	void square256(const cl_uint rindex) { _square(_square256, rindex, 256); }
+	void square512(const cl_uint rindex) { _square(_square512, rindex, 512); }
+	void square1024(const cl_uint rindex) { _square(_square1024, rindex, 1024); }
 
+public:
 	void poly2int0() { _executeKernel(_poly2int0, _size_blk); }
 	void poly2int1() { _executeKernel(_poly2int1, _size_blk); }
 
+public:
 	void split0() { _executeKernel(_split0, _size / 2); }
 	void split4_i() { _executeKernel(_split4_i, _size / 8); }
 
+public:
 	void split4_01(const cl_uint m)
 	{
 		_setKernelArg(_split4_01, 2, sizeof(cl_uint), &m);
 		_executeKernel(_split4_01, _size / 8);
 	}
 
+public:
 	void split4_10(const cl_uint m)
 	{
 		_setKernelArg(_split4_10, 2, sizeof(cl_uint), &m);
 		_executeKernel(_split4_10, _size / 8);
 	}
 
+public:
 	void split2() { _executeKernel(_split2, _size / 4); }
 	void split2_10() { _executeKernel(_split2_10, _size / 4); }
 
+public:
 	void split_o() { _executeKernel(_split_o, _size / 2); }
 	void split_o_10() { _executeKernel(_split_o_10, _size / 2); }
 
+public:
 	void split_f() { _executeKernel(_split_f, 1); }
 
 private:
@@ -534,6 +637,7 @@ private:
 		oclFatal(clFinish(_queue));
 	}
 
+private:
 	cl_mem _createBuffer(const cl_mem_flags flags, const size_t size) const
 	{
 		cl_int err;
@@ -542,6 +646,7 @@ private:
 		return mem;
 	}
 
+private:
 	static void _releaseBuffer(cl_mem & mem)
 	{
 		if (mem != nullptr)
@@ -551,14 +656,17 @@ private:
 		}
 	}
 
-	cl_kernel _createKernel(const char * const kernelName) const
+private:
+	cl_kernel _createKernel(const char * const kernelName)
 	{
 		cl_int err;
-		cl_kernel kern = clCreateKernel(_program, kernelName, &err);
+		cl_kernel kernel = clCreateKernel(_program, kernelName, &err);
 		oclFatal(err);
-		return kern;
+		_profileMap[kernel] = Profile(kernelName);
+		return kernel;
 	}
 
+private:
 	static void _releaseKernel(cl_kernel & kernel)
 	{
 		if (kernel != nullptr)
@@ -568,21 +676,22 @@ private:
 		}		
 	}
 
+private:
 	static void _setKernelArg(cl_kernel kernel, const cl_uint arg_index, const size_t arg_size, const void * const arg_value)
 	{
 		oclFatal(clSetKernelArg(kernel, arg_index, arg_size, arg_value));
 	}
 
-	void _executeKernel(cl_kernel kernel, const size_t globalWorkSize, const size_t localWorkSize = 0)
+private:
+	void _executeKernelN(cl_kernel kernel, const size_t globalWorkSize, const size_t localWorkSize = 0)
 	{
-		//size_t localWS = std::min(globalWorkSize, size_t(16));
-		//oclFatal(clEnqueueNDRangeKernel(_queue, kernel, 1, nullptr, &globalWorkSize, &localWS, 0, nullptr, nullptr));
 		oclFatal(clEnqueueNDRangeKernel(_queue, kernel, 1, nullptr, &globalWorkSize, (localWorkSize == 0) ? nullptr : &localWorkSize, 0, nullptr, nullptr));
 		++_syncCount;
 		//if (_syncCount >= 1024) _sync();
 	}
 
-	cl_ulong _profileKernel(cl_kernel kernel, const size_t globalWorkSize, const size_t localWorkSize = 0)
+private:
+	void _executeKernelP(cl_kernel kernel, const size_t globalWorkSize, const size_t localWorkSize = 0)
 	{
 		_sync();
 		cl_event evt;
@@ -596,7 +705,10 @@ private:
 			if ((err_s == CL_SUCCESS) && (err_e == CL_SUCCESS)) dt = end - start;
 		}
 		clReleaseEvent(evt);
-		return dt;
+
+		Profile & profile = _profileMap[kernel];
+		profile.count++;
+		profile.time += dt;
 	}
 };
 

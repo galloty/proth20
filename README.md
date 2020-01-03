@@ -12,12 +12,16 @@ proth20 is a new highly optimised GPU application, created in 2020.
 
 A **preliminary** version of proth20 is available for tests. It will evolve rapidly. Parallelization of the algorithms is completed; they are implemented on GPU.  
 It was built with gcc 8.1 on Windows but it can be built on Linux or OS X.
+An OpenCL SDK is not required. OpenCL header files are included in the project and the application is linked with the dynamic OpenCL library of the OS.
 
 ## TODO
 
-- reduce the number of kernels
+- reduce the number of kernel calls
 - optimize kernels
+- integrate OpenCL files to the binary
 - add command line arguments
+- add Robert Gerbicz error checking and add error detection to the computation of a^k
 - save & restore context
 - add BOINC interface
 - extend the limit > 1600000-digit numbers
+- add auto-tuning of kernel function parameters

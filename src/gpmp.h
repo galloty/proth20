@@ -30,6 +30,7 @@ private:
 private:
 	static constexpr int log2(const size_t n) { return (n > 1) ? 1 + log2(n >> 1) : 0; }
 
+private:
 	static constexpr uint32_t invert(const uint32_t n, const uint32_t m)
 	{
 		__int64 s0 = 1, s1 = 0, d0 = n % m, d1 = m;
@@ -50,6 +51,7 @@ private:
 		return uint32_t(s0);
 	}
 
+private:
 	static constexpr size_t transformSize(const uint32_t k, const uint32_t n)
 	{
 		// P = k.2^n + 1 = k.2^s * (2^digit_bit)^e + 1
@@ -62,7 +64,7 @@ private:
 		const size_t x_hi_size = e + (2 * (log2(k) + 1 + s) + digit_bit - 1) / digit_bit;
 
 		// Power of 2 such that size >= 2 * X_hi_size (we have to compute X^2 such that X < P)
-		size_t size = 32;
+		size_t size = 64;
 		while (size < 2 * x_hi_size) size *= 2;
 		return size;
 	}
@@ -193,6 +195,7 @@ public:
 		_device.writeMemory_err(&err);
 	}
 
+public:
 	virtual ~gpmp()
 	{
 		_device.releaseKernels();
@@ -202,10 +205,11 @@ public:
 		delete[] _x;
 	}
 
+public:
 	size_t getSize() const { return _size; }
-
 	size_t getDigits() const { return size_t(ceil(log10(_k) + _n * log10(2))); }
 
+public:
 	int getError() const
 	{
 		cl_int err = 0;
@@ -213,6 +217,7 @@ public:
 		return int(err);
 	}
 
+public:
 	// void test()
 	// {
 	// 	const size_t size = _size;
@@ -228,30 +233,41 @@ public:
 	// 	square();
 	// }
 
+public:
 	void square()
 	{
 		const size_t size = _size;
 
 		// x size is size / 2; _x[0] = R, _x[1] = Y; compute (R - Y)^2
 
+		cl_uint m = cl_uint(size / 4);
 		cl_uint rindex = 0;
+
 		_device.sub_ntt4(rindex);
-		cl_uint m = cl_uint(size / 16);
-		while (true)
+		rindex += m;
+		m /= 4;
+
+		while (m > 256)
 		{
-			rindex += 4 * m;
 			_device.ntt4(m, rindex);
-			if (m <= 4) break;
+			rindex += m;
 			m /= 4;
 		}
 
-		if (m == 4) _device.square4(); else _device.square2();
+		if (m == 256) _device.square1024(rindex);
+		else if (m == 128) _device.square512(rindex);
+		else if (m == 64) _device.square256(rindex);
+		else if (m == 32) _device.square128(rindex);
+		else if (m == 16) _device.square64(rindex);
+		else if (m == 8) _device.square32(rindex);
+		else if (m == 4) _device.square16(rindex);
+		else if (m == 2) _device.square8(rindex);
 
-		while (m <= cl_uint(size / 4))
+		while (m <= cl_uint(size / 16))
 		{
-			_device.intt4(m, rindex);
-			rindex -= 4 * m;
 			m *= 4;
+			rindex -= m;
+			_device.intt4(m, rindex);
 		}
 
 		_device.poly2int0();
@@ -266,6 +282,7 @@ public:
 		// Now x size is size / 2, _x[0] = R, _x[1] = Y such that X = R - Y and -k.2^n < R - Y < k.2^n
 	}
 
+public:
 	void mul(const uint32_t a)
 	{
 		const size_t size = _size;
@@ -289,6 +306,7 @@ public:
 		// Now x size is size / 2, _x[0] = R, _x[1] = Y such that X = R - Y and -k.2^n < R - Y < k.2^n
 	}
 
+public:
 	bool isMinusOne(uint64_t & res64)
 	{
 		const size_t size = _size;
@@ -367,6 +385,7 @@ private:
 		// x size is size / 2, _x[0] = R, _x[1] = Y
 	}
 
+private:
 	static bool _isOne(cl_uint2 * const a, const size_t size)
 	{
 		if (a[0].s[0] != 1) return false;
@@ -374,6 +393,7 @@ private:
 		return true;
 	}
 
+private:
 	static uint64_t _getRes64(cl_uint2 * const a, const size_t size)
 	{
 		uint64_t r = 0, b = 1;
@@ -385,6 +405,7 @@ private:
 		return r;
 	}
 
+private:
 	static void _mul(cl_uint2 * const a, const size_t size, const uint32_t d)
 	{
 		uint64_t l = 0;
@@ -403,6 +424,7 @@ private:
 		}
 	}
 
+private:
 	static bool _sub(cl_uint2 * const a, const size_t size)
 	{
 		int32_t carry = 0;
@@ -423,6 +445,7 @@ private:
 		return true;
 	}
 
+private:
 	static void _add(cl_uint2 * const a, const size_t size, const uint32_t k, const uint32_t n)
 	{
 		const uint32_t e = n / digit_bit, s = n % digit_bit;

@@ -48,6 +48,7 @@ private:
 		return ss.str();
 	}
 
+private:
 	static uint64_t check(const uint32_t k, const uint32_t n, ocl::Device & device, const bool bench = false)
 	{
 		std::cout << "Testing " << k << " * 2^" << n << " + 1" << std::flush;
@@ -122,6 +123,7 @@ public:
 	Application() {}
 	virtual ~Application() {}
 
+public:
 	static void run()
 	{
 		std::cout << "proth20 0.0.1" << std::endl;
@@ -149,8 +151,8 @@ public:
 		primeList.push_back(Number(1197, 343384));
 		primeList.push_back(Number(1089, 685641));
 		primeList.push_back(Number(1005, 1375758));
-		primeList.push_back(Number(1089, 2746155));
-		primeList.push_back(Number(45, 5308037));
+		primeList.push_back(Number(1089, 2746155));	// 1.10 ms
+		primeList.push_back(Number(45, 5308037));	// 2.29 ms
 
 		std::vector<Number>	compositeList;
 		compositeList.push_back(Number(9999, 299, "B073C97A2450454F"));
@@ -169,21 +171,30 @@ public:
 		engine.displayDevices();
 
 		ocl::Device device0(engine, 0);
-		//ocl::Device device1(engine, 1);
+
+		// test Intel GPU
+		// ocl::Device device1(engine, 1);
+		// check(1199, 2755, device1);
+
+		// profile
+		// gpmp X(45, 5308037, device0);
+		// X.square();
+		// device0.displayProfiles();
 
 		// bench
-		//for (const auto & p : primeList) check(p.k, p.n, device0, true);
+		for (const auto & p : primeList) check(p.k, p.n, device0, true);
 
-		//check(1199, 2755, device1);
-
+		// check residues
 		for (const auto & c : compositeList)
 		{
 			const std::string res64 = resString(check(c.k, c.n, device0));
 			if (res64 != c.res64) std::cout << "Error: " << res64 << " != " << c.res64 << std::endl;
 		}
 
+		// test primes
 		for (const auto & p : primeList) check(p.k, p.n, device0);
 
+		// too large
 		check(3, 5505020, device0);
 	}
 };

@@ -11,48 +11,39 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #include <sstream>
 #include <iomanip>
 
-#if defined (_WIN32) // use Performance Counter
-
+#if defined (_WIN32)	// use Performance Counter
 #include <Windows.h>
+#else					// otherwise use gettimeofday() instead
+#include <sys/time.h>
+#endif
 
-class Timer
+struct Timer
 {
-public:
+#if defined (_WIN32)
 	typedef LARGE_INTEGER Time;
+#else
+	typedef timeval Time;
+#endif
 
 	static Time currentTime()
 	{
+#if defined (_WIN32)
 		LARGE_INTEGER time; QueryPerformanceCounter(&time);
+#else
+		timeval time; gettimeofday(&time, nullptr);
+#endif
 		return time;
 	}
 
 	static double diffTime(const Time & end, const Time & start)
 	{
+#if defined (_WIN32)
 		LARGE_INTEGER freq; QueryPerformanceFrequency(&freq);
 		return double(end.QuadPart - start.QuadPart) / double(freq.QuadPart);
-	}
-
-#else // Otherwise use gettimeofday() instead
-
-#include <sys/time.h>
-
-class Timer
-{
-public:
-	typedef timeval Time;
-
-	static Time currentTime()
-	{
-		timeval time; gettimeofday(&time, nullptr);
-		return time;
-	}
-
-	static double diffTime(const Time & end, const Time & start)
-	{
+#else
 		return double(end.tv_sec - start.tv_sec) + double(end.tv_usec - start.tv_usec) * 1e-6;
-	}
-
 #endif
+	}
 
 	static std::string formatTime(const double time)
 	{
