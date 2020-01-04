@@ -195,8 +195,9 @@ private:
 	cl_context _context = nullptr;
 	cl_command_queue _queue = nullptr;
 	cl_program _program = nullptr;
-	size_t _size = 0, _size_blk = 0;
+	size_t _size = 0, _constant_size = 0, _size_blk = 0;
 	cl_mem _x = nullptr, _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr = nullptr, _bp = nullptr, _ibp = nullptr, _err = nullptr;
+	cl_mem _cr1ir1 = nullptr, _cr2ir2 = nullptr;
 	cl_kernel _sub_ntt4 = nullptr, _ntt4 = nullptr, _intt4 = nullptr;
 	cl_kernel _square8 = nullptr, _square16 = nullptr, _square32 = nullptr, _square64 = nullptr;
 	cl_kernel _square128 = nullptr, _square256 = nullptr,_square512 = nullptr, _square1024 = nullptr;
@@ -306,6 +307,11 @@ public:
 				clGetProgramBuildInfo(_program, _device, CL_PROGRAM_BUILD_LOG, logSize, buildLog, nullptr);
 				buildLog[logSize] = '\0';
 				std::cerr << buildLog << std::endl;
+#if ocl_debug
+				std::ofstream fileOut("pgm.log"); 
+				fileOut << buildLog << std::endl;
+				fileOut.close();
+#endif
 				delete[] buildLog;
 			}
 		}
@@ -316,8 +322,8 @@ public:
 		size_t binSize; clGetProgramInfo(_program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binSize, nullptr);
 		char * binary = new char[binSize];
 		clGetProgramInfo(_program, CL_PROGRAM_BINARIES, sizeof(char *), &binary, nullptr);
-		std::ofstream fileOut("pgm.txt", std::ios_base::binary); 
-		fileOut.write(binary, binSize); 
+		std::ofstream fileOut("pgm.txt", std::ios_base::binary);
+		fileOut.write(binary, binSize);
 		fileOut.close();
 		delete[] binary;
 #endif	
@@ -334,7 +340,7 @@ public:
 	}
 
 public:
-	void allocMemory(const size_t size)
+	void allocMemory(const size_t size, const size_t constant_size)
 	{
 #if ocl_debug
 		std::cerr << "Alloc gpu memory." << std::endl;
@@ -348,6 +354,10 @@ public:
 		_bp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint) * size / 2);
 		_ibp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint) * size / 2);
 		_err = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_int));
+
+		_constant_size = constant_size;
+		_cr1ir1 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * constant_size);
+		_cr2ir2 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * constant_size);
 	}
 
 public:
@@ -368,6 +378,13 @@ public:
 			_releaseBuffer(_err);
 			_size = 0;
 		}
+
+		if (_constant_size != 0)
+		{
+			_releaseBuffer(_cr1ir1);
+			_releaseBuffer(_cr2ir2);
+			_constant_size = 0;
+		}
 	}
 
 private:
@@ -375,9 +392,8 @@ private:
 	{
 		cl_kernel kernel = _createKernel(kernelName);
 		_setKernelArg(kernel, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(kernel, 1, sizeof(cl_mem), &_r1ir1);
-		_setKernelArg(kernel, 2, sizeof(cl_mem), &_r2);
-		_setKernelArg(kernel, 3, sizeof(cl_mem), &_ir2);
+		_setKernelArg(kernel, 1, sizeof(cl_mem), &_cr1ir1);
+		_setKernelArg(kernel, 2, sizeof(cl_mem), &_cr2ir2);
 		return kernel;
 	}
 
@@ -536,6 +552,14 @@ public:
 	}
 
 public:
+	void writeMemory_cr(const cl_uint4 * const ptr_cr1ir1, const cl_uint4 * const ptr_cr2ir2)
+	{
+		_sync();
+		oclFatal(clEnqueueWriteBuffer(_queue, _cr1ir1, CL_TRUE, 0, sizeof(cl_uint4) * _constant_size, ptr_cr1ir1, 0, nullptr, nullptr));
+		oclFatal(clEnqueueWriteBuffer(_queue, _cr2ir2, CL_TRUE, 0, sizeof(cl_uint4) * _constant_size, ptr_cr2ir2, 0, nullptr, nullptr));
+	}
+
+public:
 	void writeMemory_bp(const cl_uint * const ptr_bp, const cl_uint * const ptr_ibp)
 	{
 		_sync();
@@ -555,13 +579,6 @@ public:
 	{
 		_sync();
 		oclFatal(clEnqueueWriteBuffer(_queue, _err, CL_TRUE, 0, sizeof(cl_int), ptr, 0, nullptr, nullptr));
-	}
-
-private:
-	inline void _square(cl_kernel kernel, const cl_uint rindex, const size_t size)
-	{
-		_setKernelArg(kernel, 4, sizeof(cl_uint), &rindex);
-		_executeKernel(kernel, _size / 4, size / 4);
 	}
 
 public:
@@ -588,14 +605,14 @@ public:
 	}
 
 public:
-	void square8(const cl_uint rindex) { _square(_square8, rindex, 8); }
-	void square16(const cl_uint rindex) { _square(_square16, rindex, 16); }
-	void square32(const cl_uint rindex) { _square(_square32, rindex, 32); }
-	void square64(const cl_uint rindex) { _square(_square64, rindex, 64); }
-	void square128(const cl_uint rindex) { _square(_square128, rindex, 128); }
-	void square256(const cl_uint rindex) { _square(_square256, rindex, 256); }
-	void square512(const cl_uint rindex) { _square(_square512, rindex, 512); }
-	void square1024(const cl_uint rindex) { _square(_square1024, rindex, 1024); }
+	void square8() { _executeKernel(_square8, _size / 4, 8 / 4); }
+	void square16() { _executeKernel(_square16, _size / 4, 16 / 4); }
+	void square32() { _executeKernel(_square32, _size / 4, 32 / 4); }
+	void square64() { _executeKernel(_square64, _size / 4, 64 / 4); }
+	void square128() { _executeKernel(_square128, _size / 4, 128 / 4); }
+	void square256() { _executeKernel(_square256, _size / 4, 256 / 4); }
+	void square512() { _executeKernel(_square512, _size / 4, 512 / 4); }
+	void square1024() { _executeKernel(_square1024, _size / 4, 1024 / 4); }
 
 public:
 	void poly2int0() { _executeKernel(_poly2int0, _size_blk); }

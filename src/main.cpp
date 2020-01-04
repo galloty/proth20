@@ -151,8 +151,8 @@ public:
 		primeList.push_back(Number(1197, 343384));
 		primeList.push_back(Number(1089, 685641));
 		primeList.push_back(Number(1005, 1375758));
-		primeList.push_back(Number(1089, 2746155));	// 1.10 ms
-		primeList.push_back(Number(45, 5308037));	// 2.29 ms
+		primeList.push_back(Number(1089, 2746155));	// 1.14 ms
+		primeList.push_back(Number(45, 5308037));	// 2.34 ms
 
 		std::vector<Number>	compositeList;
 		compositeList.push_back(Number(9999, 299, "B073C97A2450454F"));

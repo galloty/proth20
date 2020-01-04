@@ -128,6 +128,8 @@ public:
 		_size(transformSize(k, n)), _k(k), _n(n), _sign(false), _device(device), _x(new cl_uint2[_size])
 	{
 		const size_t size = _size;
+		const size_t constant_max_m = 256;
+		const size_t constant_size = 256 + 64 + 16 + 4;
 
 		if (size / 2 * double(digit_mask) * digit_mask >= P1P2 / 2)
 		{
@@ -141,7 +143,7 @@ public:
 		clFile.close();
 		_device.loadProgram(src.str().c_str());
 
-		_device.allocMemory(size);
+		_device.allocMemory(size, constant_size);
 		cl_uint2 norm; norm.s[0] = cl_uint(P1 - (P1 - 1) / size); norm.s[1] = cl_uint(P2 - (P2 - 1) / size);
 		cl_uint blk = 16;
 		const cl_int k_shift = cl_int(log2(k) - 1);
@@ -156,25 +158,39 @@ public:
 		cl_uint4 * const r1ir1 = new cl_uint4[size];
 		cl_uint2 * const r2 = new cl_uint2[size];
 		cl_uint2 * const ir2 = new cl_uint2[size];
+		cl_uint4 * const cr1ir1 = new cl_uint4[constant_size];
+		cl_uint4 * const cr2ir2 = new cl_uint4[constant_size];
 		RNS ps = RNS::prRoot(size), ips = ps.invert();
 		size_t j = 0;
-		for (size_t m = size; m != 0; m /= 4)
+		for (size_t m = size / 4; m > 1; m /= 4)
 		{
 			RNS r1 = RNS(1, 1), ir1 = RNS(1, 1);
-			for (size_t i = 0; i < m / 4; ++i)
+			const size_t o = (m < 8) ? 0 : 2 * (m / 2 - 1) / 3;
+
+			for (size_t i = 0; i < m; ++i)
 			{
 				r1ir1[j] = { r1.get1(), r1.get2(), ir1.get1(), ir1.get2() };
 				const RNS r1sq = r1 * r1, ir1sq = ir1 * ir1;
 				r2[j] = { r1sq.get1(), r1sq.get2() }; ir2[j] = { ir1sq.get1(), ir1sq.get2() };
 				++j;
+
+				if (m <= constant_max_m)
+				{
+					cr1ir1[o + i] = { r1.get1(), r1.get2(), ir1.get1(), ir1.get2() };
+					cr2ir2[o + i] = { r1sq.get1(), r1sq.get2(), ir1sq.get1(), ir1sq.get2() };
+				}
+
 				r1 *= ps; ir1 *= ips;
 			}
 			ps *= ps; ps *= ps; ips *= ips; ips *= ips;
 		}
 		_device.writeMemory_r(r1ir1, r2, ir2);
+		_device.writeMemory_cr(cr1ir1, cr2ir2);
 		delete[] r1ir1;
 		delete[] r2;
 		delete[] ir2;
+		delete[] cr1ir1;
+		delete[] cr2ir2;
 
 		cl_uint * const bp = new cl_uint[size / 2];
 		cl_uint * const ibp = new uint32_t[size / 2];
@@ -254,14 +270,14 @@ public:
 			m /= 4;
 		}
 
-		if (m == 256) _device.square1024(rindex);
-		else if (m == 128) _device.square512(rindex);
-		else if (m == 64) _device.square256(rindex);
-		else if (m == 32) _device.square128(rindex);
-		else if (m == 16) _device.square64(rindex);
-		else if (m == 8) _device.square32(rindex);
-		else if (m == 4) _device.square16(rindex);
-		else if (m == 2) _device.square8(rindex);
+		if (m == 256) _device.square1024();
+		else if (m == 128) _device.square512();
+		else if (m == 64) _device.square256();
+		else if (m == 32) _device.square128();
+		else if (m == 16) _device.square64();
+		else if (m == 8) _device.square32();
+		else if (m == 4) _device.square16();
+		else if (m == 2) _device.square8();
 
 		while (m <= cl_uint(size / 16))
 		{
