@@ -151,8 +151,8 @@ public:
 		primeList.push_back(Number(1197, 343384));
 		primeList.push_back(Number(1089, 685641));
 		primeList.push_back(Number(1005, 1375758));
-		primeList.push_back(Number(1089, 2746155));	// 1.14 ms
-		primeList.push_back(Number(45, 5308037));	// 2.34 ms
+		primeList.push_back(Number(1089, 2746155));	// 0.934 (add chunk to squarexxx)
+		primeList.push_back(Number(45, 5308037));	// 1.65 ms
 
 		std::vector<Number>	compositeList;
 		compositeList.push_back(Number(9999, 299, "B073C97A2450454F"));
@@ -179,7 +179,22 @@ public:
 		// profile
 		// gpmp X(45, 5308037, device0);
 		// X.square();
+		// std::cout << "Size = " << X.getSize() << std::endl;
 		// device0.displayProfiles();
+
+		// Size = 524288
+		// - sub_ntt64: 1, 7.44 %, 142336 (142336)
+		// - ntt64: 1, 7.65 %, 146432 (146432)
+		// - intt64: 2, 15.3 %, 293824 (146912)
+		// - square128: 1, 15 %, 286400 (286400)
+		// - poly2int0: 1, 15.7 %, 300256 (300256)
+		// - poly2int1: 1, 3.23 %, 61888 (61888)
+		// - split0: 1, 3.44 %, 65856 (65856)
+		// - split4_i: 1, 6.2 %, 118752 (118752)
+		// - split4_01: 4, 9.99 %, 191328 (47832)
+		// - split4_10: 4, 11.1 %, 211616 (52904)
+		// - split_o_10: 1, 4.83 %, 92544 (92544)
+		// - split_f: 1, 0.16 %, 3072 (3072)
 
 		// bench
 		for (const auto & p : primeList) check(p.k, p.n, device0, true);

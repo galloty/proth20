@@ -64,7 +64,7 @@ private:
 		const size_t x_hi_size = e + (2 * (log2(k) + 1 + s) + digit_bit - 1) / digit_bit;
 
 		// Power of 2 such that size >= 2 * X_hi_size (we have to compute X^2 such that X < P)
-		size_t size = 64;
+		size_t size = 2048;
 		while (size < 2 * x_hi_size) size *= 2;
 		return size;
 	}
@@ -129,7 +129,7 @@ public:
 	{
 		const size_t size = _size;
 		const size_t constant_max_m = 256;
-		const size_t constant_size = 256 + 64 + 16 + 4;
+		const size_t constant_size = 256 + 64 + 16 + 4;	// 340 * 2 * sizeof(cl_uint4) = 10880 bytes
 
 		if (size / 2 * double(digit_mask) * digit_mask >= P1P2 / 2)
 		{
@@ -256,18 +256,17 @@ public:
 
 		// x size is size / 2; _x[0] = R, _x[1] = Y; compute (R - Y)^2
 
-		cl_uint m = cl_uint(size / 4);
-		cl_uint rindex = 0;
+		_device.sub_ntt64();
 
-		_device.sub_ntt4(rindex);
-		rindex += m;
-		m /= 4;
+		cl_uint m = cl_uint(size / 4);
+		cl_uint rindex = m + m / 4 + m / 16;
+		m /= 64;
 
 		while (m > 256)
 		{
-			_device.ntt4(m, rindex);
-			rindex += m;
-			m /= 4;
+			_device.ntt64(m, rindex);
+			rindex += m + m / 4 + m / 16;
+			m /= 64;
 		}
 
 		if (m == 256) _device.square1024();
@@ -275,15 +274,13 @@ public:
 		else if (m == 64) _device.square256();
 		else if (m == 32) _device.square128();
 		else if (m == 16) _device.square64();
-		else if (m == 8) _device.square32();
-		else if (m == 4) _device.square16();
-		else if (m == 2) _device.square8();
+		else /*if (m == 8)*/ _device.square32();
 
 		while (m <= cl_uint(size / 16))
 		{
-			m *= 4;
-			rindex -= m;
-			_device.intt4(m, rindex);
+			m *= 64;
+			rindex -= m + m / 4 + m / 16;
+			_device.intt64(m, rindex);
 		}
 
 		_device.poly2int0();

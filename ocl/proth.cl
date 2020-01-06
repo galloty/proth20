@@ -5,6 +5,10 @@ proth20 is free source code, under the MIT license (see LICENSE). You can redist
 Please give feedback to the authors if improvement is realized. It is distributed in the hope that it will be useful.
 */
 
+// __global is faster than __constant on NVIDIA GPU
+//#define __constmem	__constant
+#define __constmem	__global
+
 #define	digit_bit		21
 #define digit_mask		((1u << digit_bit) - 1)
 
@@ -87,54 +91,14 @@ inline uint2 sqrmod(const uint2 lhs) { return mulmod(lhs, lhs); }
 
 inline uint2 mulI(const uint2 lhs) { return mulmod(lhs, (uint2)(P1_I, P2_I)); }
 
-__kernel
-void sub_ntt4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint rindex)
+inline void _sub_forward4i(const size_t ml, __local uint2 * restrict const X, const size_t mg, __global const uint2 * restrict const x, const uint2 r2, const uint4 r1ir1)
 {
-	const size_t n_4 = get_global_size(0), k = get_global_id(0);
-
-	const size_t i = k;
-
-	const uint4 r1ir1_i = r1ir1[rindex + i];
-	const uint2 r2_i = r2[rindex + i];
-
-	const uint2 abi = x[i + 0 * n_4], abim = x[i + 1 * n_4];
+	const uint2 abi = x[0 * mg], abim = x[1 * mg];
 	const uint2 abi0 = (uint2)(abi.s0, abi.s0), abi1 = (uint2)(abi.s1, abi.s1);
 	const uint2 abim0 = (uint2)(abim.s0, abim.s0), abim1 = (uint2)(abim.s1, abim.s1);
 	const uint2 u0 = submod(abi0, abi1), u1 = submod(abim0, abim1), u3 = mulI(u1);
-	x[i + 0 * n_4] = addmod(u0, u1); x[i + 1 * n_4] = mulmod(submod(u0, u1), r2_i);
-	x[i + 2 * n_4] = mulmod(submod(u0, u3), r1ir1_i.s23); x[i + 3 * n_4] = mulmod(addmod(u0, u3), r1ir1_i.s01);
-}
-
-__kernel
-void ntt4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
-{
-	const size_t n_4 = get_global_size(0), k = get_global_id(0);
-
-	const size_t i = k & (m - 1), j = 4 * k - 3 * i;
-
-	const uint2 r2_i = r2[rindex + i];
-	const uint4 r1ir1_i = r1ir1[rindex + i];
-
-	const uint2 u0 = x[j + 0 * m], u2 = x[j + 2 * m], u1 = x[j + 1 * m], u3 = x[j + 3 * m];
-	const uint2 v0 = addmod(u0, u2), v2 = submod(u0, u2), v1 = addmod(u1, u3), v3 = mulI(submod(u3, u1));
-	x[j + 0 * m] = addmod(v0, v1); x[j + 1 * m] = mulmod(submod(v0, v1), r2_i);
-	x[j + 2 * m] = mulmod(addmod(v2, v3), r1ir1_i.s23); x[j + 3 * m] = mulmod(submod(v2, v3), r1ir1_i.s01);
-}
-
-__kernel
-void intt4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2, const uint m, const uint rindex)
-{
-	const size_t n_4 = get_global_size(0), k = get_global_id(0);
-
-	const size_t i = k & (m - 1), j = 4 * k - 3 * i;
-
-	const uint2 ir2_i = ir2[rindex + i];
-	const uint4 r1ir1_i = r1ir1[rindex + i];
-
-	const uint2 v0 = x[j + 0 * m], v1 = mulmod(x[j + 1 * m], ir2_i), v2 = mulmod(x[j + 2 * m], r1ir1_i.s01), v3 = mulmod(x[j + 3 * m], r1ir1_i.s23);
-	const uint2 u0 = addmod(v0, v1), u2 = addmod(v2, v3), u1 = submod(v0, v1), u3 = mulI(submod(v2, v3));
-	x[j + 0 * m] = addmod(u0, u2); x[j + 2 * m] = submod(u0, u2);
-	x[j + 1 * m] = addmod(u1, u3); x[j + 3 * m] = submod(u1, u3);
+	X[0 * ml] = addmod(u0, u1); X[1 * ml] = mulmod(submod(u0, u1), r2);
+	X[2 * ml] = mulmod(submod(u0, u3), r1ir1.s23); X[3 * ml] = mulmod(addmod(u0, u3), r1ir1.s01);
 }
 
 inline void _forward4i(const size_t ml, __local uint2 * restrict const X, const size_t mg, __global const uint2 * restrict const x, const uint2 r2, const uint4 r1ir1)
@@ -155,14 +119,30 @@ inline void _forward4(const size_t m, __local uint2 * restrict const X, const ui
 	X[2 * m] = mulmod(addmod(v2, v3), r1ir1.s23); X[3 * m] = mulmod(submod(v2, v3), r1ir1.s01);
 }
 
+inline void _forward4o(const size_t mg, __global uint2 * restrict const x, const size_t ml, __local const uint2 * restrict const X, const uint2 r2, const uint4 r1ir1)
+{
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	const uint2 u0 = X[0 * ml], u2 = X[2 * ml], u1 = X[1 * ml], u3 = X[3 * ml];
+	const uint2 v0 = addmod(u0, u2), v2 = submod(u0, u2), v1 = addmod(u1, u3), v3 = mulI(submod(u3, u1));
+	x[0 * mg] = addmod(v0, v1); x[1 * mg] = mulmod(submod(v0, v1), r2);
+	x[2 * mg] = mulmod(addmod(v2, v3), r1ir1.s23); x[3 * mg] = mulmod(submod(v2, v3), r1ir1.s01);
+}
+
+inline void _backward4i(const size_t ml, __local uint2 * restrict const X, const size_t mg, __global const uint2 * restrict const x, const uint2 ir2, const uint4 r1ir1)
+{
+	const uint2 v0 = x[0 * mg], v1 = mulmod(x[1 * mg], ir2), v2 = mulmod(x[2 * mg], r1ir1.s01), v3 = mulmod(x[3 * mg], r1ir1.s23);
+	const uint2 u0 = addmod(v0, v1), u2 = addmod(v2, v3), u1 = submod(v0, v1), u3 = mulI(submod(v2, v3));
+	X[0 * ml] = addmod(u0, u2); X[2 * ml] = submod(u0, u2); X[1 * ml] = addmod(u1, u3); X[3 * ml] = submod(u1, u3);
+}
+
 inline void _backward4(const size_t m, __local uint2 * restrict const X, const uint2 ir2, const uint4 r1ir1)
 {
 	barrier(CLK_LOCAL_MEM_FENCE);
 
 	const uint2 v0 = X[0 * m], v1 = mulmod(X[1 * m], ir2), v2 = mulmod(X[2 * m], r1ir1.s01), v3 = mulmod(X[3 * m], r1ir1.s23);
 	const uint2 u0 = addmod(v0, v1), u2 = addmod(v2, v3), u1 = submod(v0, v1), u3 = mulI(submod(v2, v3));
-	X[0 * m] = addmod(u0, u2); X[2 * m] = submod(u0, u2);
-	X[1 * m] = addmod(u1, u3); X[3 * m] = submod(u1, u3);
+	X[0 * m] = addmod(u0, u2); X[2 * m] = submod(u0, u2); X[1 * m] = addmod(u1, u3); X[3 * m] = submod(u1, u3);
 }
 
 inline void _backward4o(const size_t mg, __global uint2 * restrict const x, const size_t ml, __local const uint2 * restrict const X, const uint2 ir2, const uint4 r1ir1)
@@ -171,8 +151,7 @@ inline void _backward4o(const size_t mg, __global uint2 * restrict const x, cons
 
 	const uint2 v0 = X[0 * ml], v1 = mulmod(X[1 * ml], ir2), v2 = mulmod(X[2 * ml], r1ir1.s01), v3 = mulmod(X[3 * ml], r1ir1.s23);
 	const uint2 u0 = addmod(v0, v1), u2 = addmod(v2, v3), u1 = submod(v0, v1), u3 = mulI(submod(v2, v3));
-	x[0 * mg] = addmod(u0, u2); x[2 * mg] = submod(u0, u2);
-	x[1 * mg] = addmod(u1, u3); x[3 * mg] = submod(u1, u3);
+	x[0 * mg] = addmod(u0, u2); x[2 * mg] = submod(u0, u2); x[1 * mg] = addmod(u1, u3); x[3 * mg] = submod(u1, u3);
 }
 
 inline void _square2(__local uint2 * restrict const X)
@@ -197,32 +176,133 @@ inline void _square4(__local uint2 * restrict const X)
 	X[0] = addmod(t0, t2); X[2] = submod(t0, t2); X[1] = addmod(t1, t3); X[3] = submod(t1, t3);
 }
 
-__kernel __attribute__((reqd_work_group_size(8 / 4, 1, 1)))
-void square8(__global uint2 * restrict const x, __constant const uint4 * restrict const r1ir1, __constant const uint4 * restrict const r2ir2)
+#define CHUNK64		16
+
+__kernel  __attribute__((reqd_work_group_size(64 / 4 * CHUNK64, 1, 1)))
+void sub_ntt64(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2)
 {
-	__local uint2 X[8];
+	__local uint2 X[64 * CHUNK64];
 
-	const size_t i = get_local_id(0), k = get_group_id(0) * 8 + i;
+	const size_t m = get_global_size(0) / 16;
 
-	_forward4i(2, &X[i], 2, &x[k], r2ir2[i].s01, r1ir1[i]);
-	_square2(&X[4 * i]);
-	_backward4o(2, &x[k], 2, &X[i], r2ir2[i].s23, r1ir1[i]);
+	const size_t local_id = get_local_id(0), chunk_idx = local_id % CHUNK64, threadIdx = local_id / CHUNK64, block_idx = get_group_id(0) * CHUNK64;	// threadIdx < 64 / 4
+
+	const size_t bl_i = block_idx | chunk_idx;
+
+	const size_t _i_16m = threadIdx;											// [+ 16, 32, 48] 0, 1, 2, 3, 4, ..., 15
+	const size_t _i_4m = ((4 * threadIdx) & ~(4 * 4 - 1)) | (threadIdx % 4);	// [+ 4, 8, 12] 0, 1, 2, 3, 16, 17, ...
+	const size_t _i_m = 4 * threadIdx;											// [+ 1, 2, 3] 0, 4, 8, 12, ...
+
+	const size_t i_16m = _i_16m * CHUNK64 | chunk_idx;
+	const size_t i_4m = _i_4m * CHUNK64 | chunk_idx;
+	const size_t i_m = _i_m * CHUNK64 | chunk_idx;
+
+	const size_t k_16m = _i_16m * m | bl_i;
+	const size_t k_4m = _i_4m * m | bl_i;
+	const size_t k_m = _i_m * m | bl_i;
+
+	const size_t j_16m = k_16m;	// & (16 * m - 1); We have _i_16m < 16 and bl_i < m
+	const size_t j_4m = k_4m & (4 * m - 1);
+	const size_t j_m = bl_i;	// k_m & (m - 1); We have bl_i < m
+
+	_sub_forward4i(16 * CHUNK64, &X[i_16m], 16 * m, &x[k_16m], r2[j_16m], r1ir1[j_16m]);
+	_forward4(4 * CHUNK64, &X[i_4m], r2[16 * m + j_4m], r1ir1[16 * m + j_4m]);
+	_forward4o(m, &x[k_m], CHUNK64, &X[i_m], r2[16 * m + 4 * m + j_m], r1ir1[16 * m + 4 * m + j_m]);
 }
 
-__kernel __attribute__((reqd_work_group_size(16 / 4, 1, 1)))
-void square16(__global uint2 * restrict const x, __constant const uint4 * restrict const r1ir1, __constant const uint4 * restrict const r2ir2)
+__kernel  __attribute__((reqd_work_group_size(64 / 4 * CHUNK64, 1, 1)))
+void ntt64(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
 {
-	__local uint2 X[16];
+	__local uint2 X[64 * CHUNK64];
 
-	const size_t i = get_local_id(0), k = get_group_id(0) * 16 + i;
+	const size_t local_id = get_local_id(0), chunk_idx = local_id % CHUNK64, threadIdx = local_id / CHUNK64, block_idx = get_group_id(0) * CHUNK64;	// threadIdx < 64 / 4
 
-	_forward4i(4, &X[i], 4, &x[k], r2ir2[i].s01, r1ir1[i]);
-	_square4(&X[4 * i]);
-	_backward4o(4, &x[k], 4, &X[i], r2ir2[i].s23, r1ir1[i]);
+	__global uint2 * restrict const xo = &x[64 * (block_idx & ~(m - 1))];		// m-block offset
+	const size_t bl_i = (block_idx & (m - 1)) | chunk_idx;
+
+	const size_t _i_16m = threadIdx;											// [+ 16, 32, 48] 0, 1, 2, 3, 4, ..., 15
+	const size_t _i_4m = ((4 * threadIdx) & ~(4 * 4 - 1)) | (threadIdx % 4);	// [+ 4, 8, 12] 0, 1, 2, 3, 16, 17, ...
+	const size_t _i_m = 4 * threadIdx;											// [+ 1, 2, 3] 0, 4, 8, 12, ...
+
+	const size_t i_16m = _i_16m * CHUNK64 | chunk_idx;
+	const size_t i_4m = _i_4m * CHUNK64 | chunk_idx;
+	const size_t i_m = _i_m * CHUNK64 | chunk_idx;
+
+	const size_t k_16m = _i_16m * m | bl_i;
+	const size_t k_4m = _i_4m * m | bl_i;
+	const size_t k_m = _i_m * m | bl_i;
+
+	const size_t j_16m = k_16m;	// & (16 * m - 1); We have _i_16m < 16 and bl_i < m
+	const size_t j_4m = k_4m & (4 * m - 1);
+	const size_t j_m = bl_i;	// k_m & (m - 1); We have bl_i < m
+
+	_forward4i(16 * CHUNK64, &X[i_16m], 16 * m, &xo[k_16m], r2[rindex + j_16m], r1ir1[rindex + j_16m]);
+	_forward4(4 * CHUNK64, &X[i_4m], r2[rindex + 16 * m + j_4m], r1ir1[rindex + 16 * m + j_4m]);
+	_forward4o(m, &xo[k_m], CHUNK64, &X[i_m], r2[rindex + 16 * m + 4 * m + j_m], r1ir1[rindex + 16 * m + 4 * m + j_m]);
+}
+
+__kernel  __attribute__((reqd_work_group_size(64 / 4 * CHUNK64, 1, 1)))
+void intt64(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2, const uint m, const uint rindex)
+{
+	__local uint2 X[64 * CHUNK64];
+
+	const size_t local_id = get_local_id(0), chunk_idx = local_id % CHUNK64, threadIdx = local_id / CHUNK64, block_idx = get_group_id(0) * CHUNK64;	// threadIdx < 64 / 4
+
+	__global uint2 * restrict const xo = &x[64 * (block_idx & ~(m - 1))];		// m-block offset
+	const size_t bl_i = (block_idx & (m - 1)) | chunk_idx;
+
+	const size_t _i_16m = threadIdx;											// [+ 16, 32, 48] 0, 1, 2, 3, 4, ..., 15
+	const size_t _i_4m = ((4 * threadIdx) & ~(4 * 4 - 1)) | (threadIdx % 4);	// [+ 4, 8, 12] 0, 1, 2, 3, 16, 17, ...
+	const size_t _i_m = 4 * threadIdx;											// [+ 1, 2, 3] 0, 4, 8, 12, ...
+
+	const size_t i_16m = _i_16m * CHUNK64 | chunk_idx;
+	const size_t i_4m = _i_4m * CHUNK64 | chunk_idx;
+	const size_t i_m = _i_m * CHUNK64 | chunk_idx;
+
+	const size_t k_16m = _i_16m * m | bl_i;
+	const size_t k_4m = _i_4m * m | bl_i;
+	const size_t k_m = _i_m * m | bl_i;
+
+	const size_t j_16m = k_16m;	// & (16 * m - 1); We have _i_16m < 16 and bl_i < m
+	const size_t j_4m = k_4m & (4 * m - 1);
+	const size_t j_m = bl_i;	// k_m & (m - 1); We have bl_i < m
+
+	_backward4i(CHUNK64, &X[i_m], m, &xo[k_m], ir2[rindex + 16 * m + 4 * m + j_m], r1ir1[rindex + 16 * m + 4 * m + j_m]);
+	_backward4(4 * CHUNK64, &X[i_4m], ir2[rindex + 16 * m + j_4m], r1ir1[rindex + 16 * m + j_4m]);
+	_backward4o(16 * m, &xo[k_16m], 16 * CHUNK64, &X[i_16m], ir2[rindex + j_16m], r1ir1[rindex + j_16m]);
+}
+
+#define CHUNK16		16
+
+__kernel  __attribute__((reqd_work_group_size(16 / 4 * CHUNK16, 1, 1)))
+void ntt16(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const int lm, const uint rindex)
+{
+	__local uint2 X[16 * CHUNK16];
+
+	const size_t m = (size_t)(1)<< lm;
+
+	const size_t local_id = get_local_id(0), chunk_idx = local_id % CHUNK16, chunkIdx = local_id / CHUNK16;
+	const size_t local_chunk_idx = chunkIdx % (16 / 4);
+	const size_t group_id = get_group_id(0), group_offset = ((group_id * CHUNK16) & (m - 1)) + ((((group_id * CHUNK16) >> lm) * 16) << lm);
+
+	const size_t _i_4m = local_chunk_idx;		// 0, m, 2m, 3m
+	const size_t _i_m = local_chunk_idx * 4;	// 0, 4m, 8m, 12m
+
+	const size_t k_4m = (_i_4m << lm) + group_offset + chunk_idx;
+	const size_t k_m = (_i_m << lm) + group_offset + chunk_idx;
+
+	const size_t i_4m = _i_4m * CHUNK16 + chunk_idx;
+	const size_t i_m = _i_m * CHUNK16 + chunk_idx;
+
+	const size_t j_4m = k_4m & (4 * m - 1);
+	const size_t j_m = k_m & (m - 1);
+
+	_forward4i(4 * CHUNK16, &X[i_4m], 4 * m, &x[k_4m], r2[rindex + j_4m], r1ir1[rindex + j_4m]);
+	_forward4o(m, &x[k_m], CHUNK16, &X[i_m], r2[rindex + 4 * m + j_m], r1ir1[rindex + 4 * m + j_m]);
 }
 
 __kernel __attribute__((reqd_work_group_size(32 / 4, 1, 1)))
-void square32(__global uint2 * restrict const x, __constant const uint4 * restrict const r1ir1, __constant const uint4 * restrict const r2ir2)
+void square32(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)
 {
 	__local uint2 X[32];
 
@@ -237,7 +317,7 @@ void square32(__global uint2 * restrict const x, __constant const uint4 * restri
 }
 
 __kernel __attribute__((reqd_work_group_size(64 / 4, 1, 1)))
-void square64(__global uint2 * restrict const x, __constant const uint4 * restrict const r1ir1, __constant const uint4 * restrict const r2ir2)
+void square64(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)
 {
 	__local uint2 X[64];
 
@@ -252,7 +332,7 @@ void square64(__global uint2 * restrict const x, __constant const uint4 * restri
 }
 
 __kernel __attribute__((reqd_work_group_size(128 / 4, 1, 1)))
-void square128(__global uint2 * restrict const x, __constant const uint4 * restrict const r1ir1, __constant const uint4 * restrict const r2ir2)
+void square128(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)
 {
 	__local uint2 X[128];
 
@@ -270,7 +350,7 @@ void square128(__global uint2 * restrict const x, __constant const uint4 * restr
 }
 
 __kernel __attribute__((reqd_work_group_size(256 / 4, 1, 1)))
-void square256(__global uint2 * restrict const x, __constant const uint4 * restrict const r1ir1, __constant const uint4 * restrict const r2ir2)
+void square256(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)
 {
 	__local uint2 X[256];
 
@@ -288,7 +368,7 @@ void square256(__global uint2 * restrict const x, __constant const uint4 * restr
 }
 
 __kernel __attribute__((reqd_work_group_size(512 / 4, 1, 1)))
-void square512(__global uint2 * restrict const x, __constant const uint4 * restrict const r1ir1, __constant const uint4 * restrict const r2ir2)
+void square512(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)
 {
 	__local uint2 X[512];
 
@@ -309,7 +389,7 @@ void square512(__global uint2 * restrict const x, __constant const uint4 * restr
 }
 
 __kernel __attribute__((reqd_work_group_size(1024 / 4, 1, 1)))
-void square1024(__global uint2 * restrict const x, __constant const uint4 * restrict const r1ir1, __constant const uint4 * restrict const r2ir2)
+void square1024(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)
 {
 	__local uint2 X[1024];
 
