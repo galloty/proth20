@@ -87,7 +87,7 @@ private:
 
 		// X = X^(2^(n - 1))
 		Timer::Time startBenchTime = Timer::currentTime();
-		const uint32_t benchCount = 1000;
+		const uint32_t benchCount = (n < 100000) ? 10000 : 5000000 / (n / 1000);
 		for (uint32_t i = 0; i < n - 1; ++i)
 		{
 			X.square();
@@ -147,25 +147,25 @@ public:
 		primeList.push_back(Number(1027, 21468));	// square32
 		primeList.push_back(Number(1109, 42921));	// square64
 		primeList.push_back(Number(1085, 85959));	// square128
-		primeList.push_back(Number(1015, 171214));	// square256,  0.0826
-		primeList.push_back(Number(1197, 343384));	// square512,  0.136
-		primeList.push_back(Number(1089, 685641));	// square1024, 0.221
-		primeList.push_back(Number(1005, 1375758));	// square32,   0.424
-		primeList.push_back(Number(1089, 2746155));	// square64,   0.856
-		primeList.push_back(Number(45, 5308037));	// square128,  1.65 ms
+		primeList.push_back(Number(1015, 171214));	// square256,  0.079
+		primeList.push_back(Number(1197, 343384));	// square512,  0.124
+		primeList.push_back(Number(1089, 685641));	// square1024, 0.210
+		primeList.push_back(Number(1005, 1375758));	// square32,   0.387
+		primeList.push_back(Number(1089, 2746155));	// square64,   0.736
+		primeList.push_back(Number(45, 5308037));	// square128,  1.43 ms
 
 		std::vector<Number>	compositeList;
-		compositeList.push_back(Number(9999, 299, "B073C97A2450454F"));
-		compositeList.push_back(Number(21, 636, "4FD4F9FE4C6E7C1B"));
-		compositeList.push_back(Number(4769, 1307, "8B5F4C7215F37871"));
-		compositeList.push_back(Number(9671, 2631, "0715EDFC4814B64A"));
-		compositeList.push_back(Number(19, 5336, "614B05AC60E508A0"));
-		compositeList.push_back(Number(963, 10705, "232BF76A98040BA3"));
-		compositeList.push_back(Number(6189,21469, "88D2582BDDE8E7CA"));
-		compositeList.push_back(Number(2389, 42922, "E427B88330D2EE8C"));
-		compositeList.push_back(Number(1295, 85959, "53D33CD949CC31DB"));
-		compositeList.push_back(Number(9273, 171214, "AEC1A38C0C4B1D98"));
-		compositeList.push_back(Number(8651, 343387, "B832D18693CCB6BC"));
+		compositeList.push_back(Number(9999, 299,    "B073C97A2450454F"));
+		compositeList.push_back(Number(21, 636,      "4FD4F9FE4C6E7C1B"));
+		compositeList.push_back(Number(4769, 1307,   "8B5F4C7215F37871"));
+		compositeList.push_back(Number(9671, 2631,   "0715EDFC4814B64A"));
+		compositeList.push_back(Number(19, 5336,     "614B05AC60E508A0"));
+		compositeList.push_back(Number(963, 10705,   "232BF76A98040BA3"));
+		compositeList.push_back(Number(6189, 21469,  "88D2582BDDE8E7CA"));	// size = 2k	split_o(false)
+		compositeList.push_back(Number(2389, 42922,  "E427B88330D2EE8C"));	// size = 4k,	split2_10
+		compositeList.push_back(Number(1295, 85959,  "53D33CD949CC31DB"));	// size = 8k
+		compositeList.push_back(Number(9273, 171214, "AEC1A38C0C4B1D98"));	// size = 16k	split2
+		compositeList.push_back(Number(8651, 343387, "B832D18693CCB6BC"));	// size = 32k	split_o(false)
 
 		ocl::Engine engine;
 		engine.displayDevices();
@@ -183,18 +183,16 @@ public:
 		// device0.displayProfiles();
 
 		// Size = 524288
-		// - sub_ntt64: 1, 7.44 %, 142336 (142336)
-		// - ntt64: 1, 7.65 %, 146432 (146432)
-		// - intt64: 2, 15.3 %, 293824 (146912)
-		// - square128: 1, 15 %, 286400 (286400)
-		// - poly2int0: 1, 15.7 %, 300256 (300256)
-		// - poly2int1: 1, 3.23 %, 61888 (61888)
-		// - split0: 1, 3.44 %, 65856 (65856)
-		// - split4_i: 1, 6.2 %, 118752 (118752)
-		// - split4_01: 4, 9.99 %, 191328 (47832)
-		// - split4_10: 4, 11.1 %, 211616 (52904)
-		// - split_o_10: 1, 4.83 %, 92544 (92544)
-		// - split_f: 1, 0.16 %, 3072 (3072)
+		// - sub_ntt64: 1, 8.52 %, 142528 (142528)
+		// - ntt64: 1, 8.69 %, 145248 (145248)
+		// - intt64: 2, 16.9 %, 283168 (141584)
+		// - square128: 1, 17.1 %, 286720 (286720)
+		// - poly2int0: 1, 18.4 %, 306976 (306976)
+		// - poly2int1: 1, 3.54 %, 59264 (59264)
+		// - split_i: 1, 8.88 %, 148480 (148480)
+		// - split4: 8, 13.6 %, 227808 (28476)
+		// - split_o: 1, 4.08 %, 68224 (68224)
+		// - split_f: 1, 0.212 %, 3552 (3552)
 
 		// bench
 		for (const auto & p : primeList) check(p.k, p.n, device0, true);

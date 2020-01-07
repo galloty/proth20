@@ -196,12 +196,12 @@ private:
 	cl_command_queue _queue = nullptr;
 	cl_program _program = nullptr;
 	size_t _size = 0, _constant_size = 0, _size_blk = 0;
-	cl_mem _x = nullptr, _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr = nullptr, _bp = nullptr, _ibp = nullptr, _err = nullptr;
+	cl_mem _x = nullptr, _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr = nullptr, _bp = nullptr, _ibp = nullptr, _t0 = nullptr, _t1 = nullptr, _err = nullptr;
 	cl_mem _cr1ir1 = nullptr, _cr2ir2 = nullptr;
 	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr;
 	cl_kernel _square32 = nullptr, _square64 = nullptr, _square128 = nullptr, _square256 = nullptr,_square512 = nullptr, _square1024 = nullptr;
-	cl_kernel _poly2int0 = nullptr, _poly2int1 = nullptr, _split0 = nullptr, _split4_i = nullptr, _split4_01 = nullptr, _split4_10 = nullptr;
-	cl_kernel _split2 = nullptr, _split2_10 = nullptr, _split_o = nullptr, _split_o_10 = nullptr, _split_f = nullptr;
+	cl_kernel _poly2int0 = nullptr, _poly2int1 = nullptr, _split_i = nullptr, _split4 = nullptr;
+	cl_kernel _split2 = nullptr, _split2_10 = nullptr, _split_o = nullptr, _split_f = nullptr;
 	struct Profile
 	{
 		std::string name;
@@ -353,8 +353,10 @@ public:
 		_r2 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint2) * size);
 		_ir2 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint2) * size);
 		_cr = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_long) * size);
-		_bp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint) * size / 2);
+		_bp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * size / 2 / 4);
 		_ibp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint) * size / 2);
+		_t0 = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * size / 2);
+		_t1 = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * size / 2);
 		_err = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_int));
 
 		_constant_size = constant_size;
@@ -377,6 +379,8 @@ public:
 			_releaseBuffer(_cr);
 			_releaseBuffer(_bp);
 			_releaseBuffer(_ibp);
+			_releaseBuffer(_t0);
+			_releaseBuffer(_t1);
 			_releaseBuffer(_err);
 			_size = 0;
 		}
@@ -406,6 +410,22 @@ private:
 		_setKernelArg(kernel, 0, sizeof(cl_mem), &_x);
 		_setKernelArg(kernel, 1, sizeof(cl_mem), &_cr1ir1);
 		_setKernelArg(kernel, 2, sizeof(cl_mem), &_cr2ir2);
+		return kernel;
+	}
+
+private:
+	inline cl_kernel _createSplitKernel(const char * const kernelName, const bool forward,
+		const cl_uint e, const cl_int s, const cl_uint d, const cl_uint d_inv, const cl_int d_shift)
+	{
+		cl_kernel kernel = _createKernel(kernelName);
+		_setKernelArg(kernel, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(kernel, 1, sizeof(cl_mem), &_t1);
+		_setKernelArg(kernel, 2, sizeof(cl_mem), forward ? &_bp : &_ibp);
+		_setKernelArg(kernel, 3, sizeof(cl_uint), &e);
+		_setKernelArg(kernel, 4, sizeof(cl_int), &s);
+		_setKernelArg(kernel, 5, sizeof(cl_uint), &d);
+		_setKernelArg(kernel, 6, sizeof(cl_uint), &d_inv);
+		_setKernelArg(kernel, 7, sizeof(cl_int), &d_shift);
 		return kernel;
 	}
 
@@ -440,51 +460,26 @@ public:
 		_setKernelArg(_poly2int1, 2, sizeof(cl_uint), &blk);
 		_setKernelArg(_poly2int1, 3, sizeof(cl_mem), &_err);
 
-		_split0 = _createKernel("split0");
-		_setKernelArg(_split0, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_split0, 1, sizeof(cl_uint), &e);
-		_setKernelArg(_split0, 2, sizeof(cl_int), &s);
+		_split_i = _createSplitKernel("split_i", true, e, s, d, d_inv, d_shift);
 
-		_split4_i = _createKernel("split4_i");
-		_setKernelArg(_split4_i, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_split4_i, 1, sizeof(cl_mem), &_bp);
-		_setKernelArg(_split4_i, 2, sizeof(cl_uint), &d);
-		_setKernelArg(_split4_i, 3, sizeof(cl_uint), &d_inv);
-		_setKernelArg(_split4_i, 4, sizeof(cl_int), &d_shift);
-
-		_split4_01 = _createKernel("split4_01");
-		_setKernelArg(_split4_01, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_split4_01, 1, sizeof(cl_uint), &d);
-
-		_split4_10 = _createKernel("split4_10");
-		_setKernelArg(_split4_10, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_split4_10, 1, sizeof(cl_uint), &d);
+		_split4 = _createKernel("split4");
+		_setKernelArg(_split4, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(_split4, 1, sizeof(cl_mem), &_t0);
+		_setKernelArg(_split4, 2, sizeof(cl_mem), &_t1);
+		_setKernelArg(_split4, 3, sizeof(cl_uint), &d);
 
 		_split2 = _createKernel("split2");
 		_setKernelArg(_split2, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_split2, 1, sizeof(cl_uint), &d);
+		_setKernelArg(_split2, 1, sizeof(cl_mem), &_t0);
+		_setKernelArg(_split2, 2, sizeof(cl_uint), &d);
 
 		_split2_10 = _createKernel("split2_10");
 		_setKernelArg(_split2_10, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_split2_10, 1, sizeof(cl_uint), &d);
+		_setKernelArg(_split2_10, 1, sizeof(cl_mem), &_t0);
+		_setKernelArg(_split2_10, 2, sizeof(cl_mem), &_t1);
+		_setKernelArg(_split2_10, 3, sizeof(cl_uint), &d);
 
-		_split_o = _createKernel("split_o");
-		_setKernelArg(_split_o, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_split_o, 1, sizeof(cl_mem), &_ibp);
-		_setKernelArg(_split_o, 2, sizeof(cl_uint), &e);
-		_setKernelArg(_split_o, 3, sizeof(cl_int), &s);
-		_setKernelArg(_split_o, 4, sizeof(cl_uint), &d);
-		_setKernelArg(_split_o, 5, sizeof(cl_uint), &d_inv);
-		_setKernelArg(_split_o, 6, sizeof(cl_int), &d_shift);
-
-		_split_o_10 = _createKernel("split_o_10");
-		_setKernelArg(_split_o_10, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_split_o_10, 1, sizeof(cl_mem), &_ibp);
-		_setKernelArg(_split_o_10, 2, sizeof(cl_uint), &e);
-		_setKernelArg(_split_o_10, 3, sizeof(cl_int), &s);
-		_setKernelArg(_split_o_10, 4, sizeof(cl_uint), &d);
-		_setKernelArg(_split_o_10, 5, sizeof(cl_uint), &d_inv);
-		_setKernelArg(_split_o_10, 6, sizeof(cl_int), &d_shift);
+		_split_o = _createSplitKernel("split_o", false, e, s, d, d_inv, d_shift);
 
 		_split_f = _createKernel("split_f");
 		_setKernelArg(_split_f, 0, sizeof(cl_mem), &_x);
@@ -516,14 +511,11 @@ public:
 		_releaseKernel(_poly2int0);
 		_releaseKernel(_poly2int1);
 
-		_releaseKernel(_split0);
-		_releaseKernel(_split4_i);
-		_releaseKernel(_split4_01);
-		_releaseKernel(_split4_10);
+		_releaseKernel(_split_i);
+		_releaseKernel(_split4);
 		_releaseKernel(_split2);
 		_releaseKernel(_split2_10);
 		_releaseKernel(_split_o);
-		_releaseKernel(_split_o_10);
 		_releaseKernel(_split_f);
 
 	}
@@ -560,10 +552,10 @@ public:
 	}
 
 public:
-	void writeMemory_bp(const cl_uint * const ptr_bp, const cl_uint * const ptr_ibp)
+	void writeMemory_bp(const cl_uint4 * const ptr_bp, const cl_uint * const ptr_ibp)
 	{
 		_sync();
-		oclFatal(clEnqueueWriteBuffer(_queue, _bp, CL_TRUE, 0, sizeof(cl_uint) * _size / 2, ptr_bp, 0, nullptr, nullptr));
+		oclFatal(clEnqueueWriteBuffer(_queue, _bp, CL_TRUE, 0, sizeof(cl_uint4) * _size / 2 / 4, ptr_bp, 0, nullptr, nullptr));
 		oclFatal(clEnqueueWriteBuffer(_queue, _ibp, CL_TRUE, 0, sizeof(cl_uint) * _size / 2, ptr_ibp, 0, nullptr, nullptr));
 	}
 
@@ -615,21 +607,15 @@ public:
 	void poly2int1() { _executeKernel(_poly2int1, _size_blk); }
 
 public:
-	void split0() { _executeKernel(_split0, _size / 2); }
-	void split4_i() { _executeKernel(_split4_i, _size / 8); }
+	void split_i() { _executeKernel(_split_i, _size / 8); }
 
 public:
-	void split4_01(const cl_uint m)
+	void split4(const cl_uint m, const bool b)
 	{
-		_setKernelArg(_split4_01, 2, sizeof(cl_uint), &m);
-		_executeKernel(_split4_01, _size / 8);
-	}
-
-public:
-	void split4_10(const cl_uint m)
-	{
-		_setKernelArg(_split4_10, 2, sizeof(cl_uint), &m);
-		_executeKernel(_split4_10, _size / 8);
+		const cl_int ib = b ? 1 : 0;
+		_setKernelArg(_split4, 4, sizeof(cl_uint), &m);
+		_setKernelArg(_split4, 5, sizeof(cl_int), &ib);
+		_executeKernel(_split4, _size / 8);
 	}
 
 public:
@@ -637,8 +623,11 @@ public:
 	void split2_10() { _executeKernel(_split2_10, _size / 4); }
 
 public:
-	void split_o() { _executeKernel(_split_o, _size / 2); }
-	void split_o_10() { _executeKernel(_split_o_10, _size / 2); }
+	void split_o(const bool b)
+	{
+		_setKernelArg(_split_o, 1, sizeof(cl_mem), b ? &_t0 : &_t1);
+		_executeKernel(_split_o, _size / 2);
+	}
 
 public:
 	void split_f() { _executeKernel(_split_f, 1); }

@@ -440,88 +440,74 @@ void poly2int1(__global uint2 * restrict const x, __global const long * restrict
 }
 
 __kernel
-void split0(__global uint2 * restrict const x, const uint e, const int s)
+void split_i(__global uint2 * restrict const x, __global uint * restrict const t, __global const uint4 * restrict const bp,
+	const uint e, const int s, const uint d, const uint d_inv, const int d_shift)
 {
-	const size_t n = get_global_size(0), k = get_global_id(0);
+	const size_t k = get_global_id(0);
 
-	const ulong l = ((ulong)(x[e + k + 1].s0) << digit_bit) | x[e + k].s0;
-	const uint r = (uint)(l >> s) & digit_mask;
-	x[k].s1 = r;
-}
+	__global uint2 * restrict const xi = &x[4 * k];
 
-__kernel
-void split4_i(__global uint2 * restrict const x, __global const uint * restrict const bp, const uint d, const uint d_inv, const int d_shift)
-{
-	const size_t n = 4 * get_global_size(0), k = get_global_id(0);
+	const uint xe0 = xi[e + 0].s0, xe1 = xi[e + 1].s0, xe2 = xi[e + 2].s0, xe3 = xi[e + 3].s0, xe4 = xi[e + 4].s0; 
 
-	__global uint2 * restrict const xj = &x[n + 4 * k];
+	const uint x0 = ((xe1 << (digit_bit - s)) | (xe0 >> s)) & digit_mask;
+	const uint x1 = ((xe2 << (digit_bit - s)) | (xe1 >> s)) & digit_mask;
+	const uint x2 = ((xe3 << (digit_bit - s)) | (xe2 >> s)) & digit_mask;
+	const uint x3 = ((xe4 << (digit_bit - s)) | (xe3 >> s)) & digit_mask;
 
-	const uint u0 = _rem(x[4 * k + 0].s1 * (ulong)(bp[4 * k + 0]), d, d_inv, d_shift), u1 = _rem(x[4 * k + 1].s1 * (ulong)(bp[4 * k + 1]), d, d_inv, d_shift);
-	const uint u2 = _rem(x[4 * k + 2].s1 * (ulong)(bp[4 * k + 2]), d, d_inv, d_shift), u3 = _rem(x[4 * k + 3].s1 * (ulong)(bp[4 * k + 3]), d, d_inv, d_shift);
+	const uint4 b = bp[k];
+
+	xi[0].s1 = x0; xi[1].s1 = x1; xi[2].s1 = x2; xi[3].s1 = x3;
+
+	const uint u0 = _rem(x0 * (ulong)(b.s0), d, d_inv, d_shift), u1 = _rem(x1 * (ulong)(b.s1), d, d_inv, d_shift);
+	const uint u2 = _rem(x2 * (ulong)(b.s2), d, d_inv, d_shift), u3 = _rem(x3 * (ulong)(b.s3), d, d_inv, d_shift);
 	const uint u01 = _addmod(u0, u1, d), u23 = _addmod(u2, u3, d);
-	xj[0].s1 = _addmod(u01, u23, d); xj[1].s1 = _addmod(u1, u23, d);
-	xj[2].s1 = u23; xj[3].s1 = u3;
+	t[4 * k + 0] = _addmod(u01, u23, d); t[4 * k + 1] = _addmod(u1, u23, d); t[4 * k + 2] = u23; t[4 * k + 3] = u3;
 }
 
 __kernel
-void split4_01(__global uint2 * restrict const x, const uint d, const uint m)
+void split4(__global uint2 * restrict const x, __global uint * restrict const t0, __global uint * restrict const t1, const uint d, const uint m, const int b01)
 {
-	const size_t n = 4 * get_global_size(0), k = get_global_id(0);
+	const size_t k = get_global_id(0);
 
 	const size_t i = k & (m - 1);
 
-	__global uint2 * restrict const xj = &x[n + 4 * (k - i)];
+	__global const uint * restrict const ti = (b01 != 0) ? t0 : t1;
+	__global uint * restrict const to = (b01 != 0) ? t1 : t0;
 
-	const uint u0 = xj[i + 0 * m].s0, u1 = xj[i + 1 * m].s0, u2 = xj[i + 2 * m].s0, u3 = xj[i + 3 * m].s0;
-	const uint s1 = xj[1 * m].s0, s2 = xj[2 * m].s0, s3 = xj[3 * m].s0;
+	__global uint * restrict const xi = &ti[4 * (k - i)];
+	__global uint * restrict const xo = &to[4 * (k - i)];
+
+	const uint u0 = xi[i + 0 * m], u1 = xi[i + 1 * m], u2 = xi[i + 2 * m], u3 = xi[i + 3 * m];
+	const uint s1 = xi[1 * m], s2 = xi[2 * m], s3 = xi[3 * m];
 	const uint u01 = _addmod(u0, s1, d), u23 = _addmod(u2, s3, d), s23 = _addmod(s2, s3, d);
-	xj[i + 0 * m].s1 = _addmod(u01, s23, d); xj[i + 1 * m].s1 = _addmod(u1, s23, d);
-	xj[i + 2 * m].s1 = u23; xj[i + 3 * m].s1 = u3;
+	xo[i + 0 * m] = _addmod(u01, s23, d); xo[i + 1 * m] = _addmod(u1, s23, d);
+	xo[i + 2 * m] = u23; xo[i + 3 * m] = u3;
 }
 
 __kernel
-void split4_10(__global uint2 * restrict const x, const uint d, const uint m)
-{
-	const size_t n = 4 * get_global_size(0), k = get_global_id(0);
-
-	const size_t i = k & (m - 1);
-
-	__global uint2 * restrict const xj = &x[n + 4 * (k - i)];
-
-	const uint u0 = xj[i + 0 * m].s1, u1 = xj[i + 1 * m].s1, u2 = xj[i + 2 * m].s1, u3 = xj[i + 3 * m].s1;
-	const uint s1 = xj[1 * m].s1, s2 = xj[2 * m].s1, s3 = xj[3 * m].s1;
-	const uint u01 = _addmod(u0, s1, d), u23 = _addmod(u2, s3, d), s23 = _addmod(s2, s3, d);
-	xj[i + 0 * m].s0 = _addmod(u01, s23, d); xj[i + 1 * m].s0 = _addmod(u1, s23, d);
-	xj[i + 2 * m].s0 = u23; xj[i + 3 * m].s0 = u3;
-}
-
-__kernel
-void split2(__global uint2 * restrict const x, const uint d)
+void split2(__global uint2 * restrict const x, __global uint * restrict const t0, const uint d)
 {
 	const size_t n_2 = get_global_size(0), k = get_global_id(0);
 
-	__global uint2 * restrict const xn = &x[2 * n_2];
-
-	xn[k].s0 = _addmod(xn[k].s0, xn[n_2].s0, d);
+	t0[k] = _addmod(t0[k], t0[n_2], d);
 }
 
 __kernel
-void split2_10(__global uint2 * restrict const x, const uint d)
+void split2_10(__global uint2 * restrict const x, __global uint * restrict const t0, __global const uint * restrict const t1, const uint d)
 {
 	const size_t n_2 = get_global_size(0), k = get_global_id(0);
 
-	__global uint2 * restrict const xn = &x[2 * n_2];
-
-	xn[k].s0 = _addmod(xn[k].s1, xn[n_2].s1, d);
-	xn[k + n_2].s0 = xn[k + n_2].s1;
+	t0[k] = _addmod(t1[k], t1[n_2], d);
+	t0[k + n_2] = t1[k + n_2];
 }
 
 __kernel
-void split_o(__global uint2 * restrict const x, __global const uint * restrict const ibp, const uint e, const int s, const uint d, const uint d_inv, const int d_shift)
+void split_o(__global uint2 * restrict const x, __global uint * restrict const t, __global const uint * restrict const ibp,
+	const uint e, const int s, const uint d, const uint d_inv, const int d_shift)
 {
 	const size_t n = get_global_size(0), k = get_global_id(0);
 
-	const uint rbk_prev = (k + 1 < n) ? x[n + k + 1].s0 : 0;
+	const uint rbk_prev = (k + 1 < n) ? t[k + 1] : 0;
 	const uint r_prev = _rem(rbk_prev * (ulong)(ibp[k]), d, d_inv, d_shift);
 
 	const uint2 x_k = x[k];
@@ -530,40 +516,17 @@ void split_o(__global uint2 * restrict const x, __global const uint * restrict c
 
 	const uint q_d = mul_hi((uint)(q >> d_shift), d_inv);	// d < 2^29
 	const uint r = (uint)(q) - q_d * d;
-	const uint t = (r >= d) ? 1 : 0;
+	const uint c = (r >= d) ? 1 : 0;
 
-	//x[k] = (uint2)((k > e + 2) ? 0 : x_k.s0, q_d + t);
-	if (k > e + 2) x[k].s0 = 0;
-	x[k].s1 = q_d + t;
-}
+	x[k] = (uint2)((k > e + 2) ? 0 : x_k.s0, q_d + c);
 
-__kernel
-void split_o_10(__global uint2 * restrict const x, __global const uint * restrict const ibp, const uint e, const int s, const uint d, const uint d_inv, const int d_shift)
-{
-	const size_t n = get_global_size(0), k = get_global_id(0);
-
-	const uint rbk_prev = (k + 1 < n) ? x[n + k + 1].s1 : 0;
-	const uint r_prev = _rem(rbk_prev * (ulong)(ibp[k]), d, d_inv, d_shift);
-
-	const uint2 x_k = x[k];
-
-	const ulong q = ((ulong)(r_prev) << digit_bit) | x_k.s1;
-
-	const uint q_d = mul_hi((uint)(q >> d_shift), d_inv);	// d < 2^29
-	const uint r = (uint)(q) - q_d * d;
-	const uint t = (r >= d) ? 1 : 0;
-
-	//x[k] = (uint2)((k > e + 2) ? 0 : x_k.s0, q_d + t);
-	if (k > e + 2) x[k].s0 = 0;
-	x[k].s1 = q_d + t;
-
-	if (k + 1 == n) { x[n].s0 = x[n].s1; }
+	if (k + 1 == n) { x[n].s0 = t[0]; }
 }
 
 __kernel
 void split_f(__global uint2 * restrict const x, const uint n, const uint e, const int s)
 {
-	const uint rs = (x[e].s0 & ((1u << s) - 1));
+	const uint rs = x[e].s0 & ((1u << s) - 1);
 	const ulong rds = ((ulong)(x[n].s0) << s) | rs;		// rds < 2^(29 + digit_bit - 1)
 
 	x[e].s0 = (uint)(rds) & digit_mask;

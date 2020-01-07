@@ -192,16 +192,19 @@ public:
 		delete[] cr1ir1;
 		delete[] cr2ir2;
 
-		cl_uint * const bp = new cl_uint[size / 2];
+		cl_uint4 * const bp = new cl_uint4[size / 2 / 4];
 		cl_uint * const ibp = new uint32_t[size / 2];
 		const uint32_t ib = invert(uint32_t(1) << digit_bit, k);
 		uint32_t bp_i = 1, ibp_i = ib;
-		for (size_t i = 0; i < size / 2; ++i)
+		for (size_t i = 0; i < size / 2 / 4; ++i)
 		{
-			bp[i] = cl_uint(bp_i);
-			ibp[i] = cl_uint(ibp_i);
-			bp_i = uint32_t((uint64_t(bp_i) << digit_bit) % k);
-			ibp_i = uint32_t((uint64_t(ibp_i) * ib) % k);
+			for (size_t j = 0; j < 4; ++j)
+			{
+				bp[i].s[j] = cl_uint(bp_i);
+				ibp[4 * i + j] = cl_uint(ibp_i);
+				bp_i = uint32_t((uint64_t(bp_i) << digit_bit) % k);
+				ibp_i = uint32_t((uint64_t(ibp_i) * ib) % k);
+			}
 		}
 		_device.writeMemory_bp(bp, ibp);
 		delete[] bp;
@@ -360,21 +363,18 @@ private:
 
 		// x size is size, 0 <= e < size / 2
 
-		_device.split0();
-
-		// x size is size / 2, x[0] = X mod B^n, x[1] = X / (B^e * 2^s)
-
 		// Daisuke Takahashi, A parallel algorithm for multiple-precision division by a single-precision integer.
 
-		_device.split4_i();
+		_device.split_i();
+
+		// x size is size / 2, x[0] = X mod B^n, x[1] = X / (B^e * 2^s)
 
 		size_t m = 4;
 		bool b0 = false;
 
 		while (m < size / 4)
 		{
-			if (b0) _device.split4_01(m);
-			else _device.split4_10(m);
+			_device.split4(m, b0);
 			m *= 4;
 			b0 = !b0;
 		}
@@ -388,8 +388,7 @@ private:
 
 		// x size is size / 2, x[0] = X mod B^n, x[1] = X / (B^e * 2^s), x[n][0] = remainders x[1] / d
 
-		if (b0) _device.split_o();
-		else _device.split_o_10();
+		_device.split_o(b0);
 
 		// x size is size / 2, x[0] = X mod B^n, x[1] = Y
 
