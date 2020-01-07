@@ -144,15 +144,15 @@ public:
 		primeList.push_back(Number(1139, 2641));
 		primeList.push_back(Number(1035, 5336));
 		primeList.push_back(Number(965, 10705));
-		primeList.push_back(Number(1027, 21468));
-		primeList.push_back(Number(1109, 42921));
-		primeList.push_back(Number(1085, 85959));
-		primeList.push_back(Number(1015, 171214));
-		primeList.push_back(Number(1197, 343384));
-		primeList.push_back(Number(1089, 685641));
-		primeList.push_back(Number(1005, 1375758));
-		primeList.push_back(Number(1089, 2746155));	// 0.934 (add chunk to squarexxx)
-		primeList.push_back(Number(45, 5308037));	// 1.65 ms
+		primeList.push_back(Number(1027, 21468));	// square32
+		primeList.push_back(Number(1109, 42921));	// square64
+		primeList.push_back(Number(1085, 85959));	// square128
+		primeList.push_back(Number(1015, 171214));	// square256,  0.0826
+		primeList.push_back(Number(1197, 343384));	// square512,  0.136
+		primeList.push_back(Number(1089, 685641));	// square1024, 0.221
+		primeList.push_back(Number(1005, 1375758));	// square32,   0.424
+		primeList.push_back(Number(1089, 2746155));	// square64,   0.856
+		primeList.push_back(Number(45, 5308037));	// square128,  1.65 ms
 
 		std::vector<Number>	compositeList;
 		compositeList.push_back(Number(9999, 299, "B073C97A2450454F"));

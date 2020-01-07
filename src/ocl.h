@@ -198,7 +198,7 @@ private:
 	size_t _size = 0, _constant_size = 0, _size_blk = 0;
 	cl_mem _x = nullptr, _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr = nullptr, _bp = nullptr, _ibp = nullptr, _err = nullptr;
 	cl_mem _cr1ir1 = nullptr, _cr2ir2 = nullptr;
-	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr, _ntt16 = nullptr;
+	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr;
 	cl_kernel _square32 = nullptr, _square64 = nullptr, _square128 = nullptr, _square256 = nullptr,_square512 = nullptr, _square1024 = nullptr;
 	cl_kernel _poly2int0 = nullptr, _poly2int1 = nullptr, _split0 = nullptr, _split4_i = nullptr, _split4_01 = nullptr, _split4_10 = nullptr;
 	cl_kernel _split2 = nullptr, _split2_10 = nullptr, _split_o = nullptr, _split_o_10 = nullptr, _split_f = nullptr;
@@ -213,7 +213,8 @@ private:
 	};
 	std::map<cl_kernel, Profile> _profileMap;
 
-	static const size_t CHUNK64 = 16;
+	// Must be identical to ocl defines
+	static const size_t CHUNK64 = 16, BLK32 = 8, BLK64 = 4, BLK128 = 2, BLK256 = 1;
 
 public:
 	Device(const Engine & engine, const size_t d) : _engine(engine), _d(d), _platform(engine.getPlatform(d)), _device(engine.getDevice(d))
@@ -419,7 +420,6 @@ public:
 		_sub_ntt64 = _createNttKernel("sub_ntt64", true);
 		_ntt64 = _createNttKernel("ntt64", true);
 		_intt64 = _createNttKernel("intt64", false);
-		_ntt16 = _createNttKernel("ntt16", true);
 
 		_square32 = _createSquareKernel("square32");
 		_square64 = _createSquareKernel("square64");
@@ -505,15 +505,17 @@ public:
 		_releaseKernel(_sub_ntt64);
 		_releaseKernel(_ntt64);
 		_releaseKernel(_intt64);
-		_releaseKernel(_ntt16);
+
 		_releaseKernel(_square32);
 		_releaseKernel(_square64);
 		_releaseKernel(_square128);
 		_releaseKernel(_square256);
 		_releaseKernel(_square512);
 		_releaseKernel(_square1024);
+
 		_releaseKernel(_poly2int0);
 		_releaseKernel(_poly2int1);
+
 		_releaseKernel(_split0);
 		_releaseKernel(_split4_i);
 		_releaseKernel(_split4_01);
@@ -601,21 +603,10 @@ public:
 	}
 
 public:
-	static constexpr int log2(const size_t n) { return (n > 1) ? 1 + log2(n >> 1) : 0; }
-
-	void ntt16(const cl_uint m, const cl_uint rindex)
-	{
-		const cl_int lm_4 = log2(m / 4);
-		_setKernelArg(_ntt16, 3, sizeof(cl_int), &lm_4);
-		_setKernelArg(_ntt16, 4, sizeof(cl_uint), &rindex);
-		_executeKernel(_ntt16, _size / 4, 4 * 16);
-	}
-
-public:
-	void square32() { _executeKernel(_square32, _size / 4, 32 / 4); }
-	void square64() { _executeKernel(_square64, _size / 4, 64 / 4); }
-	void square128() { _executeKernel(_square128, _size / 4, 128 / 4); }
-	void square256() { _executeKernel(_square256, _size / 4, 256 / 4); }
+	void square32() { _executeKernel(_square32, _size / 4, BLK32 * 32 / 4); }
+	void square64() { _executeKernel(_square64, _size / 4, BLK64 * 64 / 4); }
+	void square128() { _executeKernel(_square128, _size / 4, BLK128 * 128 / 4); }
+	void square256() { _executeKernel(_square256, _size / 4, BLK256 * 256 / 4); }
 	void square512() { _executeKernel(_square512, _size / 4, 512 / 4); }
 	void square1024() { _executeKernel(_square1024, _size / 4, 1024 / 4); }
 

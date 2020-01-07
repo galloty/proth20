@@ -21,6 +21,12 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #define	InvP2_P1	913159918u		// 1 / P2 mod P1
 #define	P1P2		(P1 * (ulong)(P2))
 
+#define CHUNK64		16
+#define BLK32		8
+#define BLK64		4
+#define BLK128		2
+#define BLK256		1
+
 /*
 Barrett's product/reduction, where P is such that h (the number of iterations in the 'while loop') is 0 or 1.
 
@@ -176,7 +182,6 @@ inline void _square4(__local uint2 * restrict const X)
 	X[0] = addmod(t0, t2); X[2] = submod(t0, t2); X[1] = addmod(t1, t3); X[3] = submod(t1, t3);
 }
 
-#define CHUNK64		16
 
 __kernel  __attribute__((reqd_work_group_size(64 / 4 * CHUNK64, 1, 1)))
 void sub_ntt64(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2)
@@ -272,99 +277,80 @@ void intt64(__global uint2 * restrict const x, __global const uint4 * restrict c
 	_backward4o(16 * m, &xo[k_16m], 16 * CHUNK64, &X[i_16m], ir2[rindex + j_16m], r1ir1[rindex + j_16m]);
 }
 
-#define CHUNK16		16
-
-__kernel  __attribute__((reqd_work_group_size(16 / 4 * CHUNK16, 1, 1)))
-void ntt16(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const int lm, const uint rindex)
-{
-	__local uint2 X[16 * CHUNK16];
-
-	const size_t m = (size_t)(1)<< lm;
-
-	const size_t local_id = get_local_id(0), chunk_idx = local_id % CHUNK16, chunkIdx = local_id / CHUNK16;
-	const size_t local_chunk_idx = chunkIdx % (16 / 4);
-	const size_t group_id = get_group_id(0), group_offset = ((group_id * CHUNK16) & (m - 1)) + ((((group_id * CHUNK16) >> lm) * 16) << lm);
-
-	const size_t _i_4m = local_chunk_idx;		// 0, m, 2m, 3m
-	const size_t _i_m = local_chunk_idx * 4;	// 0, 4m, 8m, 12m
-
-	const size_t k_4m = (_i_4m << lm) + group_offset + chunk_idx;
-	const size_t k_m = (_i_m << lm) + group_offset + chunk_idx;
-
-	const size_t i_4m = _i_4m * CHUNK16 + chunk_idx;
-	const size_t i_m = _i_m * CHUNK16 + chunk_idx;
-
-	const size_t j_4m = k_4m & (4 * m - 1);
-	const size_t j_m = k_m & (m - 1);
-
-	_forward4i(4 * CHUNK16, &X[i_4m], 4 * m, &x[k_4m], r2[rindex + j_4m], r1ir1[rindex + j_4m]);
-	_forward4o(m, &x[k_m], CHUNK16, &X[i_m], r2[rindex + 4 * m + j_m], r1ir1[rindex + 4 * m + j_m]);
-}
-
-__kernel __attribute__((reqd_work_group_size(32 / 4, 1, 1)))
+__kernel __attribute__((reqd_work_group_size(32 / 4 * BLK32, 1, 1)))
 void square32(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)
 {
-	__local uint2 X[32];
+	__local uint2 X[32 * BLK32];
 
-	const size_t i = get_local_id(0), k = get_group_id(0) * 32 + i, j = i + 2;
+	// copy mem first ?
+
+	const size_t i = get_local_id(0);
+	const size_t i_8 = i % 8, i8 = ((4 * i) & (size_t)~(4 * 8 - 1)) | i_8, j8 = i_8 + 2;
 	const size_t i_2 = i % 2, i2 = ((4 * i) & (size_t)~(4 * 2 - 1)) | i_2, j2 = i_2;
+	const size_t k8 = get_group_id(0) * 32 * BLK32 | i8;
 
-	_forward4i(8, &X[i], 8, &x[k], r2ir2[j].s01, r1ir1[j]);
+	_forward4i(8, &X[i8], 8, &x[k8], r2ir2[j8].s01, r1ir1[j8]);
 	_forward4(2, &X[i2], r2ir2[j2].s01, r1ir1[j2]);
 	_square2(&X[4 * i]);
 	_backward4(2, &X[i2], r2ir2[j2].s23, r1ir1[j2]);
-	_backward4o(8, &x[k], 8, &X[i], r2ir2[j].s23, r1ir1[j]);
+	_backward4o(8, &x[k8], 8, &X[i8], r2ir2[j8].s23, r1ir1[j8]);
 }
 
-__kernel __attribute__((reqd_work_group_size(64 / 4, 1, 1)))
+__kernel __attribute__((reqd_work_group_size(64 / 4 * BLK64, 1, 1)))
 void square64(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)
 {
-	__local uint2 X[64];
+	__local uint2 X[64 * BLK64];
 
-	const size_t i = get_local_id(0), k = get_group_id(0) * 64 + i, j = i + 4;
+	const size_t i = get_local_id(0);
+	const size_t i_16 = i % 16, i16 = ((4 * i) & (size_t)~(4 * 16 - 1)) | i_16, j16 = i_16 + 4;
 	const size_t i_4 = i % 4, i4 = ((4 * i) & (size_t)~(4 * 4 - 1)) | i_4, j4 = i_4;
+	const size_t k16 = get_group_id(0) * 64 * BLK64 | i16;
 
-	_forward4i(16, &X[i], 16, &x[k], r2ir2[j].s01, r1ir1[j]);
+	_forward4i(16, &X[i16], 16, &x[k16], r2ir2[j16].s01, r1ir1[j16]);
 	_forward4(4, &X[i4], r2ir2[j4].s01, r1ir1[j4]);
 	_square4(&X[4 * i]);
 	_backward4(4, &X[i4], r2ir2[j4].s23, r1ir1[j4]);
-	_backward4o(16, &x[k], 16, &X[i], r2ir2[j].s23, r1ir1[j]);
+	_backward4o(16, &x[k16], 16, &X[i16], r2ir2[j16].s23, r1ir1[j16]);
 }
 
-__kernel __attribute__((reqd_work_group_size(128 / 4, 1, 1)))
+__kernel __attribute__((reqd_work_group_size(128 / 4 * BLK128, 1, 1)))
 void square128(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)
 {
-	__local uint2 X[128];
+	__local uint2 X[128 * BLK128];
 
-	const size_t i = get_local_id(0), k = get_group_id(0) * 128 + i, j = i + 2 + 8;
+	const size_t i = get_local_id(0);
+	const size_t i_32 = i % 32, i32 = ((4 * i) & (size_t)~(4 * 32 - 1)) | i_32, j32 = i_32 + 2 + 8;
 	const size_t i_8 = i % 8, i8 = ((4 * i) & (size_t)~(4 * 8 - 1)) | i_8, j8 = i_8 + 2;
 	const size_t i_2 = i % 2, i2 = ((4 * i) & (size_t)~(4 * 2 - 1)) | i_2, j2 = i_2;
+	const size_t k32 = get_group_id(0) * 128 * BLK128 | i32;
 
-	_forward4i(32, &X[i], 32, &x[k], r2ir2[j].s01, r1ir1[j]);
+	_forward4i(32, &X[i32], 32, &x[k32], r2ir2[j32].s01, r1ir1[j32]);
 	_forward4(8, &X[i8], r2ir2[j8].s01, r1ir1[j8]);
 	_forward4(2, &X[i2], r2ir2[j2].s01, r1ir1[j2]);
 	_square2(&X[4 * i]);
 	_backward4(2, &X[i2], r2ir2[j2].s23, r1ir1[j2]);
 	_backward4(8, &X[i8], r2ir2[j8].s23, r1ir1[j8]);
-	_backward4o(32, &x[k], 32, &X[i], r2ir2[j].s23, r1ir1[j]);
+	_backward4o(32, &x[k32], 32, &X[i32], r2ir2[j32].s23, r1ir1[j32]);
 }
 
-__kernel __attribute__((reqd_work_group_size(256 / 4, 1, 1)))
+__kernel __attribute__((reqd_work_group_size(256 / 4 * BLK256, 1, 1)))
 void square256(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)
 {
-	__local uint2 X[256];
+	__local uint2 X[256 * BLK256];
 
-	const size_t i = get_local_id(0), k = get_group_id(0) * 256 + i, j = i + 4 + 16;
+	const size_t i = get_local_id(0);
+	const size_t i_64 = i % 64, i64 = ((4 * i) & (size_t)~(4 * 64 - 1)) | i_64, j64 = i_64 + 4 + 16;
 	const size_t i_16 = i % 16, i16 = ((4 * i) & (size_t)~(4 * 16 - 1)) | i_16, j16 = i_16 + 4;
 	const size_t i_4 = i % 4, i4 = ((4 * i) & (size_t)~(4 * 4 - 1)) | i_4, j4 = i_4;
+	const size_t k64 = get_group_id(0) * 256 * BLK256 | i64;
 
-	_forward4i(64, &X[i], 64, &x[k], r2ir2[j].s01, r1ir1[j]);
+	_forward4i(64, &X[i64], 64, &x[k64], r2ir2[j64].s01, r1ir1[j64]);
 	_forward4(16, &X[i16], r2ir2[j16].s01, r1ir1[j16]);
 	_forward4(4, &X[i4], r2ir2[j4].s01, r1ir1[j4]);
 	_square4(&X[4 * i]);
 	_backward4(4, &X[i4], r2ir2[j4].s23, r1ir1[j4]);
 	_backward4(16, &X[i16], r2ir2[j16].s23, r1ir1[j16]);
-	_backward4o(64, &x[k], 64, &X[i], r2ir2[j].s23, r1ir1[j]);
+	_backward4o(64, &x[k64], 64, &X[i64], r2ir2[j64].s23, r1ir1[j64]);
 }
 
 __kernel __attribute__((reqd_work_group_size(512 / 4, 1, 1)))
@@ -372,12 +358,14 @@ void square512(__global uint2 * restrict const x, __constmem const uint4 * restr
 {
 	__local uint2 X[512];
 
-	const size_t i = get_local_id(0), k = get_group_id(0) * 512 + i, j = i + 2 + 8 + 32;
+	const size_t i = get_local_id(0);
+	const size_t i128 = i, j128 = i + 2 + 8 + 32;
 	const size_t i_32 = i % 32, i32 = ((4 * i) & (size_t)~(4 * 32 - 1)) | i_32, j32 = i_32 + 2 + 8;
 	const size_t i_8 = i % 8, i8 = ((4 * i) & (size_t)~(4 * 8 - 1)) | i_8, j8 = i_8 + 2;
 	const size_t i_2 = i % 2, i2 = ((4 * i) & (size_t)~(4 * 2 - 1)) | i_2, j2 = i_2;
+	const size_t k128 = get_group_id(0) * 512 | i128;
 
-	_forward4i(128, &X[i], 128, &x[k], r2ir2[j].s01, r1ir1[j]);
+	_forward4i(128, &X[i128], 128, &x[k128], r2ir2[j128].s01, r1ir1[j128]);
 	_forward4(32, &X[i32], r2ir2[j32].s01, r1ir1[j32]);
 	_forward4(8, &X[i8], r2ir2[j8].s01, r1ir1[j8]);
 	_forward4(2, &X[i2], r2ir2[j2].s01, r1ir1[j2]);
@@ -385,7 +373,7 @@ void square512(__global uint2 * restrict const x, __constmem const uint4 * restr
 	_backward4(2, &X[i2], r2ir2[j2].s23, r1ir1[j2]);
 	_backward4(8, &X[i8], r2ir2[j8].s23, r1ir1[j8]);
 	_backward4(32, &X[i32], r2ir2[j32].s23, r1ir1[j32]);
-	_backward4o(128, &x[k], 128, &X[i], r2ir2[j].s23, r1ir1[j]);
+	_backward4o(128, &x[k128], 128, &X[i128], r2ir2[j128].s23, r1ir1[j128]);
 }
 
 __kernel __attribute__((reqd_work_group_size(1024 / 4, 1, 1)))
@@ -393,12 +381,14 @@ void square1024(__global uint2 * restrict const x, __constmem const uint4 * rest
 {
 	__local uint2 X[1024];
 
-	const size_t i = get_local_id(0), k = get_group_id(0) * 1024 + i, j = i + 4 + 16 + 64;
+	const size_t i = get_local_id(0);
+	const size_t i256 = i, j256 = i + 4 + 16 + 64;
 	const size_t i_64 = i % 64, i64 = ((4 * i) & (size_t)~(4 * 64 - 1)) | i_64, j64 = i_64 + 4 + 16;
 	const size_t i_16 = i % 16, i16 = ((4 * i) & (size_t)~(4 * 16 - 1)) | i_16, j16 = i_16 + 4;
 	const size_t i_4 = i % 4, i4 = ((4 * i) & (size_t)~(4 * 4 - 1)) | i_4, j4 = i_4;
+	const size_t k256 = get_group_id(0) * 1024 | i256;
 
-	_forward4i(256, &X[i], 256, &x[k], r2ir2[j].s01, r1ir1[j]);
+	_forward4i(256, &X[i256], 256, &x[k256], r2ir2[j256].s01, r1ir1[j256]);
 	_forward4(64, &X[i64], r2ir2[j64].s01, r1ir1[j64]);
 	_forward4(16, &X[i16], r2ir2[j16].s01, r1ir1[j16]);
 	_forward4(4, &X[i4], r2ir2[j4].s01, r1ir1[j4]);
@@ -406,7 +396,7 @@ void square1024(__global uint2 * restrict const x, __constmem const uint4 * rest
 	_backward4(4, &X[i4], r2ir2[j4].s23, r1ir1[j4]);
 	_backward4(16, &X[i16], r2ir2[j16].s23, r1ir1[j16]);
 	_backward4(64, &X[i64], r2ir2[j64].s23, r1ir1[j64]);
-	_backward4o(256, &x[k], 256, &X[i], r2ir2[j].s23, r1ir1[j]);
+	_backward4o(256, &x[k256], 256, &X[i256], r2ir2[j256].s23, r1ir1[j256]);
 }
 
 __kernel
