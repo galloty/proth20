@@ -144,10 +144,9 @@ public:
 		_device.loadProgram(src.str().c_str());
 
 		_device.allocMemory(size, constant_size);
-		cl_uint2 norm; norm.s[0] = cl_uint(P1 - (P1 - 1) / size); norm.s[1] = cl_uint(P2 - (P2 - 1) / size);
-		cl_uint blk = 16;
+		const cl_uint2 norm = { cl_uint(P1 - (P1 - 1) / size), cl_uint(P2 - (P2 - 1) / size) };
 		const cl_int k_shift = cl_int(log2(k) - 1);
-		_device.createKernels(norm, blk, cl_uint(n / digit_bit), cl_int(n % digit_bit), cl_uint(k), cl_uint((uint64_t(1) << (32 + k_shift)) / k), k_shift);
+		_device.createKernels(norm, cl_uint(n / digit_bit), cl_int(n % digit_bit), cl_uint(k), cl_uint((uint64_t(1) << (32 + k_shift)) / k), k_shift);
 
 		cl_uint2 * const x = _x;
 		x[0] = { 1, 0 };

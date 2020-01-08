@@ -195,7 +195,7 @@ private:
 	cl_context _context = nullptr;
 	cl_command_queue _queue = nullptr;
 	cl_program _program = nullptr;
-	size_t _size = 0, _constant_size = 0, _size_blk = 0;
+	size_t _size = 0, _constant_size = 0;
 	cl_mem _x = nullptr, _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr = nullptr, _bp = nullptr, _ibp = nullptr, _t0 = nullptr, _t1 = nullptr, _err = nullptr;
 	cl_mem _cr1ir1 = nullptr, _cr2ir2 = nullptr;
 	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr;
@@ -214,7 +214,7 @@ private:
 	std::map<cl_kernel, Profile> _profileMap;
 
 	// Must be identical to ocl defines
-	static const size_t CHUNK64 = 16, BLK32 = 8, BLK64 = 4, BLK128 = 2, BLK256 = 1;
+	static const size_t CHUNK64 = 16, BLK32 = 8, BLK64 = 4, BLK128 = 2, BLK256 = 1, P2I_WGS = 16, P2I_BLK = 16;
 
 public:
 	Device(const Engine & engine, const size_t d) : _engine(engine), _d(d), _platform(engine.getPlatform(d)), _device(engine.getDevice(d))
@@ -352,7 +352,7 @@ public:
 		_r1ir1 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * size);
 		_r2 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint2) * size);
 		_ir2 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint2) * size);
-		_cr = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_long) * size);
+		_cr = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_long) * size / P2I_BLK);
 		_bp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * size / 2 / 4);
 		_ibp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint) * size / 2);
 		_t0 = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * size / 2);
@@ -430,13 +430,11 @@ private:
 	}
 
 public:
-	void createKernels(const cl_uint2 norm, const cl_uint blk, const cl_uint e, const cl_int s, const cl_uint d, const cl_uint d_inv, const cl_int d_shift)
+	void createKernels(const cl_uint2 norm, const cl_uint e, const cl_int s, const cl_uint d, const cl_uint d_inv, const cl_int d_shift)
 	{
 #if ocl_debug
 		std::cerr << "Create ocl kernels." << std::endl;
 #endif
-		_size_blk = _size / blk;
-
 		_sub_ntt64 = _createNttKernel("sub_ntt64", true);
 		_ntt64 = _createNttKernel("ntt64", true);
 		_intt64 = _createNttKernel("intt64", false);
@@ -452,13 +450,11 @@ public:
 		_setKernelArg(_poly2int0, 0, sizeof(cl_mem), &_x);
 		_setKernelArg(_poly2int0, 1, sizeof(cl_mem), &_cr);
 		_setKernelArg(_poly2int0, 2, sizeof(cl_uint2), &norm);
-		_setKernelArg(_poly2int0, 3, sizeof(cl_uint), &blk);
 
 		_poly2int1 = _createKernel("poly2int1");
 		_setKernelArg(_poly2int1, 0, sizeof(cl_mem), &_x);
 		_setKernelArg(_poly2int1, 1, sizeof(cl_mem), &_cr);
-		_setKernelArg(_poly2int1, 2, sizeof(cl_uint), &blk);
-		_setKernelArg(_poly2int1, 3, sizeof(cl_mem), &_err);
+		_setKernelArg(_poly2int1, 2, sizeof(cl_mem), &_err);
 
 		_split_i = _createSplitKernel("split_i", true, e, s, d, d_inv, d_shift);
 
@@ -495,8 +491,6 @@ public:
 #if ocl_debug
 		std::cerr << "Release ocl kernels." << std::endl;
 #endif
-		_size_blk = 0;
-
 		_releaseKernel(_sub_ntt64);
 		_releaseKernel(_ntt64);
 		_releaseKernel(_intt64);
@@ -517,7 +511,6 @@ public:
 		_releaseKernel(_split2_10);
 		_releaseKernel(_split_o);
 		_releaseKernel(_split_f);
-
 	}
 
 public:
@@ -603,8 +596,8 @@ public:
 	void square1024() { _executeKernel(_square1024, _size / 4, 1024 / 4); }
 
 public:
-	void poly2int0() { _executeKernel(_poly2int0, _size_blk); }
-	void poly2int1() { _executeKernel(_poly2int1, _size_blk); }
+	void poly2int0() { _executeKernel(_poly2int0, _size / P2I_BLK, P2I_WGS); }
+	void poly2int1() { _executeKernel(_poly2int1, _size / P2I_BLK); }
 
 public:
 	void split_i() { _executeKernel(_split_i, _size / 8); }

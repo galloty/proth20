@@ -147,12 +147,12 @@ public:
 		primeList.push_back(Number(1027, 21468));	// square32
 		primeList.push_back(Number(1109, 42921));	// square64
 		primeList.push_back(Number(1085, 85959));	// square128
-		primeList.push_back(Number(1015, 171214));	// square256,  0.079
-		primeList.push_back(Number(1197, 343384));	// square512,  0.124
-		primeList.push_back(Number(1089, 685641));	// square1024, 0.210
-		primeList.push_back(Number(1005, 1375758));	// square32,   0.387
-		primeList.push_back(Number(1089, 2746155));	// square64,   0.736
-		primeList.push_back(Number(45, 5308037));	// square128,  1.43 ms
+		primeList.push_back(Number(1015, 171214));	// square256,  0.073
+		primeList.push_back(Number(1197, 343384));	// square512,  0.116
+		primeList.push_back(Number(1089, 685641));	// square1024, 0.195
+		primeList.push_back(Number(1005, 1375758));	// square32,   0.350
+		primeList.push_back(Number(1089, 2746155));	// square64,   0.664
+		primeList.push_back(Number(45, 5308037));	// square128,  1.28 ms
 
 		std::vector<Number>	compositeList;
 		compositeList.push_back(Number(9999, 299,    "B073C97A2450454F"));
