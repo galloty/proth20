@@ -196,12 +196,14 @@ private:
 	cl_command_queue _queue = nullptr;
 	cl_program _program = nullptr;
 	size_t _size = 0, _constant_size = 0;
-	cl_mem _x = nullptr, _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr = nullptr, _bp = nullptr, _ibp = nullptr, _t0 = nullptr, _t1 = nullptr, _err = nullptr;
+	cl_mem _x = nullptr, _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr = nullptr, _bp = nullptr, _ibp = nullptr, _t = nullptr, _err = nullptr;
 	cl_mem _cr1ir1 = nullptr, _cr2ir2 = nullptr;
 	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr;
 	cl_kernel _square32 = nullptr, _square64 = nullptr, _square128 = nullptr, _square256 = nullptr,_square512 = nullptr, _square1024 = nullptr;
-	cl_kernel _poly2int0 = nullptr, _poly2int1 = nullptr, _split_i = nullptr, _split4 = nullptr;
-	cl_kernel _split2 = nullptr, _split2_10 = nullptr, _split_o = nullptr, _split_f = nullptr;
+	cl_kernel _poly2int0 = nullptr, _poly2int1 = nullptr;
+	cl_kernel _reduce_i = nullptr, _reduce_o = nullptr, _reduce_f = nullptr;
+	cl_kernel _reduce_upsweep4 = nullptr, _reduce_downsweep4 = nullptr, _reduce_topsweep2 = nullptr, _reduce_topsweep4 = nullptr;
+	;
 	struct Profile
 	{
 		std::string name;
@@ -265,17 +267,21 @@ public:
 	}
 
 public:
-	void displayProfiles() const
+	void displayProfiles(const size_t count) const
 	{
-		cl_ulong time = 0;
-		for (auto it : _profileMap) time += it.second.time;
+		cl_ulong ptime = 0;
+		for (auto it : _profileMap) ptime += it.second.time;
+		ptime /= count;
+
 		for (auto it : _profileMap)
 		{
 			const Profile & profile = it.second;
 			if (profile.count != 0)
 			{
-				std::cout << "- " << profile.name << ": " << profile.count << ", " << std::setprecision(3)
-					<< profile.time * 100.0 / time << " %, " << profile.time << " (" << (profile.time / profile.count) << ")" << std::endl;
+				const size_t ncount = profile.count / count;
+				const cl_ulong ntime = profile.time / count;
+				std::cout << "- " << profile.name << ": " << ncount << ", " << std::setprecision(3)
+					<< ntime * 100.0 / ptime << " %, " << ntime << " (" << (ntime / ncount) << ")" << std::endl;
 			}
 		}
 	}
@@ -355,8 +361,7 @@ public:
 		_cr = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_long) * size / P2I_BLK);
 		_bp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * size / 2 / 4);
 		_ibp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint) * size / 2);
-		_t0 = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * size / 2);
-		_t1 = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * size / 2);
+		_t = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * (size / 2 + 1));
 		_err = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_int));
 
 		_constant_size = constant_size;
@@ -379,8 +384,7 @@ public:
 			_releaseBuffer(_cr);
 			_releaseBuffer(_bp);
 			_releaseBuffer(_ibp);
-			_releaseBuffer(_t0);
-			_releaseBuffer(_t1);
+			_releaseBuffer(_t);
 			_releaseBuffer(_err);
 			_size = 0;
 		}
@@ -414,12 +418,12 @@ private:
 	}
 
 private:
-	inline cl_kernel _createSplitKernel(const char * const kernelName, const bool forward,
+	inline cl_kernel _createReduceKernel(const char * const kernelName, const bool forward,
 		const cl_uint e, const cl_int s, const cl_uint d, const cl_uint d_inv, const cl_int d_shift)
 	{
 		cl_kernel kernel = _createKernel(kernelName);
 		_setKernelArg(kernel, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(kernel, 1, sizeof(cl_mem), &_t1);
+		_setKernelArg(kernel, 1, sizeof(cl_mem), &_t);
 		_setKernelArg(kernel, 2, sizeof(cl_mem), forward ? &_bp : &_ibp);
 		_setKernelArg(kernel, 3, sizeof(cl_uint), &e);
 		_setKernelArg(kernel, 4, sizeof(cl_int), &s);
@@ -428,6 +432,16 @@ private:
 		_setKernelArg(kernel, 7, sizeof(cl_int), &d_shift);
 		return kernel;
 	}
+
+private:
+	inline cl_kernel _createSweepKernel(const char * const kernelName, const cl_uint d)
+	{
+		cl_kernel kernel = _createKernel(kernelName);
+		_setKernelArg(kernel, 0, sizeof(cl_mem), &_t);
+		_setKernelArg(kernel, 1, sizeof(cl_uint), &d);
+		return kernel;
+	}
+
 
 public:
 	void createKernels(const cl_uint2 norm, const cl_uint e, const cl_int s, const cl_uint d, const cl_uint d_inv, const cl_int d_shift)
@@ -456,33 +470,26 @@ public:
 		_setKernelArg(_poly2int1, 1, sizeof(cl_mem), &_cr);
 		_setKernelArg(_poly2int1, 2, sizeof(cl_mem), &_err);
 
-		_split_i = _createSplitKernel("split_i", true, e, s, d, d_inv, d_shift);
+		_reduce_i = _createReduceKernel("reduce_i", true, e, s, d, d_inv, d_shift);
+		_reduce_o = _createReduceKernel("reduce_o", false, e, s, d, d_inv, d_shift);
 
-		_split4 = _createKernel("split4");
-		_setKernelArg(_split4, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_split4, 1, sizeof(cl_mem), &_t0);
-		_setKernelArg(_split4, 2, sizeof(cl_mem), &_t1);
-		_setKernelArg(_split4, 3, sizeof(cl_uint), &d);
-
-		_split2 = _createKernel("split2");
-		_setKernelArg(_split2, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_split2, 1, sizeof(cl_mem), &_t0);
-		_setKernelArg(_split2, 2, sizeof(cl_uint), &d);
-
-		_split2_10 = _createKernel("split2_10");
-		_setKernelArg(_split2_10, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_split2_10, 1, sizeof(cl_mem), &_t0);
-		_setKernelArg(_split2_10, 2, sizeof(cl_mem), &_t1);
-		_setKernelArg(_split2_10, 3, sizeof(cl_uint), &d);
-
-		_split_o = _createSplitKernel("split_o", false, e, s, d, d_inv, d_shift);
-
-		_split_f = _createKernel("split_f");
-		_setKernelArg(_split_f, 0, sizeof(cl_mem), &_x);
+		_reduce_f = _createKernel("reduce_f");
+		_setKernelArg(_reduce_f, 0, sizeof(cl_mem), &_x);
 		const cl_uint n = cl_uint(_size / 2);
-		_setKernelArg(_split_f, 1, sizeof(cl_uint), &n);
-		_setKernelArg(_split_f, 2, sizeof(cl_uint), &e);
-		_setKernelArg(_split_f, 3, sizeof(cl_int), &s);
+		_setKernelArg(_reduce_f, 1, sizeof(cl_uint), &n);
+		_setKernelArg(_reduce_f, 2, sizeof(cl_uint), &e);
+		_setKernelArg(_reduce_f, 3, sizeof(cl_int), &s);
+
+		_reduce_upsweep4 = _createSweepKernel("reduce_upsweep4", d);
+		_reduce_downsweep4 = _createSweepKernel("reduce_downsweep4", d);
+
+		_reduce_topsweep2 = _createSweepKernel("reduce_topsweep2", d);
+		const cl_uint n_2 = cl_uint(_size / 4);
+		_setKernelArg(_reduce_topsweep2, 2, sizeof(cl_uint), &n_2);
+
+		_reduce_topsweep4 = _createSweepKernel("reduce_topsweep4", d);
+		const cl_uint n_4 = cl_uint(_size / 8);
+		_setKernelArg(_reduce_topsweep4, 2, sizeof(cl_uint), &n_4);
 	}
 
 public:
@@ -505,12 +512,13 @@ public:
 		_releaseKernel(_poly2int0);
 		_releaseKernel(_poly2int1);
 
-		_releaseKernel(_split_i);
-		_releaseKernel(_split4);
-		_releaseKernel(_split2);
-		_releaseKernel(_split2_10);
-		_releaseKernel(_split_o);
-		_releaseKernel(_split_f);
+		_releaseKernel(_reduce_i);
+		_releaseKernel(_reduce_o);
+		_releaseKernel(_reduce_f);
+		_releaseKernel(_reduce_upsweep4);
+		_releaseKernel(_reduce_downsweep4);
+		_releaseKernel(_reduce_topsweep2);
+		_releaseKernel(_reduce_topsweep4);
 	}
 
 public:
@@ -600,30 +608,29 @@ public:
 	void poly2int1() { _executeKernel(_poly2int1, _size / P2I_BLK); }
 
 public:
-	void split_i() { _executeKernel(_split_i, _size / 8); }
+	void reduce_i() { _executeKernel(_reduce_i, _size / 8); }
 
 public:
-	void split4(const cl_uint m, const bool b)
+	void reduce_upsweep4(const cl_uint m, const cl_uint s)
 	{
-		const cl_int ib = b ? 1 : 0;
-		_setKernelArg(_split4, 4, sizeof(cl_uint), &m);
-		_setKernelArg(_split4, 5, sizeof(cl_int), &ib);
-		_executeKernel(_split4, _size / 8);
+		_setKernelArg(_reduce_upsweep4, 2, sizeof(cl_uint), &m);
+		_executeKernel(_reduce_upsweep4, s);
 	}
 
 public:
-	void split2() { _executeKernel(_split2, _size / 4); }
-	void split2_10() { _executeKernel(_split2_10, _size / 4); }
-
-public:
-	void split_o(const bool b)
+	void reduce_downsweep4(const cl_uint m, const cl_uint s)
 	{
-		_setKernelArg(_split_o, 1, sizeof(cl_mem), b ? &_t0 : &_t1);
-		_executeKernel(_split_o, _size / 2);
+		_setKernelArg(_reduce_downsweep4, 2, sizeof(cl_uint), &m);
+		_executeKernel(_reduce_downsweep4, s);
 	}
 
 public:
-	void split_f() { _executeKernel(_split_f, 1); }
+	void reduce_topsweep2() { _executeKernel(_reduce_topsweep2, 1); }
+	void reduce_topsweep4() { _executeKernel(_reduce_topsweep4, 1); }
+
+public:
+	void reduce_o() { _executeKernel(_reduce_o, _size / 2); }
+	void reduce_f() { _executeKernel(_reduce_f, 1); }
 
 private:
 	void _sync()

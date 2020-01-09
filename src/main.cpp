@@ -126,6 +126,68 @@ public:
 public:
 	static void run()
 	{
+		// for (size_t n = 16; n <= 32; n *= 2)
+		// {
+		// 	int t[n + 1];
+		// 	for (size_t i = 0; i < n; ++i) t[i + 1] = n - i;
+
+		// 	size_t s = 1, m = n / 4;
+		// 	for (; m > 1; s *= 4, m /= 4)
+		// 	{
+		// 		for (size_t k = 0; k < m; ++k)
+		// 		{
+		// 			int * const tk = &t[k * 4 * s + 1];	// shift s
+		// 			const int u0 = tk[0 * s], u1 = tk[1 * s], u2 = tk[2 * s], u3 = tk[3 * s];
+		// 			const int v0 = u0 + u1, v2 = u2 + u3;
+		// 			tk[0 * s] = v0 + v2;
+		// 			tk[2 * s] = v2;
+		// 		}
+		// 	}
+
+		// 	if (m == 1)
+		// 	{
+		// 		const size_t n_4 = n / 4;
+		// 		const int u0 = t[1 + 0 * n_4], u1 = t[1 + 1 * n_4], u2 = t[1 + 2 * n_4], u3 = t[1 + 3 * n_4];
+		// 		const int v0 = u0 + u1, v2 = u2 + u3;
+		// 		t[0] = v0 + v2;
+		// 		t[1 + 0 * n_4] = u1 + v2;
+		// 		t[1 + 1 * n_4] = v2;
+		// 		t[1 + 2 * n_4] = u3;
+		// 		t[1 + 3 * n_4] = 0;
+		// 	}
+		// 	else
+		// 	{
+		// 		const size_t n_2 = n / 2;
+		// 		const int u0 = t[1], u1 = t[1 + n_2];
+		// 		t[0] = u0 + u1;
+		// 		t[1] = u1;
+		// 		t[1 + n_2] = 0;
+		// 	}
+
+		// 	m = (m == 0) ? 2 : 4; s /= 4;
+
+		// 	for (; m < n; s /= 4, m *= 4)
+		// 	{
+		// 		for (size_t k = 0; k < m; ++k)
+		// 		{
+		// 			int * const tk = &t[k * 4 * s + 1];
+		// 			const int u0 = tk[0 * s], u1 = tk[1 * s], u2 = tk[2 * s], u3 = tk[3 * s];
+		// 			const int v0 = u0 + u2;
+		// 			tk[0 * s] = v0 + u1;
+		// 			tk[1 * s] = v0;
+		// 			tk[2 * s] = u0 + u3;
+		// 			tk[3 * s] = u0;
+		// 		}
+		// 	}
+
+		// 	// 136, 120, 105, 91, 78, 66, 55, 45, 36, 28, 21, 15, 10, 6, 3, 1
+		// 	// 528, 496, 465, 435, 406, 378, 351, 325, 300, 276, 253, 231, 210, 190, 171, 153, 136, 120, 105, 91, 78, 66, 55, 45, 36, 28, 21, 15, 10, 6, 3, 1
+		// 	for (size_t i = 0; i < n; ++i) std::cout << t[i] << ", ";
+		// 	std::cout << std::endl;
+		// }
+
+		// return;
+
 		std::cout << "proth20 0.0.1" << std::endl;
 		std::cout << "Copyright (c) 2020, Yves Gallot" << std::endl;
 		std::cout << "proth20 is free source code, under the MIT license." << std::endl << std::endl;
@@ -147,12 +209,12 @@ public:
 		primeList.push_back(Number(1027, 21468));	// square32
 		primeList.push_back(Number(1109, 42921));	// square64
 		primeList.push_back(Number(1085, 85959));	// square128
-		primeList.push_back(Number(1015, 171214));	// square256,  0.073
-		primeList.push_back(Number(1197, 343384));	// square512,  0.116
-		primeList.push_back(Number(1089, 685641));	// square1024, 0.195
-		primeList.push_back(Number(1005, 1375758));	// square32,   0.350
+		primeList.push_back(Number(1015, 171214));	// square256,  0.134
+		primeList.push_back(Number(1197, 343384));	// square512,  0.139
+		primeList.push_back(Number(1089, 685641));	// square1024, 0.228
+		primeList.push_back(Number(1005, 1375758));	// square32,   0.377
 		primeList.push_back(Number(1089, 2746155));	// square64,   0.664
-		primeList.push_back(Number(45, 5308037));	// square128,  1.28 ms
+		primeList.push_back(Number(45, 5308037));	// square128,  1.27 ms
 
 		std::vector<Number>	compositeList;
 		compositeList.push_back(Number(9999, 299,    "B073C97A2450454F"));
@@ -178,21 +240,24 @@ public:
 
 		// profile
 		// gpmp X(45, 5308037, device0);
-		// X.square();
+		// const size_t pCount = 1000;
+		// for (size_t i = 0; i < pCount; ++i) X.square();
 		// std::cout << "Size = " << X.getSize() << std::endl;
-		// device0.displayProfiles();
+		// device0.displayProfiles(pCount);
 
 		// Size = 524288
-		// - sub_ntt64: 1, 8.52 %, 142528 (142528)
-		// - ntt64: 1, 8.69 %, 145248 (145248)
-		// - intt64: 2, 16.9 %, 283168 (141584)
-		// - square128: 1, 17.1 %, 286720 (286720)
-		// - poly2int0: 1, 18.4 %, 306976 (306976)
-		// - poly2int1: 1, 3.54 %, 59264 (59264)
-		// - split_i: 1, 8.88 %, 148480 (148480)
-		// - split4: 8, 13.6 %, 227808 (28476)
-		// - split_o: 1, 4.08 %, 68224 (68224)
-		// - split_f: 1, 0.212 %, 3552 (3552)
+		// - sub_ntt64: 1, 9.75 %, 123933 (123933)
+		// - ntt64: 1, 10.1 %, 128039 (128039)
+		// - intt64: 2, 19.4 %, 246634 (123317)
+		// - square128: 1, 17.6 %, 223488 (223488)
+		// - poly2int0: 1, 10.4 %, 132618 (132618)
+		// - poly2int1: 1, 3.04 %, 38687 (38687)
+		// - reduce_i: 1, 9.36 %, 118979 (118979)
+		// - reduce_upsweep4: 8, 6.41 %, 81486 (10185)
+		// - reduce_downsweep4: 8, 8.22 %, 104445 (13055)
+		// - reduce_topsweep4: 1, 0.221 %, 2811 (2811)
+		// - reduce_o: 1, 5.26 %, 66862 (66862)
+		// - reduce_f: 1, 0.251 %, 3186 (3186)
 
 		// bench
 		for (const auto & p : primeList) check(p.k, p.n, device0, true);

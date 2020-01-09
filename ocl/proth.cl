@@ -464,7 +464,7 @@ void poly2int1(__global uint2 * restrict const x, __global const long * restrict
 }
 
 __kernel
-void split_i(__global uint2 * restrict const x, __global uint * restrict const t, __global const uint4 * restrict const bp,
+void reduce_i(__global uint2 * restrict const x, __global uint * restrict const t, __global const uint4 * restrict const bp,
 	const uint e, const int s, const uint d, const uint d_inv, const int d_shift)
 {
 	const size_t k = get_global_id(0);
@@ -484,49 +484,56 @@ void split_i(__global uint2 * restrict const x, __global uint * restrict const t
 
 	const uint u0 = _rem(x0 * (ulong)(b.s0), d, d_inv, d_shift), u1 = _rem(x1 * (ulong)(b.s1), d, d_inv, d_shift);
 	const uint u2 = _rem(x2 * (ulong)(b.s2), d, d_inv, d_shift), u3 = _rem(x3 * (ulong)(b.s3), d, d_inv, d_shift);
-	const uint u01 = _addmod(u0, u1, d), u23 = _addmod(u2, u3, d);
-	t[4 * k + 0] = _addmod(u01, u23, d); t[4 * k + 1] = _addmod(u1, u23, d); t[4 * k + 2] = u23; t[4 * k + 3] = u3;
+	t[4 * k + 0 + 1] = u0; t[4 * k + 1 + 1] = u1; t[4 * k + 2 + 1] = u2; t[4 * k + 3 + 1] = u3;
 }
 
 __kernel
-void split4(__global uint2 * restrict const x, __global uint * restrict const t0, __global uint * restrict const t1, const uint d, const uint m, const int b01)
+void reduce_upsweep4(__global uint * restrict const t, const uint d, const uint m)
 {
 	const size_t k = get_global_id(0);
-
-	const size_t i = k & (m - 1);
-
-	__global const uint * restrict const ti = (b01 != 0) ? t0 : t1;
-	__global uint * restrict const to = (b01 != 0) ? t1 : t0;
-
-	__global uint * restrict const xi = &ti[4 * (k - i)];
-	__global uint * restrict const xo = &to[4 * (k - i)];
-
-	const uint u0 = xi[i + 0 * m], u1 = xi[i + 1 * m], u2 = xi[i + 2 * m], u3 = xi[i + 3 * m];
-	const uint s1 = xi[1 * m], s2 = xi[2 * m], s3 = xi[3 * m];
-	const uint u01 = _addmod(u0, s1, d), u23 = _addmod(u2, s3, d), s23 = _addmod(s2, s3, d);
-	xo[i + 0 * m] = _addmod(u01, s23, d); xo[i + 1 * m] = _addmod(u1, s23, d);
-	xo[i + 2 * m] = u23; xo[i + 3 * m] = u3;
+	__global uint * restrict const tk = &t[k * 4 * m + 1];	// TODO shift s
+	const uint u0 = tk[0 * m], u1 = tk[1 * m], u2 = tk[2 * m], u3 = tk[3 * m];
+	const uint v0 = _addmod(u0, u1, d), v2 = _addmod(u2, u3, d);
+	tk[0 * m] = _addmod(v0, v2, d);
+	tk[2 * m] = v2;
 }
 
 __kernel
-void split2(__global uint2 * restrict const x, __global uint * restrict const t0, const uint d)
+void reduce_downsweep4(__global uint * restrict const t, const uint d, const uint m)
 {
-	const size_t n_2 = get_global_size(0), k = get_global_id(0);
-
-	t0[k] = _addmod(t0[k], t0[n_2], d);
+	const size_t k = get_global_id(0);
+	__global uint * restrict const tk = &t[k * 4 * m + 1];	// TODO shift s
+	const uint u0 = tk[0 * m], u1 = tk[1 * m], u2 = tk[2 * m], u3 = tk[3 * m];
+	const uint v0 = _addmod(u0, u2, d);
+	tk[0 * m] = _addmod(v0, u1, d);
+	tk[1 * m] = v0;
+	tk[2 * m] = _addmod(u0, u3, d);
+	tk[3 * m] = u0;
 }
 
 __kernel
-void split2_10(__global uint2 * restrict const x, __global uint * restrict const t0, __global const uint * restrict const t1, const uint d)
+void reduce_topsweep2(__global uint * restrict const t, const uint d, const uint n_2)
 {
-	const size_t n_2 = get_global_size(0), k = get_global_id(0);
-
-	t0[k] = _addmod(t1[k], t1[n_2], d);
-	t0[k + n_2] = t1[k + n_2];
+	const uint u0 = t[1], u1 = t[1 + n_2];
+	t[0] = _addmod(u0, u1, d);
+	t[1] = u1;
+	t[1 + n_2] = 0;
 }
 
 __kernel
-void split_o(__global uint2 * restrict const x, __global uint * restrict const t, __global const uint * restrict const ibp,
+void reduce_topsweep4(__global uint * restrict const t, const uint d, const uint n_4)
+{
+	const uint u0 = t[1 + 0 * n_4], u1 = t[1 + 1 * n_4], u2 = t[1 + 2 * n_4], u3 = t[1 + 3 * n_4];
+	const uint v0 = _addmod(u0, u1, d), v2 = _addmod(u2, u3, d);
+	t[0] = _addmod(v0, v2, d);
+	t[1 + 0 * n_4] = _addmod(u1, v2, d);
+	t[1 + 1 * n_4] = v2;
+	t[1 + 2 * n_4] = u3;
+	t[1 + 3 * n_4] = 0;
+}
+
+__kernel
+void reduce_o(__global uint2 * restrict const x, __global const uint * restrict const t, __global const uint * restrict const ibp,
 	const uint e, const int s, const uint d, const uint d_inv, const int d_shift)
 {
 	const size_t n = get_global_size(0), k = get_global_id(0);
@@ -548,7 +555,7 @@ void split_o(__global uint2 * restrict const x, __global uint * restrict const t
 }
 
 __kernel
-void split_f(__global uint2 * restrict const x, const uint n, const uint e, const int s)
+void reduce_f(__global uint2 * restrict const x, const uint n, const uint e, const int s)
 {
 	const uint rs = x[e].s0 & ((1u << s) - 1);
 	const ulong rds = ((ulong)(x[n].s0) << s) | rs;		// rds < 2^(29 + digit_bit - 1)
