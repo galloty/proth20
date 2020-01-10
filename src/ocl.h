@@ -202,7 +202,7 @@ private:
 	cl_kernel _square32 = nullptr, _square64 = nullptr, _square128 = nullptr, _square256 = nullptr,_square512 = nullptr, _square1024 = nullptr;
 	cl_kernel _poly2int0 = nullptr, _poly2int1 = nullptr;
 	cl_kernel _reduce_i = nullptr, _reduce_o = nullptr, _reduce_f = nullptr;
-	cl_kernel _reduce_upsweep4 = nullptr, _reduce_downsweep4 = nullptr, _reduce_topsweep2 = nullptr, _reduce_topsweep4 = nullptr;
+	cl_kernel _reduce_upsweep4 = nullptr, _reduce_downsweep4 = nullptr, _reduce_topsweep8 = nullptr, _reduce_topsweep16 = nullptr;
 	;
 	struct Profile
 	{
@@ -361,7 +361,7 @@ public:
 		_cr = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_long) * size / P2I_BLK);
 		_bp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * size / 2 / 4);
 		_ibp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint) * size / 2);
-		_t = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * (size / 2 + 1));
+		_t = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * 2 * (size / 2));
 		_err = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_int));
 
 		_constant_size = constant_size;
@@ -442,7 +442,6 @@ private:
 		return kernel;
 	}
 
-
 public:
 	void createKernels(const cl_uint2 norm, const cl_uint e, const cl_int s, const cl_uint d, const cl_uint d_inv, const cl_int d_shift)
 	{
@@ -482,14 +481,8 @@ public:
 
 		_reduce_upsweep4 = _createSweepKernel("reduce_upsweep4", d);
 		_reduce_downsweep4 = _createSweepKernel("reduce_downsweep4", d);
-
-		_reduce_topsweep2 = _createSweepKernel("reduce_topsweep2", d);
-		const cl_uint n_2 = cl_uint(_size / 4);
-		_setKernelArg(_reduce_topsweep2, 2, sizeof(cl_uint), &n_2);
-
-		_reduce_topsweep4 = _createSweepKernel("reduce_topsweep4", d);
-		const cl_uint n_4 = cl_uint(_size / 8);
-		_setKernelArg(_reduce_topsweep4, 2, sizeof(cl_uint), &n_4);
+		_reduce_topsweep8 = _createSweepKernel("reduce_topsweep8", d);
+		_reduce_topsweep16 = _createSweepKernel("reduce_topsweep16", d);
 	}
 
 public:
@@ -517,8 +510,8 @@ public:
 		_releaseKernel(_reduce_f);
 		_releaseKernel(_reduce_upsweep4);
 		_releaseKernel(_reduce_downsweep4);
-		_releaseKernel(_reduce_topsweep2);
-		_releaseKernel(_reduce_topsweep4);
+		_releaseKernel(_reduce_topsweep8);
+		_releaseKernel(_reduce_topsweep16);
 	}
 
 public:
@@ -611,22 +604,31 @@ public:
 	void reduce_i() { _executeKernel(_reduce_i, _size / 8); }
 
 public:
-	void reduce_upsweep4(const cl_uint m, const cl_uint s)
+	void reduce_upsweep4(const cl_uint s, const cl_uint j)
 	{
-		_setKernelArg(_reduce_upsweep4, 2, sizeof(cl_uint), &m);
+		_setKernelArg(_reduce_upsweep4, 2, sizeof(cl_uint), &s);
+		_setKernelArg(_reduce_upsweep4, 3, sizeof(cl_uint), &j);
 		_executeKernel(_reduce_upsweep4, s);
 	}
 
 public:
-	void reduce_downsweep4(const cl_uint m, const cl_uint s)
+	void reduce_downsweep4(const cl_uint s, const cl_uint j)
 	{
-		_setKernelArg(_reduce_downsweep4, 2, sizeof(cl_uint), &m);
+		_setKernelArg(_reduce_downsweep4, 2, sizeof(cl_uint), &s);
+		_setKernelArg(_reduce_downsweep4, 3, sizeof(cl_uint), &j);
 		_executeKernel(_reduce_downsweep4, s);
 	}
 
+private:
+	inline void _executeTopsweepKernel(cl_kernel kernel, const cl_uint j, const size_t size)
+	{
+		_setKernelArg(kernel, 2, sizeof(cl_uint), &j);
+		_executeKernel(kernel, size / 4, size / 4);
+	}
+
 public:
-	void reduce_topsweep2() { _executeKernel(_reduce_topsweep2, 1); }
-	void reduce_topsweep4() { _executeKernel(_reduce_topsweep4, 1); }
+	void reduce_topsweep8(const cl_uint j) { _executeTopsweepKernel(_reduce_topsweep8, j, 8); }
+	void reduce_topsweep16(const cl_uint j) { _executeTopsweepKernel(_reduce_topsweep16, j, 16); }
 
 public:
 	void reduce_o() { _executeKernel(_reduce_o, _size / 2); }

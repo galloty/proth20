@@ -358,8 +358,6 @@ private:
 		// Y = [X_hi / k'], r = X_hi mod k'
 		// R = r * B^e + X_lo
 
-		const size_t size_2 = _size / 2;
-
 		// x size is size, 0 <= e < size / 2
 
 		// Daisuke Takahashi, A parallel algorithm for multiple-precision division by a single-precision integer.
@@ -368,19 +366,23 @@ private:
 
 		// x size is size / 2, x[0] = X mod B^n, x[1] = X / (B^e * 2^s)
 
-		size_t m = 1, s = size_2 / 4;
-		for (; s > 1; m *= 4, s /= 4)
+		cl_uint j = 1, n = cl_uint(_size / 2);
+		cl_uint s = n / 4;
+		while (true)
 		{
-			_device.reduce_upsweep4(m, s);
+			_device.reduce_upsweep4(s, j);
+			j += 5 * s;
+			if (s <= 16) break;
+			s /= 4;
 		}
 
-		if (s == 1) _device.reduce_topsweep4();
-		else		_device.reduce_topsweep2();
+		if (s == 8)	_device.reduce_topsweep8(j);
+		else		_device.reduce_topsweep16(j);
 
-		s = (s == 0) ? 2 : 4; m /= 4;
-		for (; s < size_2; m /= 4, s *= 4)
+		for (; s < n; s *= 4)
 		{
-			_device.reduce_downsweep4(m, s);
+			j -= 5 * s;
+			_device.reduce_downsweep4(s, j);
 		}
 
 		// x size is size / 2, x[0] = X mod B^n, x[1] = X / (B^e * 2^s), x[n][0] = remainders x[1] / d

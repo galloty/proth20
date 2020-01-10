@@ -204,7 +204,7 @@ void sub_ntt64(__global uint2 * restrict const x, __global const uint4 * restric
 	const size_t i_4m = _i_4m * CHUNK64 | chunk_idx;
 	const size_t i_m = _i_m * CHUNK64 | chunk_idx;
 
-	const size_t k_16m = _i_16m * m | bl_i;
+	const size_t k_16m = _i_16m * m | bl_i;	// TODO shift m ?
 	const size_t k_4m = _i_4m * m | bl_i;
 	const size_t k_m = _i_m * m | bl_i;
 
@@ -235,7 +235,7 @@ void ntt64(__global uint2 * restrict const x, __global const uint4 * restrict co
 	const size_t i_4m = _i_4m * CHUNK64 | chunk_idx;
 	const size_t i_m = _i_m * CHUNK64 | chunk_idx;
 
-	const size_t k_16m = _i_16m * m | bl_i;
+	const size_t k_16m = _i_16m * m | bl_i;	// TODO shift m ?
 	const size_t k_4m = _i_4m * m | bl_i;
 	const size_t k_m = _i_m * m | bl_i;
 
@@ -266,7 +266,7 @@ void intt64(__global uint2 * restrict const x, __global const uint4 * restrict c
 	const size_t i_4m = _i_4m * CHUNK64 | chunk_idx;
 	const size_t i_m = _i_m * CHUNK64 | chunk_idx;
 
-	const size_t k_16m = _i_16m * m | bl_i;
+	const size_t k_16m = _i_16m * m | bl_i;	// TODO shift m ?
 	const size_t k_4m = _i_4m * m | bl_i;
 	const size_t k_m = _i_m * m | bl_i;
 
@@ -488,48 +488,95 @@ void reduce_i(__global uint2 * restrict const x, __global uint * restrict const 
 }
 
 __kernel
-void reduce_upsweep4(__global uint * restrict const t, const uint d, const uint m)
+void reduce_upsweep4(__global uint * restrict const t, const uint d, const uint s, const uint j)
 {
 	const size_t k = get_global_id(0);
-	__global uint * restrict const tk = &t[k * 4 * m + 1];	// TODO shift s
-	const uint u0 = tk[0 * m], u1 = tk[1 * m], u2 = tk[2 * m], u3 = tk[3 * m];
-	const uint v0 = _addmod(u0, u1, d), v2 = _addmod(u2, u3, d);
-	tk[0 * m] = _addmod(v0, v2, d);
-	tk[2 * m] = v2;
+
+	__global uint * restrict const ti = &t[j + 0 * s + 4 * k];
+	__global uint * restrict const to = &t[j + 4 * s + 1 * k];
+
+	const uint u0 = ti[0], u1 = ti[1], u2 = ti[2], u3 = ti[3];
+	const uint u01 = _addmod(u0, u1, d), u23 = _addmod(u2, u3, d), u0123 = _addmod(u01, u23, d);
+	// to[s]: next step, ti[1] = u1, to[0]: down step, ti[3] = u3
+	to[0] = u23; to[s] = u0123;
 }
 
 __kernel
-void reduce_downsweep4(__global uint * restrict const t, const uint d, const uint m)
+void reduce_downsweep4(__global uint * restrict const t, const uint d, const uint s, const uint j)
 {
 	const size_t k = get_global_id(0);
-	__global uint * restrict const tk = &t[k * 4 * m + 1];	// TODO shift s
-	const uint u0 = tk[0 * m], u1 = tk[1 * m], u2 = tk[2 * m], u3 = tk[3 * m];
-	const uint v0 = _addmod(u0, u2, d);
-	tk[0 * m] = _addmod(v0, u1, d);
-	tk[1 * m] = v0;
-	tk[2 * m] = _addmod(u0, u3, d);
-	tk[3 * m] = u0;
+
+	__global uint * restrict const ti = &t[j + 4 * s + 1 * k];
+	__global uint * restrict const to = &t[j + 0 * s + 4 * k];
+
+	const uint u0 = ti[s], u2 = ti[0], u1 = to[1], u3 = to[3];
+	const uint u02 = _addmod(u0, u2, d), u012 = _addmod(u02, u1, d), u03 = _addmod(u0, u3, d);
+	to[0] = u012; to[1] = u02; to[2] = u03; to[3] = u0;
 }
 
-__kernel
-void reduce_topsweep2(__global uint * restrict const t, const uint d, const uint n_2)
+inline void _reduce_upsweep4i(__local uint * restrict const T, __global const uint * restrict const t, const uint d, const uint j, const uint s, const size_t k)
 {
-	const uint u0 = t[1], u1 = t[1 + n_2];
-	t[0] = _addmod(u0, u1, d);
-	t[1] = u1;
-	t[1 + n_2] = 0;
+	__global const uint * restrict const ti = &t[j + 0 * s + 4 * k];
+	__local uint * restrict const To = &T[4 * s + 1 * k];
+
+	const uint u0 = ti[0], u1 = ti[1], u2 = ti[2], u3 = ti[3];
+	const uint u01 = _addmod(u0, u1, d), u23 = _addmod(u2, u3, d), u0123 = _addmod(u01, u23, d);
+	To[0] = u23; To[s] = u0123;
 }
 
-__kernel
-void reduce_topsweep4(__global uint * restrict const t, const uint d, const uint n_4)
+inline void _reduce_downsweep4o(__global uint * restrict const t, __local const uint * restrict const T, const uint d, const uint j, const uint s, const size_t k)
 {
-	const uint u0 = t[1 + 0 * n_4], u1 = t[1 + 1 * n_4], u2 = t[1 + 2 * n_4], u3 = t[1 + 3 * n_4];
-	const uint v0 = _addmod(u0, u1, d), v2 = _addmod(u2, u3, d);
-	t[0] = _addmod(v0, v2, d);
-	t[1 + 0 * n_4] = _addmod(u1, v2, d);
-	t[1 + 1 * n_4] = v2;
-	t[1 + 2 * n_4] = u3;
-	t[1 + 3 * n_4] = 0;
+	__local const uint * restrict const Ti = &T[4 * s + 1 * k];
+	__global uint * restrict const to = &t[j + 0 * s + 4 * k];
+
+	const uint u0 = Ti[s], u2 = Ti[0], u1 = to[1], u3 = to[3];
+	const uint u02 = _addmod(u0, u2, d), u012 = _addmod(u02, u1, d), u03 = _addmod(u0, u3, d);
+	to[0] = u012; to[1] = u02; to[2] = u03; to[3] = u0;
+}
+
+inline void _reduce_topsweep2(__global uint * restrict const t, __local uint * restrict const T, const uint d, const uint j)
+{
+	const uint u0 = T[j + 0], u1 = T[j + 1];
+	const uint u01 = _addmod(u0, u1, d);
+	t[0] = u01;
+	T[j + 0] = u1; T[j + 1] = 0;
+}
+
+inline void _reduce_topsweep4(__global uint * restrict const t, __local uint * restrict const T, const uint d, const uint j)
+{
+	const uint u0 = T[j + 0], u1 = T[j + 1], u2 = T[j + 2], u3 = T[j + 3];
+	const uint u01 = _addmod(u0, u1, d), u23 = _addmod(u2, u3, d);
+	const uint u123 = _addmod(u1, u23, d), u0123 = _addmod(u01, u23, d);
+	t[0] = u0123;
+	T[j + 0] = u123; T[j + 1] = u23; T[j + 2] = u3; T[j + 3] = 0;
+}
+
+__kernel __attribute__((reqd_work_group_size(8 / 4, 1, 1)))
+void reduce_topsweep8(__global uint * restrict const t, const uint d, const uint j)
+{
+	__local uint T[8 + 4];	// TODO remove 8
+
+	const size_t i = get_local_id(0);
+
+	_reduce_upsweep4i(T, t, d, j, 2, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i == 0) _reduce_topsweep2(t, T, d, 10);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	_reduce_downsweep4o(t, T, d, j, 2, i);
+}
+
+__kernel __attribute__((reqd_work_group_size(16 / 4, 1, 1)))
+void reduce_topsweep16(__global uint * restrict const t, const uint d, const uint j)
+{
+	__local uint T[16 + 8];	// TODO remove 16
+
+	const size_t i = get_local_id(0);
+
+	_reduce_upsweep4i(T, t, d, j, 4, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i == 0) _reduce_topsweep4(t, T, d, 20);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	_reduce_downsweep4o(t, T, d, j, 4, i);
 }
 
 __kernel

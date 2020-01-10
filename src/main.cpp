@@ -126,64 +126,71 @@ public:
 public:
 	static void run()
 	{
-		// for (size_t n = 16; n <= 32; n *= 2)
+		// for (size_t n = 8; n <= 256; n *= 2)
 		// {
-		// 	int t[n + 1];
+		// 	int t[2 * n];
 		// 	for (size_t i = 0; i < n; ++i) t[i + 1] = n - i;
 
-		// 	size_t s = 1, m = n / 4;
-		// 	for (; m > 1; s *= 4, m /= 4)
+		// 	size_t j = 0;
+		// 	size_t s = n / 4;
+		// 	while (true)
 		// 	{
-		// 		for (size_t k = 0; k < m; ++k)
+		// 		for (size_t k = 0; k < s; ++k)
 		// 		{
-		// 			int * const tk = &t[k * 4 * s + 1];	// shift s
-		// 			const int u0 = tk[0 * s], u1 = tk[1 * s], u2 = tk[2 * s], u3 = tk[3 * s];
-		// 			const int v0 = u0 + u1, v2 = u2 + u3;
-		// 			tk[0 * s] = v0 + v2;
-		// 			tk[2 * s] = v2;
+		// 			int * const ti = &t[j + 0 * s + 4 * k + 1];
+		// 			int * const to = &t[j + 4 * s + 1 * k + 1];
+
+		// 			const int u0 = ti[0], u1 = ti[1], u2 = ti[2], u3 = ti[3];
+		// 			const int u01 = u0 + u1, u23 = u2 + u3, u0123 = u01 + u23;
+		// 			// to[s]: next step, ti[1] = u1, to[0]: down step, ti[3] = u3
+		// 			to[0] = u23; to[s] = u0123;
+		// 		}
+
+		// 		j += 5 * s;
+		// 		if (s <= 4) break;
+		// 		s /= 4;
+		// 	}
+
+		// 	if (s == 2)
+		// 	{
+		// 		const int u0 = t[j + 1], u1 = t[j + 2];
+		// 		const int u01 = u0 + u1;
+		// 		t[0] = u01;
+		// 		t[j + 1] = u1; t[j + 2] = 0;
+		// 	}
+		// 	else	// s == 4
+		// 	{
+		// 		const int u0 = t[j + 1], u1 = t[j + 2], u2 = t[j + 3], u3 = t[j + 4];
+		// 		const int u01 = u0 + u1, u23 = u2 + u3, u123 = u1 + u23, u0123 = u01 + u23;
+		// 		t[0] = u0123;
+		// 		t[j + 1] = u123; t[j + 2] = u23; t[j + 3] = u3; t[j + 4] = 0;
+		// 	}
+
+		// 	for (; s < n; s *= 4)
+		// 	{
+		// 		j -= 5 * s;
+
+		// 		for (size_t k = 0; k < s; ++k)
+		// 		{
+		// 			int * const ti = &t[j + 4 * s + 1 * k + 1];
+		// 			int * const to = &t[j + 0 * s + 4 * k + 1];
+
+		// 			const int u0 = ti[s], u2 = ti[0], u1 = to[1], u3 = to[3];
+		// 			const int u02 = u0 + u2, u012 = u02 + u1, u03 = u0 + u3;
+		// 			to[0] = u012; to[1] = u02; to[2] = u03; to[3] = u0;
 		// 		}
 		// 	}
 
-		// 	if (m == 1)
+		// 	int sum = 0;
+		// 	for (size_t i = 0; i < n; ++i)
 		// 	{
-		// 		const size_t n_4 = n / 4;
-		// 		const int u0 = t[1 + 0 * n_4], u1 = t[1 + 1 * n_4], u2 = t[1 + 2 * n_4], u3 = t[1 + 3 * n_4];
-		// 		const int v0 = u0 + u1, v2 = u2 + u3;
-		// 		t[0] = v0 + v2;
-		// 		t[1 + 0 * n_4] = u1 + v2;
-		// 		t[1 + 1 * n_4] = v2;
-		// 		t[1 + 2 * n_4] = u3;
-		// 		t[1 + 3 * n_4] = 0;
-		// 	}
-		// 	else
-		// 	{
-		// 		const size_t n_2 = n / 2;
-		// 		const int u0 = t[1], u1 = t[1 + n_2];
-		// 		t[0] = u0 + u1;
-		// 		t[1] = u1;
-		// 		t[1 + n_2] = 0;
-		// 	}
-
-		// 	m = (m == 0) ? 2 : 4; s /= 4;
-
-		// 	for (; m < n; s /= 4, m *= 4)
-		// 	{
-		// 		for (size_t k = 0; k < m; ++k)
+		// 		sum += (i + 1);
+		// 		if (t[n - 1 - i] != sum)
 		// 		{
-		// 			int * const tk = &t[k * 4 * s + 1];
-		// 			const int u0 = tk[0 * s], u1 = tk[1 * s], u2 = tk[2 * s], u3 = tk[3 * s];
-		// 			const int v0 = u0 + u2;
-		// 			tk[0 * s] = v0 + u1;
-		// 			tk[1 * s] = v0;
-		// 			tk[2 * s] = u0 + u3;
-		// 			tk[3 * s] = u0;
+		// 			std::cout << "Error: " << n << ": " << t[n - 1 - i] << " " << sum << std::endl;
+		// 			break;
 		// 		}
 		// 	}
-
-		// 	// 136, 120, 105, 91, 78, 66, 55, 45, 36, 28, 21, 15, 10, 6, 3, 1
-		// 	// 528, 496, 465, 435, 406, 378, 351, 325, 300, 276, 253, 231, 210, 190, 171, 153, 136, 120, 105, 91, 78, 66, 55, 45, 36, 28, 21, 15, 10, 6, 3, 1
-		// 	for (size_t i = 0; i < n; ++i) std::cout << t[i] << ", ";
-		// 	std::cout << std::endl;
 		// }
 
 		// return;
@@ -209,12 +216,12 @@ public:
 		primeList.push_back(Number(1027, 21468));	// square32
 		primeList.push_back(Number(1109, 42921));	// square64
 		primeList.push_back(Number(1085, 85959));	// square128
-		primeList.push_back(Number(1015, 171214));	// square256,  0.134
-		primeList.push_back(Number(1197, 343384));	// square512,  0.139
-		primeList.push_back(Number(1089, 685641));	// square1024, 0.228
-		primeList.push_back(Number(1005, 1375758));	// square32,   0.377
-		primeList.push_back(Number(1089, 2746155));	// square64,   0.664
-		primeList.push_back(Number(45, 5308037));	// square128,  1.27 ms
+		primeList.push_back(Number(1015, 171214));	// square256,  0.101
+		primeList.push_back(Number(1197, 343384));	// square512,  0.138
+		primeList.push_back(Number(1089, 685641));	// square1024, 0.209
+		primeList.push_back(Number(1005, 1375758));	// square32,   0.370
+		primeList.push_back(Number(1089, 2746155));	// square64,   0.636
+		primeList.push_back(Number(45, 5308037));	// square128,  1.20 ms
 
 		std::vector<Number>	compositeList;
 		compositeList.push_back(Number(9999, 299,    "B073C97A2450454F"));
