@@ -191,19 +191,16 @@ public:
 		delete[] cr1ir1;
 		delete[] cr2ir2;
 
-		cl_uint4 * const bp = new cl_uint4[size / 2 / 4];
+		cl_uint * const bp = new cl_uint[size / 2];
 		cl_uint * const ibp = new uint32_t[size / 2];
 		const uint32_t ib = invert(uint32_t(1) << digit_bit, k);
 		uint32_t bp_i = 1, ibp_i = ib;
-		for (size_t i = 0; i < size / 2 / 4; ++i)
+		for (size_t i = 0; i < size / 2; ++i)
 		{
-			for (size_t j = 0; j < 4; ++j)
-			{
-				bp[i].s[j] = cl_uint(bp_i);
-				ibp[4 * i + j] = cl_uint(ibp_i);
-				bp_i = uint32_t((uint64_t(bp_i) << digit_bit) % k);
-				ibp_i = uint32_t((uint64_t(ibp_i) * ib) % k);
-			}
+			bp[i] = cl_uint(bp_i);
+			ibp[i] = cl_uint(ibp_i);
+			bp_i = uint32_t((uint64_t(bp_i) << digit_bit) % k);
+			ibp_i = uint32_t((uint64_t(ibp_i) * ib) % k);
 		}
 		_device.writeMemory_bp(bp, ibp);
 		delete[] bp;
@@ -372,12 +369,11 @@ private:
 		{
 			_device.reduce_upsweep4(s, j);
 			j += 5 * s;
-			if (s <= 16) break;
+			if (s <= 256) break;
 			s /= 4;
 		}
 
-		if (s == 8)	_device.reduce_topsweep8(j);
-		else		_device.reduce_topsweep16(j);
+		if (s == 256) _device.reduce_topsweep256(j); else _device.reduce_topsweep128(j);
 
 		for (; s < n; s *= 4)
 		{

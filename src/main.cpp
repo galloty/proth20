@@ -131,14 +131,14 @@ public:
 		// 	int t[2 * n];
 		// 	for (size_t i = 0; i < n; ++i) t[i + 1] = n - i;
 
-		// 	size_t j = 0;
+		// 	size_t j = 1;
 		// 	size_t s = n / 4;
 		// 	while (true)
 		// 	{
 		// 		for (size_t k = 0; k < s; ++k)
 		// 		{
-		// 			int * const ti = &t[j + 0 * s + 4 * k + 1];
-		// 			int * const to = &t[j + 4 * s + 1 * k + 1];
+		// 			int * const ti = &t[j + 0 * s + 4 * k];
+		// 			int * const to = &t[j + 4 * s + 1 * k];
 
 		// 			const int u0 = ti[0], u1 = ti[1], u2 = ti[2], u3 = ti[3];
 		// 			const int u01 = u0 + u1, u23 = u2 + u3, u0123 = u01 + u23;
@@ -153,17 +153,17 @@ public:
 
 		// 	if (s == 2)
 		// 	{
-		// 		const int u0 = t[j + 1], u1 = t[j + 2];
+		// 		const int u0 = t[j + 0], u1 = t[j + 1];
 		// 		const int u01 = u0 + u1;
 		// 		t[0] = u01;
-		// 		t[j + 1] = u1; t[j + 2] = 0;
+		// 		t[j + 0] = u1; t[j + 1] = 0;
 		// 	}
 		// 	else	// s == 4
 		// 	{
-		// 		const int u0 = t[j + 1], u1 = t[j + 2], u2 = t[j + 3], u3 = t[j + 4];
+		// 		const int u0 = t[j + 0], u1 = t[j + 1], u2 = t[j + 2], u3 = t[j + 3];
 		// 		const int u01 = u0 + u1, u23 = u2 + u3, u123 = u1 + u23, u0123 = u01 + u23;
 		// 		t[0] = u0123;
-		// 		t[j + 1] = u123; t[j + 2] = u23; t[j + 3] = u3; t[j + 4] = 0;
+		// 		t[j + 0] = u123; t[j + 1] = u23; t[j + 2] = u3; t[j + 3] = 0;
 		// 	}
 
 		// 	for (; s < n; s *= 4)
@@ -172,8 +172,8 @@ public:
 
 		// 		for (size_t k = 0; k < s; ++k)
 		// 		{
-		// 			int * const ti = &t[j + 4 * s + 1 * k + 1];
-		// 			int * const to = &t[j + 0 * s + 4 * k + 1];
+		// 			int * const ti = &t[j + 4 * s + 1 * k];
+		// 			int * const to = &t[j + 0 * s + 4 * k];
 
 		// 			const int u0 = ti[s], u2 = ti[0], u1 = to[1], u3 = to[3];
 		// 			const int u02 = u0 + u2, u012 = u02 + u1, u03 = u0 + u3;
@@ -216,12 +216,12 @@ public:
 		primeList.push_back(Number(1027, 21468));	// square32
 		primeList.push_back(Number(1109, 42921));	// square64
 		primeList.push_back(Number(1085, 85959));	// square128
-		primeList.push_back(Number(1015, 171214));	// square256,  0.101
-		primeList.push_back(Number(1197, 343384));	// square512,  0.138
-		primeList.push_back(Number(1089, 685641));	// square1024, 0.209
-		primeList.push_back(Number(1005, 1375758));	// square32,   0.370
-		primeList.push_back(Number(1089, 2746155));	// square64,   0.636
-		primeList.push_back(Number(45, 5308037));	// square128,  1.20 ms
+		primeList.push_back(Number(1015, 171214));	// square256,  0.078
+		primeList.push_back(Number(1197, 343384));	// square512,  0.118
+		primeList.push_back(Number(1089, 685641));	// square1024, 0.192
+		primeList.push_back(Number(1005, 1375758));	// square32,   0.340
+		primeList.push_back(Number(1089, 2746155));	// square64,   0.608
+		primeList.push_back(Number(45, 5308037));	// square128,  1.15 ms
 
 		std::vector<Number>	compositeList;
 		compositeList.push_back(Number(9999, 299,    "B073C97A2450454F"));
@@ -253,18 +253,21 @@ public:
 		// device0.displayProfiles(pCount);
 
 		// Size = 524288
-		// - sub_ntt64: 1, 9.75 %, 123933 (123933)
-		// - ntt64: 1, 10.1 %, 128039 (128039)
-		// - intt64: 2, 19.4 %, 246634 (123317)
-		// - square128: 1, 17.6 %, 223488 (223488)
-		// - poly2int0: 1, 10.4 %, 132618 (132618)
-		// - poly2int1: 1, 3.04 %, 38687 (38687)
-		// - reduce_i: 1, 9.36 %, 118979 (118979)
-		// - reduce_upsweep4: 8, 6.41 %, 81486 (10185)
-		// - reduce_downsweep4: 8, 8.22 %, 104445 (13055)
-		// - reduce_topsweep4: 1, 0.221 %, 2811 (2811)
-		// - reduce_o: 1, 5.26 %, 66862 (66862)
-		// - reduce_f: 1, 0.251 %, 3186 (3186)
+		// - sub_ntt64: 1, 10.7 %, 124003 (124003)
+		// - ntt64: 1, 11.1 %, 128221 (128221)
+		// - intt64: 2, 21.3 %, 246828 (123414)
+		// - square128: 1, 19.3 %, 223238 (223238)
+		// NTT: 62.4 %
+		// - poly2int0: 1, 11.5 %, 132988 (132988)
+		// - poly2int1: 1, 3.35 %, 38817 (38817)
+		// POLY2INT: 14.9 %
+		// - reduce_upsweep4: 5, 3.18 %, 36741 (7348)
+		// - reduce_downsweep4: 5, 5.59 %, 64715 (12943)
+		// - reduce_topsweep256: 1, 0.397 %, 4598 (4598)
+		// - reduce_i: 1, 7.48 %, 86559 (86559)
+		// - reduce_o: 1, 5.79 %, 67019 (67019)
+		// - reduce_f: 1, 0.287 %, 3315 (3315)
+		// REDUCE: 22.7 %
 
 		// bench
 		for (const auto & p : primeList) check(p.k, p.n, device0, true);
