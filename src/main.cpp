@@ -51,8 +51,6 @@ private:
 private:
 	static uint64_t check(const uint32_t k, const uint32_t n, ocl::Device & device, const bool bench = false)
 	{
-		std::cout << "Testing " << k << " * 2^" << n << " + 1" << std::flush;
-
 		const Timer::Time startTime = Timer::currentTime();
 
 		// Proth's theorem: a such that (a/P) = -1
@@ -70,7 +68,9 @@ private:
 		}
 		if (a >= 10000) return 0;
 
-		gpmp X(k, n, device);
+		gpmp X(k, n, device);	// X = 1
+
+		std::cout << "Testing " << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits (size = "	<< X.getSize() << "), " << std::flush;
 
 		// X *= a^k, left-to-right algorithm
 		bool s = false;
@@ -96,7 +96,7 @@ private:
 				X.getError();
 				const double elapsedTime = Timer::diffTime(Timer::currentTime(), startBenchTime);
 				const double mulTime = elapsedTime / benchCount, estimatedTime = mulTime * n;
-				std::cout << ": estimated time is " << Timer::formatTime(estimatedTime) << ", " << std::setprecision(3) << mulTime * 1e3 << " ms/mul." << std::flush;
+				std::cout << "estimated time is " << Timer::formatTime(estimatedTime) << ", " << std::setprecision(3) << mulTime * 1e3 << " ms/mul." << std::flush;
 				if (bench)
 				{
 					std::cout << std::endl;
@@ -213,15 +213,15 @@ public:
 		primeList.push_back(Number(1139, 2641));
 		primeList.push_back(Number(1035, 5336));
 		primeList.push_back(Number(965, 10705));
-		primeList.push_back(Number(1027, 21468));	// square32
-		primeList.push_back(Number(1109, 42921));	// square64
-		primeList.push_back(Number(1085, 85959));	// square128
-		primeList.push_back(Number(1015, 171214));	// square256,  0.078
-		primeList.push_back(Number(1197, 343384));	// square512,  0.118
-		primeList.push_back(Number(1089, 685641));	// square1024, 0.192
-		primeList.push_back(Number(1005, 1375758));	// square32,   0.340
-		primeList.push_back(Number(1089, 2746155));	// square64,   0.608
-		primeList.push_back(Number(45, 5308037));	// square128,  1.15 ms
+		primeList.push_back(Number(1027, 21468));	// size = 2048,   square32
+		primeList.push_back(Number(1109, 42921));	// size = 4096,   square64
+		primeList.push_back(Number(1085, 85959));	// size = 8192,   square128
+		primeList.push_back(Number(1015, 171214));	// size = 16384,  square256,  0.072
+		primeList.push_back(Number(1197, 343384));	// size = 32768,  square512,  0.110
+		primeList.push_back(Number(1089, 685641));	// size = 65536,  square1024, 0.180
+		primeList.push_back(Number(1005, 1375758));	// size = 131072, square32,   0.328
+		primeList.push_back(Number(1089, 2746155));	// size = 262144, square64,   0.587
+		primeList.push_back(Number(45, 5308037));	// size = 524288, square128,  1.12 ms
 
 		std::vector<Number>	compositeList;
 		compositeList.push_back(Number(9999, 299,    "B073C97A2450454F"));
@@ -253,21 +253,21 @@ public:
 		// device0.displayProfiles(pCount);
 
 		// Size = 524288
-		// - sub_ntt64: 1, 10.7 %, 124003 (124003)
-		// - ntt64: 1, 11.1 %, 128221 (128221)
-		// - intt64: 2, 21.3 %, 246828 (123414)
-		// - square128: 1, 19.3 %, 223238 (223238)
-		// NTT: 62.4 %
-		// - poly2int0: 1, 11.5 %, 132988 (132988)
-		// - poly2int1: 1, 3.35 %, 38817 (38817)
-		// POLY2INT: 14.9 %
-		// - reduce_upsweep4: 5, 3.18 %, 36741 (7348)
-		// - reduce_downsweep4: 5, 5.59 %, 64715 (12943)
-		// - reduce_topsweep256: 1, 0.397 %, 4598 (4598)
-		// - reduce_i: 1, 7.48 %, 86559 (86559)
-		// - reduce_o: 1, 5.79 %, 67019 (67019)
-		// - reduce_f: 1, 0.287 %, 3315 (3315)
-		// REDUCE: 22.7 %
+		// - sub_ntt64: 1, 11 %, 124886 (124886)
+		// - ntt64: 1, 11.4 %, 129375 (129375)
+		// - intt64: 2, 22 %, 249285 (124642)
+		// - square128: 1, 20.2 %, 228943 (228943)
+		// NTT: 64.6 %
+		// - poly2int0: 1, 12 %, 135674 (135674)
+		// - poly2int1: 1, 3.45 %, 39137 (39137)
+		// POLY2INT: 15.4 %
+		// - reduce_upsweep16: 3, 2.45 %, 27790 (9263)
+		// - reduce_downsweep16: 3, 3.39 %, 38422 (12807)
+		// - reduce_topsweep256: 1, 0.406 %, 4609 (4609)
+		// - reduce_i: 1, 7.63 %, 86625 (86625)
+		// - reduce_o: 1, 5.9 %, 66927 (66927)
+		// - reduce_f: 1, 0.298 %, 3386 (3386)
+		// REDUCE: 20.0 %
 
 		// bench
 		for (const auto & p : primeList) check(p.k, p.n, device0, true);

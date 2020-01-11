@@ -268,11 +268,11 @@ public:
 			m /= 64;
 		}
 
-		if (m == 256) _device.square1024();
-		else if (m == 128) _device.square512();
-		else if (m == 64) _device.square256();
-		else if (m == 32) _device.square128();
-		else if (m == 16) _device.square64();
+		if (m == 256)        _device.square1024();
+		else if (m == 128)   _device.square512();
+		else if (m == 64)    _device.square256();
+		else if (m == 32)    _device.square128();
+		else if (m == 16)    _device.square64();
 		else /*if (m == 8)*/ _device.square32();
 
 		while (m <= cl_uint(size / 16))
@@ -326,6 +326,9 @@ public:
 
 		_device.readMemory_x(x);
 
+		// Another method is: compute T = R - Y + 1 or T = (R + k*2^n + 1) - Y + 1  such that 0 <= T < k*2^n + 1
+		// T == 0?
+
 		// _x[0] = R, _x[1] = Y; compute R - Y
 		bool sign = _sub(x, size / 2);
 		_sign = (_sign != sign);
@@ -363,22 +366,26 @@ private:
 
 		// x size is size / 2, x[0] = X mod B^n, x[1] = X / (B^e * 2^s)
 
-		cl_uint j = 1, n = cl_uint(_size / 2);
-		cl_uint s = n / 4;
-		while (true)
+		const cl_uint n = cl_uint(_size / 2);
+		cl_uint j = 4;		// alignment (cl_uint4)
+		cl_uint s = (n / 4) / 4;
+		for (; true; s /= 16)
 		{
-			_device.reduce_upsweep4(s, j);
-			j += 5 * s;
-			if (s <= 256) break;
-			s /= 4;
+			_device.reduce_upsweep16(s, j);
+			j += 25 * s;
+			if (s <= 64) break;
 		}
 
-		if (s == 256) _device.reduce_topsweep256(j); else _device.reduce_topsweep128(j);
+		// TODO reduce_topsweep1024 & reduce_topsweep512 => RED_BLK = 16 or 32
+		if (s == 64)         _device.reduce_topsweep256(j);
+		else if (s == 32)    _device.reduce_topsweep128(j);
+		else if (s == 16)    _device.reduce_topsweep64(j);
+		else /*if (s == 8)*/ _device.reduce_topsweep32(j);
 
-		for (; s < n; s *= 4)
+		for (; s < n / 4; s *= 16)
 		{
-			j -= 5 * s;
-			_device.reduce_downsweep4(s, j);
+			j -= 25 * s;
+			_device.reduce_downsweep16(s, j);
 		}
 
 		// x size is size / 2, x[0] = X mod B^n, x[1] = X / (B^e * 2^s), x[n][0] = remainders x[1] / d

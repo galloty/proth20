@@ -28,6 +28,7 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #define BLK256		1
 #define	P2I_WGS		16
 #define	P2I_BLK		16
+#define	RED_BLK		8
 
 /*
 Barrett's product/reduction, where P is such that h (the number of iterations in the 'while loop') is 0 or 1.
@@ -224,7 +225,7 @@ void ntt64(__global uint2 * restrict const x, __global const uint4 * restrict co
 
 	const size_t local_id = get_local_id(0), chunk_idx = local_id % CHUNK64, threadIdx = local_id / CHUNK64, block_idx = get_group_id(0) * CHUNK64;	// threadIdx < 64 / 4
 
-	__global uint2 * restrict const xo = &x[64 * (block_idx & ~(m - 1))];		// m-block offset
+	__global uint2 * const xo = &x[64 * (block_idx & ~(m - 1))];		// m-block offset
 	const size_t bl_i = (block_idx & (m - 1)) | chunk_idx;
 
 	const size_t _i_16m = threadIdx;											// [+ 16, 32, 48] 0, 1, 2, 3, 4, ..., 15
@@ -255,7 +256,7 @@ void intt64(__global uint2 * restrict const x, __global const uint4 * restrict c
 
 	const size_t local_id = get_local_id(0), chunk_idx = local_id % CHUNK64, threadIdx = local_id / CHUNK64, block_idx = get_group_id(0) * CHUNK64;	// threadIdx < 64 / 4
 
-	__global uint2 * restrict const xo = &x[64 * (block_idx & ~(m - 1))];		// m-block offset
+	__global uint2 * const xo = &x[64 * (block_idx & ~(m - 1))];		// m-block offset
 	const size_t bl_i = (block_idx & (m - 1)) | chunk_idx;
 
 	const size_t _i_16m = threadIdx;											// [+ 16, 32, 48] 0, 1, 2, 3, 4, ..., 15
@@ -410,7 +411,7 @@ void poly2int0(__global uint2 * restrict const x, __global long * restrict const
 	const size_t i = get_local_id(0), blk = get_group_id(0);
 	const size_t kc = (get_global_id(0) + 1) & (get_global_size(0) - 1);
 
-	__global uint2 * restrict const xo = &x[P2I_WGS * P2I_BLK * blk];
+	__global uint2 * const xo = &x[P2I_WGS * P2I_BLK * blk];
 
 	for (size_t j = 0; j < P2I_BLK; ++j)
 	{
@@ -445,7 +446,7 @@ void poly2int1(__global uint2 * restrict const x, __global const long * restrict
 {
 	const size_t k = get_global_id(0);
 
-	__global uint2 * restrict const xi = &x[P2I_BLK * k];
+	__global uint2 * const xi = &x[P2I_BLK * k];
 
 	long l = cr[k] + xi[0].s0;
 	xi[0].s0 = (uint)(l) & digit_mask;
@@ -463,47 +464,81 @@ void poly2int1(__global uint2 * restrict const x, __global const long * restrict
 	if (f != 0) atomic_or(err, 1);
 }
 
-__kernel
-void reduce_upsweep4(__global uint * restrict const t, const uint d, const uint s, const uint j)
+#define	R16		(RED_BLK * 16 / 4)
+
+__kernel __attribute__((reqd_work_group_size(R16, 1, 1)))
+void reduce_upsweep16(__global uint * restrict const t, const uint d, const uint s, const uint j)
 {
-	const size_t k = get_global_id(0);
+	__local uint4 T4[R16 / 4];	// alignment
+	__local uint * const T = (__local uint *)T4;
+	__global uint * const tj = &t[j];
+	__global const uint4 * const tj4 = (__global const uint4 *)tj;
 
-	__global const uint * restrict const ti = &t[j + 0 * s + 4 * k];
-	__global uint * restrict const to = &t[j + 4 * s + 1 * k];
+	const size_t i = get_local_id(0), blk = get_group_id(0), k = blk * R16 + i;
 
-	const uint u0 = ti[0], u1 = ti[1], u2 = ti[2], u3 = ti[3];
-	const uint u01 = _addmod(u0, u1, d), u23 = _addmod(u2, u3, d), u0123 = _addmod(u01, u23, d);
-	// to[s]: next step, ti[1] = u1, to[0]: down step, ti[3] = u3
-	to[0] = u23; to[s] = u0123;
+	__global uint * const to4s_k = &tj[4 * (4 * s) + k];
+
+	const uint4 u = tj4[k];
+	const uint u01 = _addmod(u.s0, u.s1, d), u23 = _addmod(u.s2, u.s3, d), u0123 = _addmod(u01, u23, d);
+	to4s_k[0] = u23; to4s_k[4 * s] = u0123; T[i] = u0123;
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	if (i < R16 / 4)
+	{
+		__global uint * const tos_i = &tj[6 * (4 * s) + blk * (R16 / 4) + i];
+
+		const uint4 u = T4[i];
+		const uint u01 = _addmod(u.s0, u.s1, d), u23 = _addmod(u.s2, u.s3, d), u0123 = _addmod(u01, u23, d);
+		tos_i[0] = u23; tos_i[s] = u0123;
+	}
 }
 
-__kernel
-void reduce_downsweep4(__global uint * restrict const t, const uint d, const uint s, const uint j)
+__kernel __attribute__((reqd_work_group_size(R16, 1, 1)))
+void reduce_downsweep16(__global uint * restrict const t, const uint d, const uint s, const uint j)
 {
-	const size_t k = get_global_id(0);
+	__local uint4 T4[R16 / 4];	// alignment
+	__local uint * const T = (__local uint *)T4;
+	__global uint * const tj = &t[j];
+	__global uint4 * const tj4 = (__global uint4 *)tj;
 
-	__global const uint * restrict const ti = &t[j + 4 * s + 1 * k];
-	__global uint * restrict const to = &t[j + 0 * s + 4 * k];
+	const size_t i = get_local_id(0), blk = get_group_id(0), k = blk * R16 + i;
 
-	const uint u0 = ti[s], u2 = ti[0], u1 = to[1], u3 = to[3];
-	const uint u02 = _addmod(u0, u2, d), u012 = _addmod(u02, u1, d), u03 = _addmod(u0, u3, d);
-	to[0] = u012; to[1] = u02; to[2] = u03; to[3] = u0;
+	if (i < R16 / 4)
+	{
+		__global const uint * const tis_i = &tj[6 * (4 * s) + blk * (R16 / 4) + i];
+		__global uint4 * const tj4s4 = (__global uint4 *)&tj[5 * (4 * s) + blk * R16];
+
+		const uint u2 = tis_i[0], u0 = tis_i[s], u02 = _addmod(u0, u2, d);
+		const uint4 u13 = tj4s4[i];
+		const uint u012 = _addmod(u02, u13.s1, d), u03 = _addmod(u0, u13.s3, d);
+		T4[i] = (uint4)(u012, u02, u03, u0);
+	}
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	__global const uint * const ti4s = &tj[4 * (4 * s)];
+
+	const uint u2 = ti4s[k], u0 = T[i], u02 = _addmod(u0, u2, d);
+	const uint4 u13 = tj4[k];
+	const uint u012 = _addmod(u02, u13.s1, d), u03 = _addmod(u0, u13.s3, d);
+	tj4[k] = (uint4)(u012, u02, u03, u0);
 }
 
 inline void _reduce_upsweep4i(__local uint * restrict const T, __global const uint * restrict const t, const uint d, const uint s, const size_t k)
 {
-	__global const uint * restrict const ti = &t[4 * k];
-	__local uint * restrict const To = &T[k];
+	__global const uint4 * const ti = (__global const uint4 *)&t[4 * k];
+	__local uint * const To = &T[k];
 
-	const uint u0 = ti[0], u1 = ti[1], u2 = ti[2], u3 = ti[3];
-	const uint u01 = _addmod(u0, u1, d), u23 = _addmod(u2, u3, d), u0123 = _addmod(u01, u23, d);
+	const uint4 u = ti[0];
+	const uint u01 = _addmod(u.s0, u.s1, d), u23 = _addmod(u.s2, u.s3, d), u0123 = _addmod(u01, u23, d);
 	To[0] = u23; To[s] = u0123;
 }
 
 inline void _reduce_upsweep4(__local uint * restrict const T, const uint d, const uint s, const size_t k)
 {
-	__local const uint * restrict const Ti = &T[0 * s + 4 * k];
-	__local uint * restrict const To = &T[4 * s + 1 * k];
+	__local const uint * const Ti = &T[0 * s + 4 * k];
+	__local uint * const To = &T[4 * s + 1 * k];
 
 	const uint u0 = Ti[0], u1 = Ti[1], u2 = Ti[2], u3 = Ti[3];
 	const uint u01 = _addmod(u0, u1, d), u23 = _addmod(u2, u3, d), u0123 = _addmod(u01, u23, d);
@@ -512,22 +547,24 @@ inline void _reduce_upsweep4(__local uint * restrict const T, const uint d, cons
 
 inline void _reduce_downsweep4(__local uint * restrict const T, const uint d, const uint s, const size_t k)
 {
-	__local const uint * restrict const Ti = &T[4 * s + 1 * k];
-	__local uint * restrict const To = &T[0 * s + 4 * k];
+	__local const uint * const Ti = &T[4 * s + 1 * k];
+	__local uint * const To = &T[0 * s + 4 * k];
 
-	const uint u0 = Ti[s], u2 = Ti[0], u1 = To[1], u3 = To[3];
-	const uint u02 = _addmod(u0, u2, d), u012 = _addmod(u02, u1, d), u03 = _addmod(u0, u3, d);
+	const uint u2 = Ti[0], u0 = Ti[s], u02 = _addmod(u0, u2, d);
+	const uint u1 = To[1], u3 = To[3];
+	const uint u012 = _addmod(u02, u1, d), u03 = _addmod(u0, u3, d);
 	To[0] = u012; To[1] = u02; To[2] = u03; To[3] = u0;
 }
 
 inline void _reduce_downsweep4o(__global uint * restrict const t, __local const uint * restrict const T, const uint d, const uint s, const size_t k)
 {
-	__local const uint * restrict const Ti = &T[k];
-	__global uint * restrict const to = &t[4 * k];
+	__local const uint * const Ti = &T[k];
+	__global uint4 * const to = (__global uint4 *)&t[4 * k];
 
-	const uint u0 = Ti[s], u2 = Ti[0], u1 = to[1], u3 = to[3];
-	const uint u02 = _addmod(u0, u2, d), u012 = _addmod(u02, u1, d), u03 = _addmod(u0, u3, d);
-	to[0] = u012; to[1] = u02; to[2] = u03; to[3] = u0;
+	const uint u2 = Ti[0], u0 = Ti[s], u02 = _addmod(u0, u2, d);
+	const uint4 u13 = to[0];
+	const uint u012 = _addmod(u02, u13.s1, d), u03 = _addmod(u0, u13.s3, d);
+	to[0] = (uint4)(u012, u02, u03, u0);
 }
 
 inline void _reduce_topsweep2(__global uint * restrict const t, __local uint * restrict const T, const uint d)
@@ -551,7 +588,7 @@ inline void _reduce_topsweep4(__global uint * restrict const t, __local uint * r
 __kernel __attribute__((reqd_work_group_size(S8, 1, 1)))
 void reduce_topsweep8(__global uint * restrict const t, const uint d, const uint j)
 {
-	__local uint T[S8 + 2];	// 4
+	__local uint T[8];	// 4
 
 	const size_t i = get_local_id(0);
 
@@ -566,7 +603,7 @@ void reduce_topsweep8(__global uint * restrict const t, const uint d, const uint
 __kernel __attribute__((reqd_work_group_size(S16, 1, 1)))
 void reduce_topsweep16(__global uint * restrict const t, const uint d, const uint j)
 {
-	__local uint T[256];	// 8
+	__local uint T[16];	// 8
 
 	const size_t i = get_local_id(0);
 
@@ -581,7 +618,7 @@ void reduce_topsweep16(__global uint * restrict const t, const uint d, const uin
 __kernel __attribute__((reqd_work_group_size(S32, 1, 1)))
 void reduce_topsweep32(__global uint * restrict const t, const uint d, const uint j)
 {
-	__local uint T[256];	// 20
+	__local uint T[32];	// 20
 
 	const size_t i = get_local_id(0);
 
@@ -600,7 +637,7 @@ void reduce_topsweep32(__global uint * restrict const t, const uint d, const uin
 __kernel __attribute__((reqd_work_group_size(S64, 1, 1)))
 void reduce_topsweep64(__global uint * restrict const t, const uint d, const uint j)
 {
-	__local uint T[256];	// 40
+	__local uint T[64];	// 40
 
 	const size_t i = get_local_id(0);
 
@@ -619,7 +656,7 @@ void reduce_topsweep64(__global uint * restrict const t, const uint d, const uin
 __kernel __attribute__((reqd_work_group_size(S128, 1, 1)))
 void reduce_topsweep128(__global uint * restrict const t, const uint d, const uint j)
 {
-	__local uint T[256];	// 82
+	__local uint T[128];	// 82
 
 	const size_t i = get_local_id(0);
 
@@ -667,13 +704,13 @@ void reduce_i(__global uint2 * restrict const x, __global uint * restrict const 
 {
 	const size_t k = get_global_id(0);
 
-	__global uint2 * restrict const xk = &x[k];
+	__global uint2 * const xk = &x[k];
 
 	const uint xs = ((xk[e + 1].s0 << (digit_bit - s)) | (xk[e + 0].s0 >> s)) & digit_mask;
 	const uint u = _rem(xs * (ulong)(bp[k]), d, d_inv, d_shift);
 
 	xk[0].s1 = xs;
-	t[k + 1] = u;
+	t[k + 4] = u;
 }
 
 __kernel
@@ -682,7 +719,7 @@ void reduce_o(__global uint2 * restrict const x, __global const uint * restrict 
 {
 	const size_t n = get_global_size(0), k = get_global_id(0);
 
-	const uint rbk_prev = (k + 1 < n) ? t[k + 1] : 0;
+	const uint rbk_prev = (k + 1 < n) ? t[k + 4] : 0;
 	const uint r_prev = _rem(rbk_prev * (ulong)(ibp[k]), d, d_inv, d_shift);
 
 	const uint2 x_k = x[k];
