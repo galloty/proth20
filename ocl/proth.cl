@@ -28,7 +28,7 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #define BLK256		1
 #define	P2I_WGS		16
 #define	P2I_BLK		16
-#define	RED_BLK		8
+#define	RED_BLK		16
 
 /*
 Barrett's product/reduction, where P is such that h (the number of iterations in the 'while loop') is 0 or 1.
@@ -422,7 +422,7 @@ void poly2int0(__global uint2 * restrict const x, __global long * restrict const
 	barrier(CLK_LOCAL_MEM_FENCE);
 
 	long l = 0;
-#pragma unroll
+//#pragma unroll
 	for (size_t j = 0; j < P2I_BLK; ++j)
 	{
 		l += L[P2I_WGS * j + i];
@@ -433,11 +433,12 @@ void poly2int0(__global uint2 * restrict const x, __global long * restrict const
 
 	barrier(CLK_LOCAL_MEM_FENCE);
 
-#pragma unroll
+//#pragma unroll
 	for (size_t j = 0; j < P2I_BLK; ++j)
 	{
 		const size_t k = P2I_WGS * j + i;
-		xo[k].s0 = (uint)X[P2I_WGS * (k % P2I_BLK) + (k / P2I_BLK)];
+		//xo[k] = (uint2)(X[P2I_WGS * (k % P2I_BLK) + (k / P2I_BLK)], 0);	faster?
+		xo[k].s0 = X[P2I_WGS * (k % P2I_BLK) + (k / P2I_BLK)];
 	}
 }
 
@@ -453,6 +454,7 @@ void poly2int1(__global uint2 * restrict const x, __global const long * restrict
 	l >>= digit_bit;						// |l| < n/2
 
 	int f = (int)(l);
+#pragma unroll
 	for (size_t j = 1; j < P2I_BLK; ++j)
 	{
 		f += xi[j].s0;
@@ -584,36 +586,6 @@ inline void _reduce_topsweep4(__global uint * restrict const t, __local uint * r
 	T[0] = u123; T[1] = u23; T[2] = u3; T[3] = 0;
 }
 
-#define	S8		(8 / 4)
-__kernel __attribute__((reqd_work_group_size(S8, 1, 1)))
-void reduce_topsweep8(__global uint * restrict const t, const uint d, const uint j)
-{
-	__local uint T[8];	// 4
-
-	const size_t i = get_local_id(0);
-
-	_reduce_upsweep4i(T, &t[j], d, S8, i);
-	barrier(CLK_LOCAL_MEM_FENCE);
-	if (i == 0) _reduce_topsweep2(t, &T[S8], d);
-	barrier(CLK_LOCAL_MEM_FENCE);
-	_reduce_downsweep4o(&t[j], T, d, S8, i);
-}
-
-#define	S16		(16 / 4)
-__kernel __attribute__((reqd_work_group_size(S16, 1, 1)))
-void reduce_topsweep16(__global uint * restrict const t, const uint d, const uint j)
-{
-	__local uint T[16];	// 8
-
-	const size_t i = get_local_id(0);
-
-	_reduce_upsweep4i(T, &t[j], d, S16, i);
-	barrier(CLK_LOCAL_MEM_FENCE);
-	if (i == 0) _reduce_topsweep4(t, &T[S16], d);
-	barrier(CLK_LOCAL_MEM_FENCE);
-	_reduce_downsweep4o(&t[j], T, d, S16, i);
-}
-
 #define	S32		(32 / 4)
 __kernel __attribute__((reqd_work_group_size(S32, 1, 1)))
 void reduce_topsweep32(__global uint * restrict const t, const uint d, const uint j)
@@ -625,7 +597,7 @@ void reduce_topsweep32(__global uint * restrict const t, const uint d, const uin
 	_reduce_upsweep4i(T, &t[j], d, S32, i);
 	barrier(CLK_LOCAL_MEM_FENCE);
 	if (i < S32 / 4) _reduce_upsweep4(&T[S32], d, S32 / 4, i);
-	barrier(CLK_LOCAL_MEM_FENCE);	
+	barrier(CLK_LOCAL_MEM_FENCE);
 	if (i == 0) _reduce_topsweep2(t, &T[S32 + 5 * (S32 / 4)], d);
 	barrier(CLK_LOCAL_MEM_FENCE);
 	if (i < S32 / 4) _reduce_downsweep4(&T[S32], d, S32 / 4, i);
@@ -644,7 +616,7 @@ void reduce_topsweep64(__global uint * restrict const t, const uint d, const uin
 	_reduce_upsweep4i(T, &t[j], d, S64, i);
 	barrier(CLK_LOCAL_MEM_FENCE);
 	if (i < S64 / 4) _reduce_upsweep4(&T[S64], d, S64 / 4, i);
-	barrier(CLK_LOCAL_MEM_FENCE);	
+	barrier(CLK_LOCAL_MEM_FENCE);
 	if (i == 0) _reduce_topsweep4(t, &T[S64 + 5 * (S64 / 4)], d);
 	barrier(CLK_LOCAL_MEM_FENCE);
 	if (i < S64 / 4) _reduce_downsweep4(&T[S64], d, S64 / 4, i);
@@ -663,9 +635,9 @@ void reduce_topsweep128(__global uint * restrict const t, const uint d, const ui
 	_reduce_upsweep4i(T, &t[j], d, S128, i);
 	barrier(CLK_LOCAL_MEM_FENCE);
 	if (i < S128 / 4) _reduce_upsweep4(&T[S128], d, S128 / 4, i);
-	barrier(CLK_LOCAL_MEM_FENCE);	
+	barrier(CLK_LOCAL_MEM_FENCE);
 	if (i < S128 / 16) _reduce_upsweep4(&T[S128 + 5 * (S128 / 4)], d, S128 / 16, i);
-	barrier(CLK_LOCAL_MEM_FENCE);	
+	barrier(CLK_LOCAL_MEM_FENCE);
 	if (i == 0) _reduce_topsweep2(t, &T[S128 + 5 * (S128 / 4) + 5 * (S128 / 16)], d);
 	barrier(CLK_LOCAL_MEM_FENCE);
 	if (i < S128 / 16) _reduce_downsweep4(&T[S128 + 5 * (S128 / 4)], d, S128 / 16, i);
@@ -686,9 +658,9 @@ void reduce_topsweep256(__global uint * restrict const t, const uint d, const ui
 	_reduce_upsweep4i(T, &t[j], d, S256, i);
 	barrier(CLK_LOCAL_MEM_FENCE);
 	if (i < S256 / 4) _reduce_upsweep4(&T[S256], d, S256 / 4, i);
-	barrier(CLK_LOCAL_MEM_FENCE);	
+	barrier(CLK_LOCAL_MEM_FENCE);
 	if (i < S256 / 16) _reduce_upsweep4(&T[S256 + 5 * (S256 / 4)], d, S256 / 16, i);
-	barrier(CLK_LOCAL_MEM_FENCE);	
+	barrier(CLK_LOCAL_MEM_FENCE);
 	if (i == 0) _reduce_topsweep4(t, &T[S256 + 5 * (S256 / 4) + 5 * (S256 / 16)], d);
 	barrier(CLK_LOCAL_MEM_FENCE);
 	if (i < S256 / 16) _reduce_downsweep4(&T[S256 + 5 * (S256 / 4)], d, S256 / 16, i);
@@ -698,38 +670,92 @@ void reduce_topsweep256(__global uint * restrict const t, const uint d, const ui
 	_reduce_downsweep4o(&t[j], T, d, S256, i);
 }
 
+#define	S512	(512 / 4)
+__kernel __attribute__((reqd_work_group_size(S512, 1, 1)))
+void reduce_topsweep512(__global uint * restrict const t, const uint d, const uint j)
+{
+	__local uint T[512];	// 340
+
+	const size_t i = get_local_id(0);
+
+	_reduce_upsweep4i(T, &t[j], d, S512, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i < S512 / 4) _reduce_upsweep4(&T[S512], d, S512 / 4, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i < S512 / 16) _reduce_upsweep4(&T[S512 + 5 * (S512 / 4)], d, S512 / 16, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i < S512 / 64) _reduce_upsweep4(&T[S512 + 5 * (S512 / 4) + 5 * (S512 / 16)], d, S512 / 64, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i == 0) _reduce_topsweep2(t, &T[S512 + 5 * (S512 / 4) + 5 * (S512 / 16) + 5 * (S512 / 64)], d);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i < S512 / 64) _reduce_downsweep4(&T[S512 + 5 * (S512 / 4) + 5 * (S512 / 16)], d, S512 / 64, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i < S512 / 16) _reduce_downsweep4(&T[S512 + 5 * (S512 / 4)], d, S512 / 16, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i < S512 / 4) _reduce_downsweep4(&T[S512], d, S512 / 4, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	_reduce_downsweep4o(&t[j], T, d, S512, i);
+}
+
+#define	S1024	(1024 / 4)
+__kernel __attribute__((reqd_work_group_size(S1024, 1, 1)))
+void reduce_topsweep1024(__global uint * restrict const t, const uint d, const uint j)
+{
+	__local uint T[1024];	// 680
+
+	const size_t i = get_local_id(0);
+
+	_reduce_upsweep4i(T, &t[j], d, S1024, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i < S1024 / 4) _reduce_upsweep4(&T[S1024], d, S1024 / 4, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i < S1024 / 16) _reduce_upsweep4(&T[S1024 + 5 * (S1024 / 4)], d, S1024 / 16, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i < S1024 / 64) _reduce_upsweep4(&T[S1024 + 5 * (S1024 / 4) + 5 * (S1024 / 16)], d, S1024 / 64, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i == 0) _reduce_topsweep4(t, &T[S1024 + 5 * (S1024 / 4) + 5 * (S1024 / 16) + 5 * (S1024 / 64)], d);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i < S1024 / 64) _reduce_downsweep4(&T[S1024 + 5 * (S1024 / 4) + 5 * (S1024 / 16)], d, S1024 / 64, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i < S1024 / 16) _reduce_downsweep4(&T[S1024 + 5 * (S1024 / 4)], d, S1024 / 16, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i < S1024 / 4) _reduce_downsweep4(&T[S1024], d, S1024 / 4, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	_reduce_downsweep4o(&t[j], T, d, S1024, i);
+}
+
 __kernel
-void reduce_i(__global uint2 * restrict const x, __global uint * restrict const t, __global const uint * restrict const bp,
-	const uint e, const int s, const uint d, const uint d_inv, const int d_shift)
+void reduce_i(__global const uint2 * restrict const x, __global uint * restrict const y, __global uint * restrict const t,
+	__global const uint * restrict const bp, const uint e, const int s, const uint d, const uint d_inv, const int d_shift)
 {
 	const size_t k = get_global_id(0);
 
-	__global uint2 * const xk = &x[k];
-
-	const uint xs = ((xk[e + 1].s0 << (digit_bit - s)) | (xk[e + 0].s0 >> s)) & digit_mask;
+	const uint xs = ((x[e + k + 1].s0 << (digit_bit - s)) | (x[e + k + 0].s0 >> s)) & digit_mask;
 	const uint u = _rem(xs * (ulong)(bp[k]), d, d_inv, d_shift);
 
-	xk[0].s1 = xs;
+	y[k] = xs;
 	t[k + 4] = u;
 }
 
 __kernel
-void reduce_o(__global uint2 * restrict const x, __global const uint * restrict const t, __global const uint * restrict const ibp,
-	const uint e, const int s, const uint d, const uint d_inv, const int d_shift)
+void reduce_o(__global uint2 * restrict const x, __global const uint * restrict const y, __global const uint * restrict const t,
+	__global const uint * restrict const ibp, const uint e, const int s, const uint d, const uint d_inv, const int d_shift)
 {
 	const size_t n = get_global_size(0), k = get_global_id(0);
 
-	const uint rbk_prev = (k + 1 < n) ? t[k + 4] : 0;
+	const uint tk = t[k + 4];
+	//const uint rbk_prev = (k + 1 != n) ? tk : 0;	// NVidia compiler generates a conditionnal branch instruction then the code must be written with a mask
+	const uint mask = (k + 1 != n) ? (uint)(-1) : 0;
+	const uint rbk_prev = tk & mask;
 	const uint r_prev = _rem(rbk_prev * (ulong)(ibp[k]), d, d_inv, d_shift);
 
-	const uint2 x_k = x[k];
-
-	const ulong q = ((ulong)(r_prev) << digit_bit) | x_k.s1;
+	const ulong q = ((ulong)(r_prev) << digit_bit) | y[k];
 
 	const uint q_d = mul_hi((uint)(q >> d_shift), d_inv);	// d < 2^29
 	const uint r = (uint)(q) - q_d * d;
 	const uint c = (r >= d) ? 1 : 0;
 
+	const uint2 x_k = x[k];
 	x[k] = (uint2)((k > e + 2) ? 0 : x_k.s0, q_d + c);
 }
 

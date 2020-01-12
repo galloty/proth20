@@ -216,12 +216,12 @@ public:
 		primeList.push_back(Number(1027, 21468));	// size = 2048,   square32
 		primeList.push_back(Number(1109, 42921));	// size = 4096,   square64
 		primeList.push_back(Number(1085, 85959));	// size = 8192,   square128
-		primeList.push_back(Number(1015, 171214));	// size = 16384,  square256,  0.072
-		primeList.push_back(Number(1197, 343384));	// size = 32768,  square512,  0.110
-		primeList.push_back(Number(1089, 685641));	// size = 65536,  square1024, 0.180
-		primeList.push_back(Number(1005, 1375758));	// size = 131072, square32,   0.328
-		primeList.push_back(Number(1089, 2746155));	// size = 262144, square64,   0.587
-		primeList.push_back(Number(45, 5308037));	// size = 524288, square128,  1.12 ms
+		primeList.push_back(Number(1015, 171214));	// size = 16384,  square256,  0.077
+		primeList.push_back(Number(1197, 343384));	// size = 32768,  square512,  0.111
+		primeList.push_back(Number(1089, 685641));	// size = 65536,  square1024, 0.177
+		primeList.push_back(Number(1005, 1375758));	// size = 131072, square32,   0.318
+		primeList.push_back(Number(1089, 2746155));	// size = 262144, square64,   0.575
+		primeList.push_back(Number(45, 5308037));	// size = 524288, square128,  1.10 ms
 
 		std::vector<Number>	compositeList;
 		compositeList.push_back(Number(9999, 299,    "B073C97A2450454F"));
@@ -253,21 +253,21 @@ public:
 		// device0.displayProfiles(pCount);
 
 		// Size = 524288
-		// - sub_ntt64: 1, 11 %, 124886 (124886)
-		// - ntt64: 1, 11.4 %, 129375 (129375)
-		// - intt64: 2, 22 %, 249285 (124642)
-		// - square128: 1, 20.2 %, 228943 (228943)
-		// NTT: 64.6 %
-		// - poly2int0: 1, 12 %, 135674 (135674)
-		// - poly2int1: 1, 3.45 %, 39137 (39137)
-		// POLY2INT: 15.4 %
-		// - reduce_upsweep16: 3, 2.45 %, 27790 (9263)
-		// - reduce_downsweep16: 3, 3.39 %, 38422 (12807)
-		// - reduce_topsweep256: 1, 0.406 %, 4609 (4609)
-		// - reduce_i: 1, 7.63 %, 86625 (86625)
-		// - reduce_o: 1, 5.9 %, 66927 (66927)
-		// - reduce_f: 1, 0.298 %, 3386 (3386)
-		// REDUCE: 20.0 %
+		// - sub_ntt64: 1, 11.2 %, 125068 (125068)
+		// - ntt64: 1, 11.6 %, 129596 (129596)
+		// - intt64: 2, 22.4 %, 249873 (124936)
+		// - square128: 1, 20.6 %, 230544 (230544)
+		// NTT: 65.8 %
+		// - poly2int0: 1, 12.3 %, 137088 (137088)
+		// - poly2int1: 1, 3.53 %, 39409 (39409)
+		// POLY2INT: 15.8 %
+		// - reduce_upsweep16: 3, 2.5 %, 27892 (9297)
+		// - reduce_downsweep16: 3, 3.41 %, 38105 (12701)
+		// - reduce_topsweep256: 1, 0.407 %, 4547 (4547)
+		// - reduce_i: 1, 4.99 %, 55740 (55740)
+		// - reduce_o: 1, 6.83 %, 76370 (76370)
+		// - reduce_f: 1, 0.309 %, 3456 (3456)
+		// REDUCE: 18.4 %
 
 		// bench
 		for (const auto & p : primeList) check(p.k, p.n, device0, true);
