@@ -166,6 +166,7 @@ public:
 		compositeList.push_back(Number(1295, 85959,  "53D33CD949CC31DB"));	// size = 8k
 		compositeList.push_back(Number(9273, 171214, "AEC1A38C0C4B1D98"));	// size = 16k	split2
 		compositeList.push_back(Number(8651, 343387, "B832D18693CCB6BC"));	// size = 32k	split_o(false)
+		compositeList.push_back(Number(9999, 685619, "B151FAF87B6977C2"));	// size = 64k
 
 		ocl::Engine engine;
 		engine.displayDevices();

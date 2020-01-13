@@ -12,6 +12,9 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #include <cstdint>
 #include <cmath>
 #include <sstream>
+#include <fstream>
+
+#include "proth_ocl.h"
 
 class gpmp
 {
@@ -137,10 +140,37 @@ public:
 			throw std::runtime_error(msg.str());
 		}
 
+		std::stringstream src;
+
 		std::ifstream clFile("ocl/proth.cl"); 
-		if (!clFile) throw std::runtime_error("'proth.cl' not found.");
-		std::stringstream src; src << clFile.rdbuf();
-		clFile.close();
+		if (clFile.is_open())	// if proth.cl file exists then generate proth_ocl.h
+		{
+			std::ofstream hFile("src/proth_ocl.h");
+			if (!hFile.is_open()) throw std::runtime_error("cannot with 'proth_ocl.h' file.");
+
+			hFile << "/*" << std::endl;
+			hFile << "Copyright 2020, Yves Gallot" << std::endl << std::endl;
+			hFile << "proth20 is free source code, under the MIT license (see LICENSE). You can redistribute, use and/or modify it." << std::endl;
+			hFile << "Please give feedback to the authors if improvement is realized. It is distributed in the hope that it will be useful." << std::endl;
+			hFile << "*/" << std::endl << std::endl;
+			hFile << "static const char * const src_proth_ocl = \\" << std::endl;
+
+			std::string line;
+			while (std::getline(clFile, line))
+			{
+				hFile << "\"" << line << "\\n\" \\" << std::endl;
+				src << line << std::endl;
+			}
+			hFile << ";" << std::endl;
+
+			hFile.close();
+			clFile.close();
+		}
+		else	// otherwise program is proth_ocl.h
+		{
+			src << src_proth_ocl;
+		}
+
 		_device.loadProgram(src.str().c_str());
 
 		_device.allocMemory(size, constant_size);

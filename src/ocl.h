@@ -12,6 +12,8 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #include <string>
 #include <vector>
 #include <map>
+#include <algorithm>
+#include <cstring>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
@@ -20,8 +22,9 @@ Please give feedback to the authors if improvement is realized. It is distribute
 namespace ocl
 {
 
-//#define ocl_debug	1
+//#define ocl_debug		1
 //#define ocl_profile	1
+#define ocl_fast_exec	1
 
 #ifdef ocl_profile
 #define	_executeKernel	_executeKernelP
@@ -188,6 +191,7 @@ private:
 #else
 	bool _selfTuning = false;
 #endif
+	bool _isSync = false;
 	size_t _syncCount = 0;
 	cl_ulong _localMemSize = 0;
 	size_t _maxWorkGroupSize = 0;
@@ -205,6 +209,8 @@ private:
 	cl_kernel _reduce_topsweep32 = nullptr, _reduce_topsweep64 = nullptr, _reduce_topsweep128 = nullptr;
 	cl_kernel _reduce_topsweep256 = nullptr, _reduce_topsweep512 = nullptr, _reduce_topsweep1024 = nullptr;
 	cl_kernel _reduce_i = nullptr, _reduce_o = nullptr, _reduce_f = nullptr;
+
+	enum class EVendor { Unknown, NVIDIA, AMD, INTEL };
 
 	struct Profile
 	{
@@ -256,6 +262,8 @@ public:
 		cl_int err_ccq;
 		_queue = clCreateCommandQueue(_context, _device, _selfTuning ? CL_QUEUE_PROFILING_ENABLE : 0, &err_ccq);
 		oclFatal(err_ccq);
+
+		if (getVendor(deviceVendor) != EVendor::NVIDIA) _isSync = true;
 	}
 
 public:
@@ -266,6 +274,21 @@ public:
 #endif
 		oclFatal(clReleaseCommandQueue(_queue));
 		oclFatal(clReleaseContext(_context));
+	}
+
+private:
+	static EVendor getVendor(const std::string & vendorString)
+	{
+		std::string lVendorString; lVendorString.resize(vendorString.size());
+		std::transform(vendorString.begin(), vendorString.end(), lVendorString.begin(), [](char c){ return std::tolower(c); });
+
+		if (strstr(lVendorString.c_str(), "nvidia") != nullptr) return EVendor::NVIDIA;
+		if (strstr(lVendorString.c_str(), "amd") != nullptr) return EVendor::AMD;
+		if (strstr(lVendorString.c_str(), "advanced micro devices") != nullptr) return EVendor::AMD;
+		if (strstr(lVendorString.c_str(), "intel") != nullptr) return EVendor::INTEL;
+		// must be tested after 'Intel' because 'ati' is in 'Intel(R) Corporation' string
+		if (strstr(lVendorString.c_str(), "ati") != nullptr) return EVendor::AMD;
+		return EVendor::Unknown;
 	}
 
 public:
@@ -332,7 +355,7 @@ public:
 		size_t binSize; clGetProgramInfo(_program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binSize, nullptr);
 		char * binary = new char[binSize];
 		clGetProgramInfo(_program, CL_PROGRAM_BINARIES, sizeof(char *), &binary, nullptr);
-		std::ofstream fileOut("pgm.txt", std::ios_base::binary);
+		std::ofstream fileOut("pgm.txt", std::ios::binary);
 		fileOut.write(binary, binSize);
 		fileOut.close();
 		delete[] binary;
@@ -694,15 +717,30 @@ private:
 private:
 	static void _setKernelArg(cl_kernel kernel, const cl_uint arg_index, const size_t arg_size, const void * const arg_value)
 	{
-		oclFatal(clSetKernelArg(kernel, arg_index, arg_size, arg_value));
+#ifndef ocl_fast_exec
+		cl_int err =
+#endif
+		clSetKernelArg(kernel, arg_index, arg_size, arg_value);
+#ifndef ocl_fast_exec
+		oclFatal(err);
+#endif
 	}
 
 private:
 	void _executeKernelN(cl_kernel kernel, const size_t globalWorkSize, const size_t localWorkSize = 0)
 	{
-		oclFatal(clEnqueueNDRangeKernel(_queue, kernel, 1, nullptr, &globalWorkSize, (localWorkSize == 0) ? nullptr : &localWorkSize, 0, nullptr, nullptr));
-		++_syncCount;
-		//if (_syncCount >= 1024) _sync();
+#ifndef ocl_fast_exec
+		cl_int err =
+#endif
+		clEnqueueNDRangeKernel(_queue, kernel, 1, nullptr, &globalWorkSize, (localWorkSize == 0) ? nullptr : &localWorkSize, 0, nullptr, nullptr);
+#ifndef ocl_fast_exec
+		oclFatal(err);
+#endif
+		if (_isSync)
+		{
+			++_syncCount;
+			if (_syncCount == 1024) _sync();
+		}
 	}
 
 private:
