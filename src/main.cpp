@@ -87,7 +87,7 @@ private:
 
 		// X = X^(2^(n - 1))
 		Timer::Time startBenchTime = Timer::currentTime();
-		const uint32_t benchCount = (n < 100000) ? 10000 : 5000000 / (n / 1000);
+		const uint32_t benchCount = (n < 100000) ? 20000 : 10000000 / (n / 1000);
 		for (uint32_t i = 0; i < n - 1; ++i)
 		{
 			X.square();
@@ -126,75 +126,6 @@ public:
 public:
 	static void run()
 	{
-		// for (size_t n = 8; n <= 256; n *= 2)
-		// {
-		// 	int t[2 * n];
-		// 	for (size_t i = 0; i < n; ++i) t[i + 1] = n - i;
-
-		// 	size_t j = 1;
-		// 	size_t s = n / 4;
-		// 	while (true)
-		// 	{
-		// 		for (size_t k = 0; k < s; ++k)
-		// 		{
-		// 			int * const ti = &t[j + 0 * s + 4 * k];
-		// 			int * const to = &t[j + 4 * s + 1 * k];
-
-		// 			const int u0 = ti[0], u1 = ti[1], u2 = ti[2], u3 = ti[3];
-		// 			const int u01 = u0 + u1, u23 = u2 + u3, u0123 = u01 + u23;
-		// 			// to[s]: next step, ti[1] = u1, to[0]: down step, ti[3] = u3
-		// 			to[0] = u23; to[s] = u0123;
-		// 		}
-
-		// 		j += 5 * s;
-		// 		if (s <= 4) break;
-		// 		s /= 4;
-		// 	}
-
-		// 	if (s == 2)
-		// 	{
-		// 		const int u0 = t[j + 0], u1 = t[j + 1];
-		// 		const int u01 = u0 + u1;
-		// 		t[0] = u01;
-		// 		t[j + 0] = u1; t[j + 1] = 0;
-		// 	}
-		// 	else	// s == 4
-		// 	{
-		// 		const int u0 = t[j + 0], u1 = t[j + 1], u2 = t[j + 2], u3 = t[j + 3];
-		// 		const int u01 = u0 + u1, u23 = u2 + u3, u123 = u1 + u23, u0123 = u01 + u23;
-		// 		t[0] = u0123;
-		// 		t[j + 0] = u123; t[j + 1] = u23; t[j + 2] = u3; t[j + 3] = 0;
-		// 	}
-
-		// 	for (; s < n; s *= 4)
-		// 	{
-		// 		j -= 5 * s;
-
-		// 		for (size_t k = 0; k < s; ++k)
-		// 		{
-		// 			int * const ti = &t[j + 4 * s + 1 * k];
-		// 			int * const to = &t[j + 0 * s + 4 * k];
-
-		// 			const int u0 = ti[s], u2 = ti[0], u1 = to[1], u3 = to[3];
-		// 			const int u02 = u0 + u2, u012 = u02 + u1, u03 = u0 + u3;
-		// 			to[0] = u012; to[1] = u02; to[2] = u03; to[3] = u0;
-		// 		}
-		// 	}
-
-		// 	int sum = 0;
-		// 	for (size_t i = 0; i < n; ++i)
-		// 	{
-		// 		sum += (i + 1);
-		// 		if (t[n - 1 - i] != sum)
-		// 		{
-		// 			std::cout << "Error: " << n << ": " << t[n - 1 - i] << " " << sum << std::endl;
-		// 			break;
-		// 		}
-		// 	}
-		// }
-
-		// return;
-
 		std::cout << "proth20 0.0.1" << std::endl;
 		std::cout << "Copyright (c) 2020, Yves Gallot" << std::endl;
 		std::cout << "proth20 is free source code, under the MIT license." << std::endl << std::endl;
@@ -216,12 +147,12 @@ public:
 		primeList.push_back(Number(1027, 21468));	// size = 2048,   square32
 		primeList.push_back(Number(1109, 42921));	// size = 4096,   square64
 		primeList.push_back(Number(1085, 85959));	// size = 8192,   square128
-		primeList.push_back(Number(1015, 171214));	// size = 16384,  square256,  0.077
-		primeList.push_back(Number(1197, 343384));	// size = 32768,  square512,  0.111
+		primeList.push_back(Number(1015, 171214));	// size = 16384,  square256,  0.072
+		primeList.push_back(Number(1197, 343384));	// size = 32768,  square512,  0.105
 		primeList.push_back(Number(1089, 685641));	// size = 65536,  square1024, 0.177
-		primeList.push_back(Number(1005, 1375758));	// size = 131072, square32,   0.318
-		primeList.push_back(Number(1089, 2746155));	// size = 262144, square64,   0.575
-		primeList.push_back(Number(45, 5308037));	// size = 524288, square128,  1.10 ms
+		primeList.push_back(Number(1005, 1375758));	// size = 131072, square32,   0.319
+		primeList.push_back(Number(1089, 2746155));	// size = 262144, square64,   0.571
+		primeList.push_back(Number(45, 5308037));	// size = 524288, square128,  1.09 ms
 
 		std::vector<Number>	compositeList;
 		compositeList.push_back(Number(9999, 299,    "B073C97A2450454F"));
@@ -253,21 +184,21 @@ public:
 		// device0.displayProfiles(pCount);
 
 		// Size = 524288
-		// - sub_ntt64: 1, 11.2 %, 125068 (125068)
-		// - ntt64: 1, 11.6 %, 129596 (129596)
-		// - intt64: 2, 22.4 %, 249873 (124936)
-		// - square128: 1, 20.6 %, 230544 (230544)
-		// NTT: 65.8 %
-		// - poly2int0: 1, 12.3 %, 137088 (137088)
-		// - poly2int1: 1, 3.53 %, 39409 (39409)
-		// POLY2INT: 15.8 %
-		// - reduce_upsweep16: 3, 2.5 %, 27892 (9297)
-		// - reduce_downsweep16: 3, 3.41 %, 38105 (12701)
-		// - reduce_topsweep256: 1, 0.407 %, 4547 (4547)
-		// - reduce_i: 1, 4.99 %, 55740 (55740)
-		// - reduce_o: 1, 6.83 %, 76370 (76370)
-		// - reduce_f: 1, 0.309 %, 3456 (3456)
-		// REDUCE: 18.4 %
+		// - sub_ntt64: 1, 11.3 %, 125281 (125281)
+		// - ntt64: 1, 11.7 %, 129282 (129282)
+		// - intt64: 2, 22.5 %, 249309 (124654)
+		// - square128: 1, 20.6 %, 228637 (228637)
+		// NTT: 66.1 %
+		// - poly2int0: 1, 12.2 %, 135665 (135665)
+		// - poly2int1: 1, 3.53 %, 39125 (39125)
+		// POLY2INT: 15.7 %
+		// - reduce_upsweep64: 2, 2.34 %, 25922 (12961)
+		// - reduce_downsweep64: 2, 3.26 %, 36184 (18092)
+		// - reduce_topsweep256: 1, 0.419 %, 4642 (4642)
+		// - reduce_i: 1, 5 %, 55429 (55429)
+		// - reduce_o: 1, 6.9 %, 76526 (76526)
+		// - reduce_f: 1, 0.261 %, 2898 (2898)
+		// REDUCE: 18.2 %
 
 		// bench
 		for (const auto & p : primeList) check(p.k, p.n, device0, true);

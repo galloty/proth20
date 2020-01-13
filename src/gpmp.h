@@ -368,23 +368,25 @@ private:
 
 		const cl_uint n = cl_uint(_size / 2);
 		cl_uint j = 4;		// alignment (cl_uint4)
-		cl_uint s = (n / 4) / 4;
-		for (; true; s /= 16)
+		cl_uint s = n / 64;
+		for (; true; s /= 64)
 		{
-			_device.reduce_upsweep16(s, j);
-			j += 25 * s;
+			_device.reduce_upsweep64(s, j);
+			j += ((5 * 4 + 5) * 4 + 5) * s;
 			if (s <= 256) break;
 		}
 
-		if (s == 256)         _device.reduce_topsweep1024(j);
-		else if (s == 128)    _device.reduce_topsweep512(j);
-		else if (s == 64)     _device.reduce_topsweep256(j);
-		else /*if (s == 32)*/ _device.reduce_topsweep128(j);
+		if (s == 256)        _device.reduce_topsweep1024(j);
+		else if (s == 128)   _device.reduce_topsweep512(j);
+		else if (s == 64)    _device.reduce_topsweep256(j);
+		else if (s == 32)    _device.reduce_topsweep128(j);
+		else if (s == 16)    _device.reduce_topsweep64(j);
+		else /*if (s == 8)*/ _device.reduce_topsweep32(j);
 
-		for (; s < n / 4; s *= 16)
+		for (; s <= n / 64; s *= 64)
 		{
-			j -= 25 * s;
-			_device.reduce_downsweep16(s, j);
+			j -= ((5 * 4 + 5) * 4 + 5) * s;
+			_device.reduce_downsweep64(s, j);
 		}
 
 		// t[4 + k] remainders y[k + 1] / d, t[0] = remainder y[0] / d

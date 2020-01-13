@@ -201,7 +201,7 @@ private:
 	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr;
 	cl_kernel _square32 = nullptr, _square64 = nullptr, _square128 = nullptr, _square256 = nullptr,_square512 = nullptr, _square1024 = nullptr;
 	cl_kernel _poly2int0 = nullptr, _poly2int1 = nullptr;
-	cl_kernel _reduce_upsweep16 = nullptr, _reduce_downsweep16 = nullptr;
+	cl_kernel _reduce_upsweep64 = nullptr, _reduce_downsweep64 = nullptr;
 	cl_kernel _reduce_topsweep32 = nullptr, _reduce_topsweep64 = nullptr, _reduce_topsweep128 = nullptr;
 	cl_kernel _reduce_topsweep256 = nullptr, _reduce_topsweep512 = nullptr, _reduce_topsweep1024 = nullptr;
 	cl_kernel _reduce_i = nullptr, _reduce_o = nullptr, _reduce_f = nullptr;
@@ -218,7 +218,7 @@ private:
 	std::map<cl_kernel, Profile> _profileMap;
 
 	// Must be identical to ocl defines
-	static const size_t CHUNK64 = 16, BLK32 = 8, BLK64 = 4, BLK128 = 2, BLK256 = 1, P2I_WGS = 16, P2I_BLK = 16, RED_BLK = 16;
+	static const size_t CHUNK64 = 16, BLK32 = 8, BLK64 = 4, BLK128 = 2, BLK256 = 1, P2I_WGS = 16, P2I_BLK = 16, RED_BLK = 4;
 
 public:
 	Device(const Engine & engine, const size_t d) : _engine(engine), _d(d), _platform(engine.getPlatform(d)), _device(engine.getDevice(d))
@@ -432,11 +432,10 @@ private:
 		_setKernelArg(kernel, 1, sizeof(cl_mem), &_y);
 		_setKernelArg(kernel, 2, sizeof(cl_mem), &_t);
 		_setKernelArg(kernel, 3, sizeof(cl_mem), forward ? &_bp : &_ibp);
-		_setKernelArg(kernel, 4, sizeof(cl_uint), &e);
-		_setKernelArg(kernel, 5, sizeof(cl_int), &s);
-		_setKernelArg(kernel, 6, sizeof(cl_uint), &d);
-		_setKernelArg(kernel, 7, sizeof(cl_uint), &d_inv);
-		_setKernelArg(kernel, 8, sizeof(cl_int), &d_shift);
+		const cl_uint3 e_d_d_inv = { e, d, d_inv };
+		const cl_int2 s_d_shift = { s, d_shift };
+		_setKernelArg(kernel, 4, sizeof(cl_uint3), &e_d_d_inv);
+		_setKernelArg(kernel, 5, sizeof(cl_int2), &s_d_shift);
 		return kernel;
 	}
 
@@ -476,8 +475,8 @@ public:
 		_setKernelArg(_poly2int1, 1, sizeof(cl_mem), &_cr);
 		_setKernelArg(_poly2int1, 2, sizeof(cl_mem), &_err);
 
-		_reduce_upsweep16 = _createSweepKernel("reduce_upsweep16", d);
-		_reduce_downsweep16 = _createSweepKernel("reduce_downsweep16", d);
+		_reduce_upsweep64 = _createSweepKernel("reduce_upsweep64", d);
+		_reduce_downsweep64 = _createSweepKernel("reduce_downsweep64", d);
 
 		_reduce_topsweep32 = _createSweepKernel("reduce_topsweep32", d);
 		_reduce_topsweep64 = _createSweepKernel("reduce_topsweep64", d);
@@ -518,8 +517,8 @@ public:
 		_releaseKernel(_poly2int0);
 		_releaseKernel(_poly2int1);
 
-		_releaseKernel(_reduce_upsweep16);
-		_releaseKernel(_reduce_downsweep16);
+		_releaseKernel(_reduce_upsweep64);
+		_releaseKernel(_reduce_downsweep64);
 
 		_releaseKernel(_reduce_topsweep32);
 		_releaseKernel(_reduce_topsweep64);
@@ -589,23 +588,18 @@ public:
 public:
 	void sub_ntt64() { _executeKernel(_sub_ntt64, _size / 4, CHUNK64 * (64 / 4)); }
 
-public:
-	void ntt64(const cl_uint m, const cl_uint rindex)
+private:
+	inline void _executeNttKernel(cl_kernel kernel, const cl_uint m, const cl_uint rindex)
 	{
 		const cl_uint m_16 = (m / 16);
-		_setKernelArg(_ntt64, 3, sizeof(cl_uint), &m_16);
-		_setKernelArg(_ntt64, 4, sizeof(cl_uint), &rindex);
-		_executeKernel(_ntt64, _size / 4, CHUNK64 * (64 / 4));
+		_setKernelArg(kernel, 3, sizeof(cl_uint), &m_16);
+		_setKernelArg(kernel, 4, sizeof(cl_uint), &rindex);
+		_executeKernel(kernel, _size / 4, CHUNK64 * (64 / 4));
 	}
 
 public:
-	void intt64(const cl_uint m, const cl_uint rindex)
-	{
-		const cl_uint m_16 = (m / 16);
-		_setKernelArg(_intt64, 3, sizeof(cl_uint), &m_16);
-		_setKernelArg(_intt64, 4, sizeof(cl_uint), &rindex);
-		_executeKernel(_intt64, _size / 4, CHUNK64 * (64 / 4));
-	}
+	void ntt64(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_ntt64, m, rindex); }
+	void intt64(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_intt64, m, rindex); }
 
 public:
 	void square32() { _executeKernel(_square32, _size / 4, BLK32 * 32 / 4); }
@@ -619,21 +613,17 @@ public:
 	void poly2int0() { _executeKernel(_poly2int0, _size / P2I_BLK, P2I_WGS); }
 	void poly2int1() { _executeKernel(_poly2int1, _size / P2I_BLK); }
 
-public:
-	void reduce_upsweep16(const cl_uint s, const cl_uint j)
+private:
+	inline void _executeUDsweepKernel(cl_kernel kernel, const cl_uint s, const cl_uint j, const size_t size)
 	{
-		_setKernelArg(_reduce_upsweep16, 2, sizeof(cl_uint), &s);
-		_setKernelArg(_reduce_upsweep16, 3, sizeof(cl_uint), &j);
-		_executeKernel(_reduce_upsweep16, (16 / 4) * s, RED_BLK * 16 / 4);
+		_setKernelArg(kernel, 2, sizeof(cl_uint), &s);
+		_setKernelArg(kernel, 3, sizeof(cl_uint), &j);
+		_executeKernel(kernel, (size / 4) * s, RED_BLK * (size / 4));
 	}
 
 public:
-	void reduce_downsweep16(const cl_uint s, const cl_uint j)
-	{
-		_setKernelArg(_reduce_downsweep16, 2, sizeof(cl_uint), &s);
-		_setKernelArg(_reduce_downsweep16, 3, sizeof(cl_uint), &j);
-		_executeKernel(_reduce_downsweep16, (16 / 4) * s, RED_BLK * 16 / 4);
-	}
+	void reduce_upsweep64(const cl_uint s, const cl_uint j) { _executeUDsweepKernel(_reduce_upsweep64, s, j, 64); }
+	void reduce_downsweep64(const cl_uint s, const cl_uint j) { _executeUDsweepKernel(_reduce_downsweep64, s, j, 64); }
 
 private:
 	inline void _executeTopsweepKernel(cl_kernel kernel, const cl_uint j, const size_t size)
