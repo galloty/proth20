@@ -110,12 +110,18 @@ public:
 
 		const std::string res = (isPrime) ? "                  " : std::string(", RES64 = ") + res64String(res64);
 
-		std::cout << "\r" << k << " * 2^" << n << " + 1 is " << (isPrime ? "prime" : "composite") << ", a = " << a << ", err = " << err
-			<< ", " << X.getDigits() << " digits (size = "	<< X.getSize() << "), time = " << Timer::formatTime(elapsedTime) << res << std::endl;
+		std::cout << "\r" << k << " * 2^" << n << " + 1 is " << (isPrime ? "prime" : "composite") << ", a = " << a << ", " 
+			<< X.getDigits() << " digits (size = "	<< X.getSize() << "), time = " << Timer::formatTime(elapsedTime) << res << std::endl;
 
 		if (r64 != 0)
 		{
 			if (res64 != r64) std::cout << "Error: " << res64String(res64) << " != " << res64String(r64) << std::endl;
+			return false;
+		}
+		if (err != 0)
+		{
+			std::cout << "Error detected." << std::endl;
+			return false;
 		}
 
 		return true;
@@ -133,34 +139,34 @@ public:
 	static void test_prime(ocl::Device & device, const bool bench = false)
 	{
 		std::vector<Number>	primeList;
-		primeList.push_back(Number(1035, 301));
-		primeList.push_back(Number(955, 636));
-		primeList.push_back(Number(969, 1307));
-		primeList.push_back(Number(1139, 2641));
-		primeList.push_back(Number(1035, 5336));
-		primeList.push_back(Number(965, 10705));
+		// primeList.push_back(Number(1035, 301));
+		// primeList.push_back(Number(955, 636, 2));
+		// primeList.push_back(Number(969, 1307));
+		// primeList.push_back(Number(1139, 2641));
+		// primeList.push_back(Number(1035, 5336));
+		// primeList.push_back(Number(965, 10705));
 		primeList.push_back(Number(1027, 21468));	// size = 2k,   square32
 		primeList.push_back(Number(1109, 42921));	// size = 4k,   square64
-		primeList.push_back(Number(1085, 85959));	// size = 8k,   square128
-		primeList.push_back(Number(1015, 171214));	// size = 16k,  square256,  0.072
-		primeList.push_back(Number(1197, 343384));	// size = 32k,  square512,  0.105
-		primeList.push_back(Number(1089, 685641));	// size = 64k,  square1024, 0.177
-		primeList.push_back(Number(1005, 1375758));	// size = 128k, square32,   0.319
-		primeList.push_back(Number(1089, 2746155));	// size = 256k, square64,   0.571
-		primeList.push_back(Number(45, 5308037));	// size = 512k, square128,  1.09 ms
+		primeList.push_back(Number(1085, 85959));	// size = 8k,   square128	64-bit 32-bit
+		primeList.push_back(Number(1015, 171214));	// size = 16k,  square256,  0.072  0.072
+		primeList.push_back(Number(1197, 343384));	// size = 32k,  square512,  0.105  0.101
+		primeList.push_back(Number(1089, 685641));	// size = 64k,  square1024, 0.177  0.168
+		primeList.push_back(Number(1005, 1375758));	// size = 128k, square32,   0.319  0.306
+		primeList.push_back(Number(1089, 2746155));	// size = 256k, square64,   0.571  0.556
+		primeList.push_back(Number(45, 5308037));	// size = 512k, square128,  1.09   1.06  ms
 
-		for (const auto & p : primeList) proth::check(p.k, p.n, device, bench);
+		for (const auto & p : primeList) proth::check(p.k, p.n, device, bench, 1);
 	}
 
 	static void test_composite(ocl::Device & device, const bool bench = false)
 	{
 		std::vector<Number>	compositeList;
-		compositeList.push_back(Number(9999, 299,    0xB073C97A2450454Full));
-		compositeList.push_back(Number(21, 636,      0x4FD4F9FE4C6E7C1Bull));
-		compositeList.push_back(Number(4769, 1307,   0x8B5F4C7215F37871ull));
-		compositeList.push_back(Number(9671, 2631,   0x0715EDFC4814B64Aull));
-		compositeList.push_back(Number(19, 5336,     0x614B05AC60E508A0ull));
-		compositeList.push_back(Number(963, 10705,   0x232BF76A98040BA3ull));
+		// compositeList.push_back(Number(9999, 299,    0xB073C97A2450454Full));
+		// compositeList.push_back(Number(21, 636,      0x4FD4F9FE4C6E7C1Bull));
+		// compositeList.push_back(Number(4769, 1307,   0x8B5F4C7215F37871ull));
+		// compositeList.push_back(Number(9671, 2631,   0x0715EDFC4814B64Aull));
+		// compositeList.push_back(Number(19, 5336,     0x614B05AC60E508A0ull));
+		// compositeList.push_back(Number(963, 10705,   0x232BF76A98040BA3ull));
 		compositeList.push_back(Number(6189, 21469,  0x88D2582BDDE8E7CAull));	// size = 2k
 		compositeList.push_back(Number(2389, 42922,  0xE427B88330D2EE8Cull));	// size = 4k
 		compositeList.push_back(Number(1295, 85959,  0x53D33CD949CC31DBull));	// size = 8k
@@ -172,6 +178,20 @@ public:
 		for (const auto & c : compositeList) proth::check(c.k, c.n, device, bench, c.res64);
 	}
 
+	static void bench(ocl::Device & device)
+	{
+		// 1,375,000 - 2,750,000: size = 256k	PPSE, PPS
+		// 2,750,000 - 5,500,000: size = 512k	DIV
+
+		std::vector<Number>	benchList;
+		benchList.push_back(Number(9501, 1553584));
+		benchList.push_back(Number(1101, 2832061));
+		benchList.push_back(Number(45, 5308037));
+
+		for (const auto & b : benchList) proth::check(b.k, b.n, device, true);
+		std::cout << std::endl;
+		for (const auto & b : benchList) proth::check(b.k, b.n, device);
+	}
 
 	static void profile(const uint32_t k, const uint32_t n, ocl::Device & device)	// ocl_profile must be defined (ocl.h)
 	{

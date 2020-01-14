@@ -252,7 +252,7 @@ public:
 
 public:
 	size_t getSize() const { return _size; }
-	size_t getDigits() const { return size_t(ceil(log10(_k) + _n * log10(2))); }
+	size_t getDigits() const { return size_t(std::ceil(std::log10(_k) + _n * std::log10(2))); }
 
 public:
 	int getError() const

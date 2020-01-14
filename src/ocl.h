@@ -165,13 +165,15 @@ public:
 	}
 
 public:
+	size_t getDeviceCount() const { return _devices.size(); }
+
+public:
 	void displayDevices() const
 	{
 		for (size_t i = 0, n = _devices.size(); i < n; ++i)
 		{
 			std::cout << i << " - " << _devices[i].name << "." << std::endl;
 		}
-		std::cout << std::endl;
 	}
 
 public:

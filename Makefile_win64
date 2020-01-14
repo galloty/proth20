@@ -1,4 +1,4 @@
-CC = g++ -m32 -std=c++17
+CC = g++ -m64 -std=c++17
 RM = cmd \/C del
 CFLAGS = -Wall -Wextra -fexceptions
 DFLAGS = -g
@@ -8,7 +8,7 @@ BIN_DIR = bin
 SRC_DIR = src
 
 OCl_INC = -I Khronos
-OCL_LIB = -Wl,-enable-stdcall-fixup C:/Windows/SysWOW64/OpenCL.dll
+OCL_LIB = C:/Windows/System32/OpenCL.dll
 
 EXEC_RELEASE = $(BIN_DIR)\proth20.exe
 EXEC_DEBUG = $(BIN_DIR)\proth20d.exe
