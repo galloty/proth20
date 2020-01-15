@@ -67,7 +67,7 @@ public:
 
 		gpmp X(k, n, device);	// X = 1
 
-		std::cout << "Testing " << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits (size = "	<< X.getSize() << "), " << std::flush;
+		std::cout << "Testing " << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits (size = "	<< X.getSize() << ")," << std::flush;
 
 		// X *= a^k, left-to-right algorithm
 		bool s = false;
@@ -93,7 +93,7 @@ public:
 				X.getError();
 				const double elapsedTime = Timer::diffTime(Timer::currentTime(), startBenchTime);
 				const double mulTime = elapsedTime / benchCount, estimatedTime = mulTime * n;
-				std::cout << "estimated time is " << Timer::formatTime(estimatedTime) << ", " << std::setprecision(3) << mulTime * 1e3 << " ms/mul." << std::flush;
+				std::cout << " estimated time is " << Timer::formatTime(estimatedTime) << ", " << std::setprecision(3) << mulTime * 1e3 << " ms/mul." << std::flush;
 				if (bench)
 				{
 					std::cout << std::endl;
@@ -105,22 +105,30 @@ public:
 		uint64_t res64;
 		const bool isPrime = X.isMinusOne(res64);
 		const int err = X.getError();
+		if (err != 0)
+		{
+			std::cout << " error detected!" << std::endl;
+			return false;
+		}
 
 		const double elapsedTime = Timer::diffTime(Timer::currentTime(), startTime);
 
-		const std::string res = (isPrime) ? "                  " : std::string(", RES64 = ") + res64String(res64);
+		const std::string res = (isPrime) ? "                        " : std::string(", RES64 = ") + res64String(res64);
 
-		std::cout << "\r" << k << " * 2^" << n << " + 1 is " << (isPrime ? "prime" : "composite") << ", a = " << a << ", " 
+		std::stringstream ss; ss << k << " * 2^" << n << " + 1 is " << (isPrime ? "prime" : "composite") << ", a = " << a << ", " 
 			<< X.getDigits() << " digits (size = "	<< X.getSize() << "), time = " << Timer::formatTime(elapsedTime) << res << std::endl;
+
+		std::cout << "\r" << ss.str();
+		std::ofstream resFile("presults.txt", std::ios::app);
+		if (resFile.is_open())
+		{
+			resFile << ss.str();
+			resFile.close();
+		}
 
 		if (r64 != 0)
 		{
 			if (res64 != r64) std::cout << "Error: " << res64String(res64) << " != " << res64String(r64) << std::endl;
-			return false;
-		}
-		if (err != 0)
-		{
-			std::cout << "Error detected." << std::endl;
 			return false;
 		}
 
