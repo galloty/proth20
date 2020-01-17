@@ -879,6 +879,21 @@ static const char * const src_proth_ocl = \
 "}\n" \
 "\n" \
 "__kernel\n" \
+"void reduce_x(__global uint2 * restrict const x, const uint n, __global int * const err)\n" \
+"{\n" \
+"	int c = 0;\n" \
+"	for (size_t k = 0; k < n; ++k)\n" \
+"	{\n" \
+"		const uint2 x_k = x[k];\n" \
+"		c += x_k.s0 - x_k.s1;\n" \
+"		x[k] = (uint2)((uint)(c) & digit_mask, 0);\n" \
+"		c >>= digit_bit;\n" \
+"	}\n" \
+"\n" \
+"	if (c != 0) atomic_or(err, c);\n" \
+"}\n" \
+"\n" \
+"__kernel\n" \
 "void set_positive(__global uint2 * restrict const x, const uint n, const uint e, const ulong ds)\n" \
 "{\n" \
 "	//_x.s0 = R, _x.s1 = Y\n" \
@@ -888,6 +903,7 @@ static const char * const src_proth_ocl = \
 "	{\n" \
 "		const size_t j = n - 1 - i;\n" \
 "		const uint2 x_j = x[j];\n" \
+"		if (x_j.s0 > x_j.s1) return;\n" \
 "		if (x_j.s0 < x_j.s1)\n" \
 "		{\n" \
 "			// R += 1\n" \
@@ -912,6 +928,19 @@ static const char * const src_proth_ocl = \
 "\n" \
 "			return;\n" \
 "		}\n" \
+"	}\n" \
+"}\n" \
+"\n" \
+"__kernel\n" \
+"void add1(__global uint2 * restrict const x)\n" \
+"{\n" \
+"	uint c = 1;\n" \
+"	for (size_t k = 0; c != 0; ++k)\n" \
+"	{\n" \
+"		const uint2 x_k = x[k];\n" \
+"		c += x_k.s0;\n" \
+"		x[k] = (uint2)((uint)(c) & digit_mask, x_k.s1);\n" \
+"		c >>= digit_bit;\n" \
 "	}\n" \
 "}\n" \
 ;

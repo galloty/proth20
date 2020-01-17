@@ -211,8 +211,8 @@ private:
 	cl_kernel _reduce_upsweep64 = nullptr, _reduce_downsweep64 = nullptr;
 	cl_kernel _reduce_topsweep32 = nullptr, _reduce_topsweep64 = nullptr, _reduce_topsweep128 = nullptr;
 	cl_kernel _reduce_topsweep256 = nullptr, _reduce_topsweep512 = nullptr, _reduce_topsweep1024 = nullptr;
-	cl_kernel _reduce_i = nullptr, _reduce_o = nullptr, _reduce_f = nullptr;
-	cl_kernel _set_positive = nullptr;
+	cl_kernel _reduce_i = nullptr, _reduce_o = nullptr, _reduce_f = nullptr, _reduce_x = nullptr;
+	cl_kernel _set_positive = nullptr, _add1 = nullptr;
 
 	enum class EVendor { Unknown, NVIDIA, AMD, INTEL };
 
@@ -535,12 +535,20 @@ public:
 		_setKernelArg(_reduce_f, 3, sizeof(cl_uint), &e);
 		_setKernelArg(_reduce_f, 4, sizeof(cl_int), &s);
 
+		_reduce_x = _createKernel("reduce_x");
+		_setKernelArg(_reduce_x, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(_reduce_x, 1, sizeof(cl_uint), &n);
+		_setKernelArg(_reduce_x, 2, sizeof(cl_mem), &_err);
+
 		_set_positive = _createKernel("set_positive");
 		_setKernelArg(_set_positive, 0, sizeof(cl_mem), &_x);
 		_setKernelArg(_set_positive, 1, sizeof(cl_uint), &n);
 		_setKernelArg(_set_positive, 2, sizeof(cl_uint), &e);
 		const cl_ulong ds = cl_ulong(d) << s;
 		_setKernelArg(_set_positive, 3, sizeof(cl_ulong), &ds);
+
+		_add1 = _createKernel("add1");
+		_setKernelArg(_add1, 0, sizeof(cl_mem), &_x);
 	}
 
 public:
@@ -581,8 +589,10 @@ public:
 		_releaseKernel(_reduce_i);
 		_releaseKernel(_reduce_o);
 		_releaseKernel(_reduce_f);
+		_releaseKernel(_reduce_x);
 
 		_releaseKernel(_set_positive);
+		_releaseKernel(_add1);
 	}
 
 public:
@@ -733,9 +743,11 @@ public:
 	void reduce_i() { _executeKernel(_reduce_i, _size / 2); }
 	void reduce_o() { _executeKernel(_reduce_o, _size / 2); }
 	void reduce_f() { _executeKernel(_reduce_f, 1); }
+	void reduce_x() { _executeKernel(_reduce_x, 1); }
 
 public:
 	void set_positive() { _executeKernel(_set_positive, 1); }
+	void add1() { _executeKernel(_add1, 1); }
 
 private:
 	void _sync()

@@ -871,6 +871,21 @@ void reduce_f(__global uint2 * restrict const x, __global const uint * restrict 
 }
 
 __kernel
+void reduce_x(__global uint2 * restrict const x, const uint n, __global int * const err)
+{
+	int c = 0;
+	for (size_t k = 0; k < n; ++k)
+	{
+		const uint2 x_k = x[k];
+		c += x_k.s0 - x_k.s1;
+		x[k] = (uint2)((uint)(c) & digit_mask, 0);
+		c >>= digit_bit;
+	}
+
+	if (c != 0) atomic_or(err, c);
+}
+
+__kernel
 void set_positive(__global uint2 * restrict const x, const uint n, const uint e, const ulong ds)
 {
 	//_x.s0 = R, _x.s1 = Y
@@ -880,6 +895,7 @@ void set_positive(__global uint2 * restrict const x, const uint n, const uint e,
 	{
 		const size_t j = n - 1 - i;
 		const uint2 x_j = x[j];
+		if (x_j.s0 > x_j.s1) return;
 		if (x_j.s0 < x_j.s1)
 		{
 			// R += 1
@@ -904,5 +920,18 @@ void set_positive(__global uint2 * restrict const x, const uint n, const uint e,
 
 			return;
 		}
+	}
+}
+
+__kernel
+void add1(__global uint2 * restrict const x)
+{
+	uint c = 1;
+	for (size_t k = 0; c != 0; ++k)
+	{
+		const uint2 x_k = x[k];
+		c += x_k.s0;
+		x[k] = (uint2)((uint)(c) & digit_mask, x_k.s1);
+		c >>= digit_bit;
 	}
 }

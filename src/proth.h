@@ -46,7 +46,7 @@ private:
 	}
 
 public:
-	static bool check(const uint32_t k, const uint32_t n, ocl::Device & device, const bool bench = false, const uint64_t r64 = 0)
+	static bool check(const uint32_t k, const uint32_t n, ocl::Device & device, const bool bench = false, const bool checkRes = false, const uint64_t r64 = 0)
 	{
 		const Timer::Time startTime = Timer::currentTime();
 
@@ -127,7 +127,7 @@ public:
 			resFile.close();
 		}
 
-		if (r64 != 0)
+		if (checkRes)
 		{
 			if (res64 != r64) std::cout << "Error: " << res64String(res64) << " != " << res64String(r64) << std::endl;
 			return false;
@@ -164,7 +164,7 @@ public:
 		primeList.push_back(Number(1089, 2746155));	// size = 256k, square64,   0.571  0.556
 		primeList.push_back(Number(45, 5308037));	// size = 512k, square128,  1.09   1.06  ms
 
-		for (const auto & p : primeList) proth::check(p.k, p.n, device, bench, 1);
+		for (const auto & p : primeList) proth::check(p.k, p.n, device, bench, true);
 	}
 
 	static void test_composite(ocl::Device & device, const bool bench = false)
@@ -184,7 +184,7 @@ public:
 		compositeList.push_back(Number(9999, 685619, 0xB151FAF87B6977C2ull));	// size = 64k
 
 		// check residues
-		for (const auto & c : compositeList) proth::check(c.k, c.n, device, bench, c.res64);
+		for (const auto & c : compositeList) proth::check(c.k, c.n, device, bench, true, c.res64);
 	}
 
 	static void bench(ocl::Device & device)

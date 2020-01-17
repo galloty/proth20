@@ -256,7 +256,7 @@ public:
 public:
 	void display() const
 	{
-		const size_t size = _size;
+		const size_t size = _size / 2;
 		cl_uint2 * const x = _mem;
 		_device.readMemory_x(x);
 		std::cout << std::endl;
@@ -424,27 +424,30 @@ public:
 public:
 	bool isMinusOne(uint64_t & res64)
 	{
-		const size_t size = _size;
+		_device.add1();
+
+		// if R < Y then add k.2^n + 1 to R. We have 0 <= R - Y + k.2^n + 1 <= k.2^n
+		_device.set_positive();
+
+		// _x[0] = R, _x[1] = Y; compute R - Y
+		_device.reduce_x();
+
 		cl_uint2 * const x = _mem;
 
 		_device.readMemory_x(x);
 
-		// Another method is: compute T = R - Y + 1 or T = (R + k*2^n + 1) - Y + 1  such that 0 <= T < k*2^n + 1
-		// T == 0?
-
-		// _x[0] = R, _x[1] = Y; compute R - Y
-		bool sign = _sub(x, size / 2);
-
-		const bool b = (sign && _isOne(x, size / 2));
-
-		if (sign)
+		uint64_t r = 0, b = 1;
+		bool isPrime = true;
+		for (size_t i = 0, n = _size / 2; i < n; ++i)
 		{
-			_neg(x, size / 2, _k, _n);
-			sign = false;
+			uint32_t x_i = x[i].s[0];
+			isPrime &= (x_i == 0);
+			r += x_i * b;
+			b <<= digit_bit;
 		}
 
-		res64 = _getRes64(x, size / 2) + 1;
-		return b;
+		res64 = r;
+		return isPrime;
 	}
 
 private:
@@ -500,65 +503,5 @@ private:
 		_device.reduce_f();
 
 		// x size is size / 2, _x[0] = R, _x[1] = Y
-	}
-
-private:
-	static bool _isOne(cl_uint2 * const a, const size_t size)
-	{
-		if (a[0].s[0] != 1) return false;
-		for (size_t i = 1; i < size; ++i) if (a[i].s[0] != 0) return false;
-		return true;
-	}
-
-private:
-	static uint64_t _getRes64(cl_uint2 * const a, const size_t size)
-	{
-		uint64_t r = 0, b = 1;
-		for (size_t i = 0; i < size; ++i)
-		{
-			r += a[i].s[0] * b;
-			b <<= digit_bit;
-		}
-		return r;
-	}
-
-private:
-	static bool _sub(cl_uint2 * const a, const size_t size)
-	{
-		int32_t carry = 0;
-		for (size_t i = 0; i < size; ++i)
-		{
-			const int32_t s = a[i].s[0] - a[i].s[1] + carry;
-			a[i].s[0] = uint32_t(s) & digit_mask;
-			carry = s >> digit_bit;
-		}
-		if (carry == 0) return false;
-		carry = 0;
-		for (size_t i = 0; i < size; ++i)
-		{
-			const int32_t s = carry - a[i].s[0];
-			a[i].s[0] = uint32_t(s) & digit_mask;
-			carry = s >> digit_bit;
-		}
-		return true;
-	}
-
-private:
-	static void _neg(cl_uint2 * const a, const size_t size, const uint32_t k, const uint32_t n)
-	{
-		const uint32_t e = n / digit_bit, s = n % digit_bit;
-		const uint64_t ks = uint64_t(k) << s;
-		const uint32_t ak[3] = { uint32_t(ks) & digit_mask, uint32_t(ks >> digit_bit) & digit_mask, uint32_t(ks >> (2 * digit_bit)) & digit_mask};
-
-		int32_t carry = 1;
-		for (size_t i = 0; i < size; ++i)
-		{
-			if (i == e) carry += ak[0];
-			if (i == e + 1) carry += ak[1];
-			if (i == e + 2) carry += ak[2];
-			const int32_t s = carry - a[i].s[0];
-			a[i].s[0] = uint32_t(s) & digit_mask;
-			carry = s >> digit_bit;
-		}
 	}
 };
