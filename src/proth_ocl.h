@@ -510,7 +510,7 @@ static const char * const src_proth_ocl = \
 "	for (size_t j = 0; j < P2I_BLK; ++j)\n" \
 "	{\n" \
 "		const size_t k = P2I_WGS * j + i;\n" \
-"		xo[k] = (uint2)(X[P2I_WGS * (k % P2I_BLK) + (k / P2I_BLK)], 0);\n" \
+"		xo[k].s0 = X[P2I_WGS * (k % P2I_BLK) + (k / P2I_BLK)];\n" \
 "	}\n" \
 "}\n" \
 "\n" \
@@ -521,18 +521,16 @@ static const char * const src_proth_ocl = \
 "\n" \
 "	__global uint2 * const xi = &x[P2I_BLK * k];\n" \
 "\n" \
-"	const uint2 xi_0 = xi[0];\n" \
-"	long l = cr[k] + xi_0.s0;\n" \
-"	xi[0] = (uint2)((uint)(l) & digit_mask, xi_0.s1);\n" \
+"	long l = cr[k] + xi[0].s0;\n" \
+"	xi[0].s0 = (uint)(l) & digit_mask;\n" \
 "	l >>= digit_bit;						// |l| < n/2\n" \
 "\n" \
 "	int f = (int)(l);\n" \
 "#pragma unroll\n" \
 "	for (size_t j = 1; j < P2I_BLK; ++j)\n" \
 "	{\n" \
-"		const uint2 xi_j = xi[j];\n" \
-"		f += xi_j.s0;\n" \
-"		xi[j] = (uint2)((uint)(f) & digit_mask, xi_j.s1);\n" \
+"		f += xi[j].s0;\n" \
+"		xi[j].s0 = (uint)(f) & digit_mask;\n" \
 "		f >>= digit_bit;					// f = -1, 0 or 1\n" \
 "		if (f == 0) break;\n" \
 "	}\n" \
@@ -680,11 +678,26 @@ static const char * const src_proth_ocl = \
 "	T[0] = u123; T[1] = u23; T[2] = u3; T[3] = 0;\n" \
 "}\n" \
 "\n" \
+"#define	S16		(16 / 4)\n" \
+"__kernel __attribute__((reqd_work_group_size(S16, 1, 1)))\n" \
+"void reduce_topsweep16(__global uint * restrict const t, const uint d, const uint j)\n" \
+"{\n" \
+"	__local uint T[64];\n" \
+"\n" \
+"	const size_t i = get_local_id(0);\n" \
+"\n" \
+"	_reduce_upsweep4i(T, &t[j], d, S16, i);\n" \
+"	barrier(CLK_LOCAL_MEM_FENCE);\n" \
+"	if (i == 0) _reduce_topsweep4(t, &T[S16], d);\n" \
+"	barrier(CLK_LOCAL_MEM_FENCE);\n" \
+"	_reduce_downsweep4o(&t[j], T, d, S16, i);\n" \
+"}\n" \
+"\n" \
 "#define	S32		(32 / 4)\n" \
 "__kernel __attribute__((reqd_work_group_size(S32, 1, 1)))\n" \
 "void reduce_topsweep32(__global uint * restrict const t, const uint d, const uint j)\n" \
 "{\n" \
-"	__local uint T[32];	// 20\n" \
+"	__local uint T[64];	// 20\n" \
 "\n" \
 "	const size_t i = get_local_id(0);\n" \
 "\n" \
@@ -862,18 +875,15 @@ static const char * const src_proth_ocl = \
 "__kernel\n" \
 "void reduce_f(__global uint2 * restrict const x, __global const uint * restrict const t, const uint n, const uint e, const int s)\n" \
 "{\n" \
-"	const uint2 x_e = x[e];\n" \
-"\n" \
-"	const uint rs = x_e.s0 & ((1u << s) - 1);\n" \
+"	const uint rs = x[e].s0 & ((1u << s) - 1);\n" \
 "	ulong l = ((ulong)(t[0]) << s) | rs;		// rds < 2^(29 + digit_bit - 1)\n" \
 "\n" \
-" 	x[e] = (uint2)((uint)(l) & digit_mask, x_e.s1);\n" \
+"	x[e].s0 = (uint)(l) & digit_mask;\n" \
 "	l >>= digit_bit;\n" \
 "\n" \
 "	for (size_t k = e + 1; l != 0; ++k)\n" \
 "	{\n" \
-"		const uint2 x_k = x[k];\n" \
-"		x[k] = (uint2)((uint)(l) & digit_mask, x_k.s1);\n" \
+"		x[k].s0 = (uint)(l) & digit_mask;\n" \
 "		l >>= digit_bit;\n" \
 "	}\n" \
 "}\n" \

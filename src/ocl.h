@@ -22,9 +22,9 @@ Please give feedback to the authors if improvement is realized. It is distribute
 namespace ocl
 {
 
-//#define ocl_debug		1
-//#define ocl_profile	1
-#define ocl_fast_exec	1
+// #define ocl_debug		1
+// #define ocl_profile		1
+#define ocl_fast_exec		1
 
 #ifdef ocl_profile
 #define	_executeKernel	_executeKernelP
@@ -209,7 +209,7 @@ private:
 	cl_kernel _mul2 = nullptr, _mul4 = nullptr;
 	cl_kernel _poly2int0 = nullptr, _poly2int1 = nullptr;
 	cl_kernel _reduce_upsweep64 = nullptr, _reduce_downsweep64 = nullptr;
-	cl_kernel _reduce_topsweep32 = nullptr, _reduce_topsweep64 = nullptr, _reduce_topsweep128 = nullptr;
+	cl_kernel _reduce_topsweep16 = nullptr, _reduce_topsweep32 = nullptr, _reduce_topsweep64 = nullptr, _reduce_topsweep128 = nullptr;
 	cl_kernel _reduce_topsweep256 = nullptr, _reduce_topsweep512 = nullptr, _reduce_topsweep1024 = nullptr;
 	cl_kernel _reduce_i = nullptr, _reduce_o = nullptr, _reduce_f = nullptr, _reduce_x = nullptr;
 	cl_kernel _set_positive = nullptr, _add1 = nullptr;
@@ -517,6 +517,7 @@ public:
 		_reduce_upsweep64 = _createSweepKernel("reduce_upsweep64", d);
 		_reduce_downsweep64 = _createSweepKernel("reduce_downsweep64", d);
 
+		_reduce_topsweep16 = _createSweepKernel("reduce_topsweep16", d);
 		_reduce_topsweep32 = _createSweepKernel("reduce_topsweep32", d);
 		_reduce_topsweep64 = _createSweepKernel("reduce_topsweep64", d);
 		_reduce_topsweep128 = _createSweepKernel("reduce_topsweep128", d);
@@ -579,6 +580,7 @@ public:
 		_releaseKernel(_reduce_upsweep64);
 		_releaseKernel(_reduce_downsweep64);
 
+		_releaseKernel(_reduce_topsweep16);
 		_releaseKernel(_reduce_topsweep32);
 		_releaseKernel(_reduce_topsweep64);
 		_releaseKernel(_reduce_topsweep128);
@@ -732,6 +734,7 @@ private:
 	}
 
 public:
+	void reduce_topsweep16(const cl_uint j) { _executeTopsweepKernel(_reduce_topsweep16, j, 16); }
 	void reduce_topsweep32(const cl_uint j) { _executeTopsweepKernel(_reduce_topsweep32, j, 32); }
 	void reduce_topsweep64(const cl_uint j) { _executeTopsweepKernel(_reduce_topsweep64, j, 64); }
 	void reduce_topsweep128(const cl_uint j) { _executeTopsweepKernel(_reduce_topsweep128, j, 128); }
@@ -757,11 +760,18 @@ private:
 	}
 
 private:
-	cl_mem _createBuffer(const cl_mem_flags flags, const size_t size) const
+	cl_mem _createBuffer(const cl_mem_flags flags, const size_t size, const bool debug = true) const
 	{
 		cl_int err;
 		cl_mem mem = clCreateBuffer(_context, flags, size, nullptr, &err);
 		oclFatal(err);
+		if (debug)
+		{
+			uint8_t * const ptr = new uint8_t[size];
+			for (size_t i = 0; i < size; ++i) ptr[i] = 0xff;
+			oclFatal(clEnqueueWriteBuffer(_queue, mem, CL_TRUE, 0, size, ptr, 0, nullptr, nullptr));
+			delete[] ptr;
+		}
 		return mem;
 	}
 

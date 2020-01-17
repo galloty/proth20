@@ -170,18 +170,18 @@ public:
 	static void test_composite(ocl::Device & device, const bool bench = false)
 	{
 		std::vector<Number>	compositeList;
-		compositeList.push_back(Number(9999, 299,    0xB073C97A2450454Full));
-		compositeList.push_back(Number(21, 636,      0x4FD4F9FE4C6E7C1Bull));
-		compositeList.push_back(Number(4769, 1307,   0x8B5F4C7215F37871ull));
-		compositeList.push_back(Number(9671, 2631,   0x0715EDFC4814B64Aull));
-		compositeList.push_back(Number(19, 5336,     0x614B05AC60E508A0ull));
-		compositeList.push_back(Number(963, 10705,   0x232BF76A98040BA3ull));
-		compositeList.push_back(Number(6189, 21469,  0x88D2582BDDE8E7CAull));	// size = 2k
-		compositeList.push_back(Number(2389, 42922,  0xE427B88330D2EE8Cull));	// size = 4k
-		compositeList.push_back(Number(1295, 85959,  0x53D33CD949CC31DBull));	// size = 8k
-		compositeList.push_back(Number(9273, 171214, 0xAEC1A38C0C4B1D98ull));	// size = 16k
-		compositeList.push_back(Number(8651, 343387, 0xB832D18693CCB6BCull));	// size = 32k
-		compositeList.push_back(Number(9999, 685619, 0xB151FAF87B6977C2ull));	// size = 64k
+		compositeList.push_back(Number(536870911,    298, 0x35461D17F60DA78Aull));
+		compositeList.push_back(Number(536870905,    626, 0x06543644B033FF0Cull));
+		compositeList.push_back(Number(536870411,   1307, 0x7747B2D2351394EFull));
+		compositeList.push_back(Number(536850911,   2631, 0x3A08775B698EEB34ull));
+		compositeList.push_back(Number(536870911,   5336, 0xDA3B38B4E68F0445ull));
+		compositeList.push_back(Number(536770911,  10705, 0x030EECBE0A5E77A6ull));
+		compositeList.push_back(Number(526870911,  21432, 0xD86853C587F1D537ull));	// size = 2k
+		compositeList.push_back(Number(436870911,  42921, 0x098AD2BD01F485BCull));	// size = 4k
+		compositeList.push_back(Number(535970911,  85942, 0x2D19C7E7E7553AD6ull));	// size = 8k
+		compositeList.push_back(Number(536860911, 171213, 0x99EFB220EE2289A0ull));	// size = 16k
+		compositeList.push_back(Number(536870911, 343386, 0x5D6A1D483910E48Full));	// size = 32k
+		compositeList.push_back(Number(536870911, 685618, 0x84C7E4E7F1344902ull));	// size = 64k
 
 		// check residues
 		for (const auto & c : compositeList) proth::check(c.k, c.n, device, bench, true, c.res64);
@@ -189,13 +189,15 @@ public:
 
 	static void bench(ocl::Device & device)
 	{
-		// 1,375,000 - 2,750,000: size = 256k	PPSE, PPS
-		// 2,750,000 - 5,500,000: size = 512k	DIV
-
 		std::vector<Number>	benchList;
-		benchList.push_back(Number(9501, 1553584));
-		benchList.push_back(Number(1101, 2832061));
-		benchList.push_back(Number(45, 5308037));
+		benchList.push_back(Number(7649,     1553995));		// PPSE
+		benchList.push_back(Number(595,      2833406));		// PPS
+		benchList.push_back(Number(45,       5308037));		// DIV
+		// benchList.push_back(Number(6679881,  6679881));		// Cullen
+		// benchList.push_back(Number(3,       10829346));		// 321
+		// benchList.push_back(Number(99739,   14019102));		// ESP
+		// benchList.push_back(Number(168451,  19375200));		// PSP
+		// benchList.push_back(Number(10223,   31172165));		// SOB
 
 		for (const auto & b : benchList) proth::check(b.k, b.n, device, true);
 		std::cout << std::endl;
@@ -211,20 +213,20 @@ public:
 		device.displayProfiles(pCount);
 
 		// Size = 524288
-		// - sub_ntt64: 1, 11.3 %, 125281 (125281)
-		// - ntt64: 1, 11.7 %, 129282 (129282)
-		// - intt64: 2, 22.5 %, 249309 (124654)
-		// - square128: 1, 20.6 %, 228637 (228637)
-		// NTT: 66.1 %
-		// - poly2int0: 1, 12.2 %, 135665 (135665)
-		// - poly2int1: 1, 3.53 %, 39125 (39125)
-		// POLY2INT: 15.7 %
-		// - reduce_upsweep64: 2, 2.34 %, 25922 (12961)
-		// - reduce_downsweep64: 2, 3.26 %, 36184 (18092)
-		// - reduce_topsweep256: 1, 0.419 %, 4642 (4642)
-		// - reduce_i: 1, 5 %, 55429 (55429)
-		// - reduce_o: 1, 6.9 %, 76526 (76526)
-		// - reduce_f: 1, 0.261 %, 2898 (2898)
-		// REDUCE: 18.2 %
+		// - sub_ntt64: 1, 11.6 %, 124732 (124732)
+		// - ntt64: 1, 10.3 %, 109968 (109968)
+		// - intt64: 2, 22.3 %, 238608 (119304)
+		// - square128: 1, 21.1 %, 225818 (225818)
+		// NTT: 65.3 %
+		// - poly2int0: 1, 12.1 %, 130266 (130266)
+		// - poly2int1: 1, 3.99 %, 42799 (42799)
+		// POLY2INT: 16.1 %
+		// - reduce_upsweep64: 2, 2.38 %, 25499 (12749)
+		// - reduce_downsweep64: 2, 3.37 %, 36128 (18064)
+		// - reduce_topsweep64: 1, 0.355 %, 3807 (3807)
+		// - reduce_i: 1, 5.16 %, 55344 (55344)
+		// - reduce_o: 1, 7.13 %, 76430 (76430)
+		// - reduce_f: 1, 0.274 %, 2943 (2943)
+		// REDUCE: 18.6 %
 	}
 };

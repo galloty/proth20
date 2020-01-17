@@ -502,7 +502,7 @@ void poly2int0(__global uint2 * restrict const x, __global long * restrict const
 	for (size_t j = 0; j < P2I_BLK; ++j)
 	{
 		const size_t k = P2I_WGS * j + i;
-		xo[k] = (uint2)(X[P2I_WGS * (k % P2I_BLK) + (k / P2I_BLK)], 0);
+		xo[k].s0 = X[P2I_WGS * (k % P2I_BLK) + (k / P2I_BLK)];
 	}
 }
 
@@ -513,18 +513,16 @@ void poly2int1(__global uint2 * restrict const x, __global const long * restrict
 
 	__global uint2 * const xi = &x[P2I_BLK * k];
 
-	const uint2 xi_0 = xi[0];
-	long l = cr[k] + xi_0.s0;
-	xi[0] = (uint2)((uint)(l) & digit_mask, xi_0.s1);
+	long l = cr[k] + xi[0].s0;
+	xi[0].s0 = (uint)(l) & digit_mask;
 	l >>= digit_bit;						// |l| < n/2
 
 	int f = (int)(l);
 #pragma unroll
 	for (size_t j = 1; j < P2I_BLK; ++j)
 	{
-		const uint2 xi_j = xi[j];
-		f += xi_j.s0;
-		xi[j] = (uint2)((uint)(f) & digit_mask, xi_j.s1);
+		f += xi[j].s0;
+		xi[j].s0 = (uint)(f) & digit_mask;
 		f >>= digit_bit;					// f = -1, 0 or 1
 		if (f == 0) break;
 	}
@@ -672,11 +670,26 @@ inline void _reduce_topsweep4(__global uint * restrict const t, __local uint * r
 	T[0] = u123; T[1] = u23; T[2] = u3; T[3] = 0;
 }
 
+#define	S16		(16 / 4)
+__kernel __attribute__((reqd_work_group_size(S16, 1, 1)))
+void reduce_topsweep16(__global uint * restrict const t, const uint d, const uint j)
+{
+	__local uint T[64];
+
+	const size_t i = get_local_id(0);
+
+	_reduce_upsweep4i(T, &t[j], d, S16, i);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (i == 0) _reduce_topsweep4(t, &T[S16], d);
+	barrier(CLK_LOCAL_MEM_FENCE);
+	_reduce_downsweep4o(&t[j], T, d, S16, i);
+}
+
 #define	S32		(32 / 4)
 __kernel __attribute__((reqd_work_group_size(S32, 1, 1)))
 void reduce_topsweep32(__global uint * restrict const t, const uint d, const uint j)
 {
-	__local uint T[32];	// 20
+	__local uint T[64];	// 20
 
 	const size_t i = get_local_id(0);
 
@@ -854,18 +867,15 @@ void reduce_o(__global uint2 * restrict const x, __global const uint * restrict 
 __kernel
 void reduce_f(__global uint2 * restrict const x, __global const uint * restrict const t, const uint n, const uint e, const int s)
 {
-	const uint2 x_e = x[e];
-
-	const uint rs = x_e.s0 & ((1u << s) - 1);
+	const uint rs = x[e].s0 & ((1u << s) - 1);
 	ulong l = ((ulong)(t[0]) << s) | rs;		// rds < 2^(29 + digit_bit - 1)
 
- 	x[e] = (uint2)((uint)(l) & digit_mask, x_e.s1);
+	x[e].s0 = (uint)(l) & digit_mask;
 	l >>= digit_bit;
 
 	for (size_t k = e + 1; l != 0; ++k)
 	{
-		const uint2 x_k = x[k];
-		x[k] = (uint2)((uint)(l) & digit_mask, x_k.s1);
+		x[k].s0 = (uint)(l) & digit_mask;
 		l >>= digit_bit;
 	}
 }

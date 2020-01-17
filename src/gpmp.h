@@ -20,7 +20,6 @@ class gpmp
 {
 private:
 	static const int digit_bit = 21;
-	static const uint32_t digit_mask = (uint32_t(1) << digit_bit) - 1;
 
 	static const uint32_t P1 = 2130706433u;		// 127 * 2^24 + 1 = 2^31 - 2^24 + 1
 	static const uint32_t P2 = 2013265921u;		//  15 * 2^27 + 1 = 2^31 - 2^27 + 1
@@ -133,7 +132,8 @@ public:
 		const size_t constant_max_m = 256;
 		const size_t constant_size = 256 + 64 + 16 + 4;	// 340 * 2 * sizeof(cl_uint4) = 10880 bytes
 
-		if (size / 2 * double(digit_mask) * digit_mask >= P1P2 / 2)
+		const double max_digit = double((uint32_t(1) << digit_bit) - 1);
+		if ((size / 2) * max_digit * max_digit >= P1P2 / 2)
 		{
 			std::stringstream msg; msg << getDigits() << "-digit numbers are not supported.";
 			throw std::runtime_error(msg.str());
@@ -282,12 +282,12 @@ public:
 	// 	const size_t size = _size;
 	// 	cl_uint2 * const x = _mem;
 
-	// 	for (size_t i = 0; i < size / 2; ++i) x[i] =  { digit_mask, 0 };
+	// 	for (size_t i = 0; i < size / 2; ++i) x[i] =  { (uint32_t(1) << digit_bit) - 1, 0 };
 	// 	for (size_t i = size / 2; i < size; ++i) x[i] = { 0, 0 };
 	// 	square();
 
-	// 	for (size_t i = 0 * size / 4; i < 1 * size / 4; ++i) x[i] = { digit_mask, 0 };
-	// 	for (size_t i = 1 * size / 4; i < 2 * size / 4; ++i) x[i] = { 0, digit_mask };
+	// 	for (size_t i = 0 * size / 4; i < 1 * size / 4; ++i) x[i] = { (uint32_t(1) << digit_bit) - 1, 0 };
+	// 	for (size_t i = 1 * size / 4; i < 2 * size / 4; ++i) x[i] = { 0, (uint32_t(1) << digit_bit) - 1 };
 	// 	for (size_t i = size / 2; i < size; ++i) x[i] = { 0, 0 };
 	// 	square();
 	// }
@@ -478,15 +478,16 @@ private:
 		{
 			_device.reduce_upsweep64(s, j);
 			j += ((5 * 4 + 5) * 4 + 5) * s;
-			if (s <= 256) break;
+			if (s <= 1024) break;
 		}
 
-		if (s == 256)        _device.reduce_topsweep1024(j);
-		else if (s == 128)   _device.reduce_topsweep512(j);
-		else if (s == 64)    _device.reduce_topsweep256(j);
-		else if (s == 32)    _device.reduce_topsweep128(j);
-		else if (s == 16)    _device.reduce_topsweep64(j);
-		else /*if (s == 8)*/ _device.reduce_topsweep32(j);
+		if (s == 1024)        _device.reduce_topsweep1024(j);
+		else if (s == 512)    _device.reduce_topsweep512(j);
+		else if (s == 256)    _device.reduce_topsweep256(j);
+		else if (s == 128)    _device.reduce_topsweep128(j);
+		else if (s == 64)     _device.reduce_topsweep64(j);
+		else if (s == 32)     _device.reduce_topsweep32(j);
+		else /*if (s == 16)*/ _device.reduce_topsweep16(j);		// 2048 / 2 / 64 = 16
 
 		for (; s <= n / 64; s *= 64)
 		{

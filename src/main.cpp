@@ -64,7 +64,7 @@ public:
 				if ((n_start != std::string::npos) && (n_end != std::string::npos)) n = std::atoi(exp.substr(n_start + 1, n_end).c_str());
 				if ((k < 3) || (n == 0)) throw std::runtime_error("invalid expression");
 
-				if (k >= 250000) throw std::runtime_error("max k = 249999");
+				if (k > 99999999) throw std::runtime_error("max k = 99999999");
 				if (n > 5500000) throw std::runtime_error("max n = 5500000");
 
 				bPrime = true;
@@ -90,15 +90,14 @@ public:
 		}
 
 		ocl::Device device0(engine, 0);
-
 		// test Intel GPU
 		// ocl::Device device1(engine, 1);
-		// proth::check(1199, 2755, device1);
 
 		// profile: ocl_profile must be defined (ocl.h)
 		// proth::profile(45, 5308037, device0);
 
 		// bench
+		// proth::bench(device0);
 		// proth::test_prime(device0, true);
 		// proth::test_composite(device0, true);
 
