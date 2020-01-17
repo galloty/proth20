@@ -288,6 +288,39 @@ static const char * const src_proth_ocl = \
 "	_backward4o(16 * m, &xo[k_16m], 16 * CHUNK64, &X[i_16m], ir2[rindex + j_16m], r1ir1[rindex + j_16m]);\n" \
 "}\n" \
 "\n" \
+"__kernel\n" \
+"void ntt4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)\n" \
+"{\n" \
+"	const size_t k = get_global_id(0);\n" \
+"\n" \
+"	const size_t i = k & (m - 1), j = 4 * k - 3 * i;\n" \
+"\n" \
+"	const uint2 r2_i = r2[rindex + i];\n" \
+"	const uint4 r1ir1_i = r1ir1[rindex + i];\n" \
+"\n" \
+"	const uint2 u0 = x[j + 0 * m], u2 = x[j + 2 * m], u1 = x[j + 1 * m], u3 = x[j + 3 * m];\n" \
+"	const uint2 v0 = addmod(u0, u2), v2 = submod(u0, u2), v1 = addmod(u1, u3), v3 = mulI(submod(u3, u1));\n" \
+"	x[j + 0 * m] = addmod(v0, v1); x[j + 1 * m] = mulmod(submod(v0, v1), r2_i);\n" \
+"	x[j + 2 * m] = mulmod(addmod(v2, v3), r1ir1_i.s23); x[j + 3 * m] = mulmod(submod(v2, v3), r1ir1_i.s01);\n" \
+"}\n" \
+"\n" \
+"\n" \
+"__kernel\n" \
+"void intt4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2, const uint m, const uint rindex)\n" \
+"{\n" \
+"	const size_t k = get_global_id(0);\n" \
+"\n" \
+"	const size_t i = k & (m - 1), j = 4 * k - 3 * i;\n" \
+"\n" \
+"	const uint2 ir2_i = ir2[rindex + i];\n" \
+"	const uint4 r1ir1_i = r1ir1[rindex + i];\n" \
+"\n" \
+"	const uint2 v0 = x[j + 0 * m], v1 = mulmod(x[j + 1 * m], ir2_i), v2 = mulmod(x[j + 2 * m], r1ir1_i.s01), v3 = mulmod(x[j + 3 * m], r1ir1_i.s23);\n" \
+"	const uint2 u0 = addmod(v0, v1), u2 = addmod(v2, v3), u1 = submod(v0, v1), u3 = mulI(submod(v2, v3));\n" \
+"	x[j + 0 * m] = addmod(u0, u2); x[j + 2 * m] = submod(u0, u2);\n" \
+"	x[j + 1 * m] = addmod(u1, u3); x[j + 3 * m] = submod(u1, u3);\n" \
+"}\n" \
+"\n" \
 "__kernel __attribute__((reqd_work_group_size(32 / 4 * BLK32, 1, 1)))\n" \
 "void square32(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)\n" \
 "{\n" \
@@ -410,6 +443,38 @@ static const char * const src_proth_ocl = \
 "	_backward4o(256, &x[k256], 256, &X[i256], r2ir2[j256].s23, r1ir1[j256]);\n" \
 "}\n" \
 "\n" \
+"__kernel\n" \
+"void mul2(__global uint2 * restrict const x, __global const uint2 * restrict const y)\n" \
+"{\n" \
+"	const size_t k = get_global_id(0);\n" \
+"\n" \
+"	const size_t i = 4 * k;\n" \
+"\n" \
+"	const uint2 ux0 = x[i + 0], ux1 = x[i + 1], ux2 = x[i + 2], ux3 = x[i + 3];\n" \
+"	const uint2 vx0 = addmod(ux0, ux1), vx1 = submod(ux0, ux1), vx2 = addmod(ux2, ux3), vx3 = submod(ux2, ux3);\n" \
+"	const uint2 uy0 = y[i + 0], uy1 = y[i + 1], uy2 = y[i + 2], uy3 = y[i + 3];\n" \
+"	const uint2 vy0 = addmod(uy0, uy1), vy1 = submod(uy0, uy1), vy2 = addmod(uy2, uy3), vy3 = submod(uy2, uy3);\n" \
+"	const uint2 s0 = mulmod(vx0, vy0), s1 = mulmod(vx1, vy1), s2 = mulmod(vx2, vy2), s3 = mulmod(vx3, vy3);\n" \
+"	x[i + 0] = addmod(s0, s1); x[i + 1] = submod(s0, s1); x[i + 2] = addmod(s2, s3); x[i + 3] = submod(s2, s3);\n" \
+"}\n" \
+"\n" \
+"__kernel\n" \
+"void mul4(__global uint2 * restrict const x, __global const uint2 * restrict const y)\n" \
+"{\n" \
+"	const size_t k = get_global_id(0);\n" \
+"\n" \
+"	const size_t i = 4 * k;\n" \
+"\n" \
+"	const uint2 ux0 = x[i + 0], ux2 = x[i + 2], ux1 = x[i + 1], ux3 = x[i + 3];\n" \
+"	const uint2 vx0 = addmod(ux0, ux2), vx2 = submod(ux0, ux2), vx1 = addmod(ux1, ux3), vx3 = mulI(submod(ux3, ux1));\n" \
+"	const uint2 uy0 = y[i + 0], uy2 = y[i + 2], uy1 = y[i + 1], uy3 = y[i + 3];\n" \
+"	const uint2 vy0 = addmod(uy0, uy2), vy2 = submod(uy0, uy2), vy1 = addmod(uy1, uy3), vy3 = mulI(submod(uy3, uy1));\n" \
+"	const uint2 s0 = mulmod(addmod(vx0, vx1), addmod(vy0, vy1)), s1 = mulmod(submod(vx0, vx1), submod(vy0, vy1));\n" \
+"	const uint2 s2 = mulmod(addmod(vx2, vx3), addmod(vy2, vy3)), s3 = mulmod(submod(vx2, vx3), submod(vy2, vy3));\n" \
+"	const uint2 t0 = addmod(s0, s1), t2 = addmod(s2, s3), t1 = submod(s0, s1), t3 = mulI(submod(s2, s3));\n" \
+"	x[i + 0] = addmod(t0, t2); x[i + 2] = submod(t0, t2); x[i + 1] = addmod(t1, t3); x[i + 3] = submod(t1, t3);\n" \
+"}\n" \
+"\n" \
 "__kernel __attribute__((reqd_work_group_size(P2I_WGS, 1, 1)))\n" \
 "void poly2int0(__global uint2 * restrict const x, __global long * restrict const cr, const uint2 norm)\n" \
 "{\n" \
@@ -445,8 +510,7 @@ static const char * const src_proth_ocl = \
 "	for (size_t j = 0; j < P2I_BLK; ++j)\n" \
 "	{\n" \
 "		const size_t k = P2I_WGS * j + i;\n" \
-"		//xo[k] = (uint2)(X[P2I_WGS * (k % P2I_BLK) + (k / P2I_BLK)], 0);	faster?\n" \
-"		xo[k].s0 = X[P2I_WGS * (k % P2I_BLK) + (k / P2I_BLK)];\n" \
+"		xo[k] = (uint2)(X[P2I_WGS * (k % P2I_BLK) + (k / P2I_BLK)], 0);\n" \
 "	}\n" \
 "}\n" \
 "\n" \
@@ -457,21 +521,23 @@ static const char * const src_proth_ocl = \
 "\n" \
 "	__global uint2 * const xi = &x[P2I_BLK * k];\n" \
 "\n" \
-"	long l = cr[k] + xi[0].s0;\n" \
-"	xi[0].s0 = (uint)(l) & digit_mask;\n" \
+"	const uint2 xi_0 = xi[0];\n" \
+"	long l = cr[k] + xi_0.s0;\n" \
+"	xi[0] = (uint2)((uint)(l) & digit_mask, xi_0.s1);\n" \
 "	l >>= digit_bit;						// |l| < n/2\n" \
 "\n" \
 "	int f = (int)(l);\n" \
 "#pragma unroll\n" \
 "	for (size_t j = 1; j < P2I_BLK; ++j)\n" \
 "	{\n" \
-"		f += xi[j].s0;\n" \
-"		xi[j].s0 = (uint)(f) & digit_mask;\n" \
+"		const uint2 xi_j = xi[j];\n" \
+"		f += xi_j.s0;\n" \
+"		xi[j] = (uint2)((uint)(f) & digit_mask, xi_j.s1);\n" \
 "		f >>= digit_bit;					// f = -1, 0 or 1\n" \
 "		if (f == 0) break;\n" \
 "	}\n" \
 "\n" \
-"	if (f != 0) atomic_or(err, 1);\n" \
+"	if (f != 0) atomic_or(err, f);\n" \
 "}\n" \
 "\n" \
 "#define	R64		(RED_BLK * 64 / 4)\n" \
@@ -796,16 +862,56 @@ static const char * const src_proth_ocl = \
 "__kernel\n" \
 "void reduce_f(__global uint2 * restrict const x, __global const uint * restrict const t, const uint n, const uint e, const int s)\n" \
 "{\n" \
-"	const uint rs = x[e].s0 & ((1u << s) - 1);\n" \
+"	const uint2 x_e = x[e];\n" \
+"\n" \
+"	const uint rs = x_e.s0 & ((1u << s) - 1);\n" \
 "	ulong l = ((ulong)(t[0]) << s) | rs;		// rds < 2^(29 + digit_bit - 1)\n" \
 "\n" \
-" 	x[e].s0 = (uint)(l) & digit_mask;\n" \
+" 	x[e] = (uint2)((uint)(l) & digit_mask, x_e.s1);\n" \
 "	l >>= digit_bit;\n" \
 "\n" \
-"	for (size_t i = e + 1; l != 0; ++i)\n" \
+"	for (size_t k = e + 1; l != 0; ++k)\n" \
 "	{\n" \
-"		x[i].s0 = (uint)(l) & digit_mask;\n" \
+"		const uint2 x_k = x[k];\n" \
+"		x[k] = (uint2)((uint)(l) & digit_mask, x_k.s1);\n" \
 "		l >>= digit_bit;\n" \
+"	}\n" \
+"}\n" \
+"\n" \
+"__kernel\n" \
+"void set_positive(__global uint2 * restrict const x, const uint n, const uint e, const ulong ds)\n" \
+"{\n" \
+"	//_x.s0 = R, _x.s1 = Y\n" \
+"	// if R < Y then add k.2^n + 1 to R.\n" \
+"\n" \
+"	for (size_t i = 0; i < n; ++i)\n" \
+"	{\n" \
+"		const size_t j = n - 1 - i;\n" \
+"		const uint2 x_j = x[j];\n" \
+"		if (x_j.s0 < x_j.s1)\n" \
+"		{\n" \
+"			// R += 1\n" \
+"			uint c = 1;\n" \
+"			for (size_t k = 0; c != 0; ++k)\n" \
+"			{\n" \
+"				const uint2 x_k = x[k];\n" \
+"				c += x_k.s0;\n" \
+"				x[k] = (uint2)(c & digit_mask, x_k.s1);\n" \
+"				c >>= digit_bit;\n" \
+"			}\n" \
+"\n" \
+"			// R += k.2^n\n" \
+"			ulong l = ds;\n" \
+"			for (size_t k = e; l != 0; ++k)\n" \
+"			{\n" \
+"				const uint2 x_k = x[k];\n" \
+"				l += x_k.s0;\n" \
+"				x[k] = (uint2)((uint)(l) & digit_mask, x_k.s1);\n" \
+"				l >>= digit_bit;\n" \
+"			}\n" \
+"\n" \
+"			return;\n" \
+"		}\n" \
 "	}\n" \
 "}\n" \
 ;

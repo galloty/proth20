@@ -71,6 +71,7 @@ public:
 
 		// X *= a^k, left-to-right algorithm
 		bool s = false;
+		X.setMultiplicand(a);
 		for (int b = 0; b < 32; ++b)
 		{
 			if (s) X.square();
@@ -78,7 +79,7 @@ public:
 			if ((k & (uint32_t(1) << (31 - b))) != 0)
 			{
 				s = true;
-				X.mul(a);
+				X.mul();
 			}
 		}
 
@@ -147,12 +148,12 @@ public:
 	static void test_prime(ocl::Device & device, const bool bench = false)
 	{
 		std::vector<Number>	primeList;
-		// primeList.push_back(Number(1035, 301));
-		// primeList.push_back(Number(955, 636, 2));
-		// primeList.push_back(Number(969, 1307));
-		// primeList.push_back(Number(1139, 2641));
-		// primeList.push_back(Number(1035, 5336));
-		// primeList.push_back(Number(965, 10705));
+		primeList.push_back(Number(1035, 301));
+		primeList.push_back(Number(955, 636, 2));
+		primeList.push_back(Number(969, 1307));
+		primeList.push_back(Number(1139, 2641));
+		primeList.push_back(Number(1035, 5336));
+		primeList.push_back(Number(965, 10705));
 		primeList.push_back(Number(1027, 21468));	// size = 2k,   square32
 		primeList.push_back(Number(1109, 42921));	// size = 4k,   square64
 		primeList.push_back(Number(1085, 85959));	// size = 8k,   square128	64-bit 32-bit
@@ -169,12 +170,12 @@ public:
 	static void test_composite(ocl::Device & device, const bool bench = false)
 	{
 		std::vector<Number>	compositeList;
-		// compositeList.push_back(Number(9999, 299,    0xB073C97A2450454Full));
-		// compositeList.push_back(Number(21, 636,      0x4FD4F9FE4C6E7C1Bull));
-		// compositeList.push_back(Number(4769, 1307,   0x8B5F4C7215F37871ull));
-		// compositeList.push_back(Number(9671, 2631,   0x0715EDFC4814B64Aull));
-		// compositeList.push_back(Number(19, 5336,     0x614B05AC60E508A0ull));
-		// compositeList.push_back(Number(963, 10705,   0x232BF76A98040BA3ull));
+		compositeList.push_back(Number(9999, 299,    0xB073C97A2450454Full));
+		compositeList.push_back(Number(21, 636,      0x4FD4F9FE4C6E7C1Bull));
+		compositeList.push_back(Number(4769, 1307,   0x8B5F4C7215F37871ull));
+		compositeList.push_back(Number(9671, 2631,   0x0715EDFC4814B64Aull));
+		compositeList.push_back(Number(19, 5336,     0x614B05AC60E508A0ull));
+		compositeList.push_back(Number(963, 10705,   0x232BF76A98040BA3ull));
 		compositeList.push_back(Number(6189, 21469,  0x88D2582BDDE8E7CAull));	// size = 2k
 		compositeList.push_back(Number(2389, 42922,  0xE427B88330D2EE8Cull));	// size = 4k
 		compositeList.push_back(Number(1295, 85959,  0x53D33CD949CC31DBull));	// size = 8k

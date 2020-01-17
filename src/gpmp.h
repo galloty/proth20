@@ -75,9 +75,8 @@ private:
 private:
 	const size_t _size;
 	const uint32_t _k, _n;
-	bool _sign;
 	ocl::Device & _device;
-	cl_uint2 * const _x;
+	cl_uint2 * const _mem;
 
 private:
 	template <uint32_t p> class Zp
@@ -128,7 +127,7 @@ private:
 
 public:
 	gpmp(const uint32_t k, const uint32_t n, ocl::Device & device) :
-		_size(transformSize(k, n)), _k(k), _n(n), _sign(false), _device(device), _x(new cl_uint2[_size])
+		_size(transformSize(k, n)), _k(k), _n(n), _device(device), _mem(new cl_uint2[_size])
 	{
 		const size_t size = _size;
 		const size_t constant_max_m = 256;
@@ -178,7 +177,7 @@ public:
 		const cl_int k_shift = cl_int(log2(k) - 1);
 		_device.createKernels(norm, cl_uint(n / digit_bit), cl_int(n % digit_bit), cl_uint(k), cl_uint((uint64_t(1) << (32 + k_shift)) / k), k_shift);
 
-		cl_uint2 * const x = _x;
+		cl_uint2 * const x = _mem;
 		x[0] = { 1, 0 };
 		for (size_t i = 1; i < size; ++i) x[i] = { 0, 0 };
 		_device.writeMemory_x(x);
@@ -247,12 +246,27 @@ public:
 		_device.releaseMemory();
 		_device.clearProgram();
 
-		delete[] _x;
+		delete[] _mem;
 	}
 
 public:
 	size_t getSize() const { return _size; }
 	size_t getDigits() const { return size_t(std::ceil(std::log10(_k) + _n * std::log10(2))); }
+
+public:
+	void display() const
+	{
+		const size_t size = _size;
+		cl_uint2 * const x = _mem;
+		_device.readMemory_x(x);
+		std::cout << std::endl;
+		for (size_t i = 0; i < size; ++i)
+		{
+			if (x[i].s[0] != 0) std::cout << " " << i << ":0 " << x[i].s[0];
+			if (x[i].s[1] != 0) std::cout << " " << i << ":0 " << x[i].s[1];
+		}
+		std::cout << std::endl;
+	}
 
 public:
 	int getError() const
@@ -266,7 +280,7 @@ public:
 	// void test()
 	// {
 	// 	const size_t size = _size;
-	// 	cl_uint2 * const x = _x;
+	// 	cl_uint2 * const x = _mem;
 
 	// 	for (size_t i = 0; i < size / 2; ++i) x[i] =  { digit_mask, 0 };
 	// 	for (size_t i = size / 2; i < size; ++i) x[i] = { 0, 0 };
@@ -293,7 +307,7 @@ public:
 
 		while (m > 256)
 		{
-			_device.ntt64(m, rindex);
+			_device.ntt64(m / 16, rindex);
 			rindex += m + m / 4 + m / 16;
 			m /= 64;
 		}
@@ -305,17 +319,15 @@ public:
 		else if (m == 16)    _device.square64();
 		else /*if (m == 8)*/ _device.square32();
 
-		while (m <= cl_uint(size / 16))
+		while (m < cl_uint(size / 4))
 		{
 			m *= 64;
 			rindex -= m + m / 4 + m / 16;
-			_device.intt64(m, rindex);
+			_device.intt64(m / 16, rindex);
 		}
 
 		_device.poly2int0();
 		_device.poly2int1();
-
-		_sign = false;
 
 		// x size is size
 
@@ -325,34 +337,95 @@ public:
 	}
 
 public:
-	void mul(const uint32_t a)
+	void setMultiplicand(const uint32_t a)
 	{
 		const size_t size = _size;
-		cl_uint2 * const x = _x;
+		cl_uint2 * const u = _mem;
+		u[0] = { a, 0 };
+		for (size_t i = 1; i < size; ++i) u[i] = { 0, 0 };
+		_device.writeMemory_u(u);
 
-		_device.readMemory_x(x);
+		_device.sub_ntt64_u();
 
-		// _x[0] = R, _x[1] = Y; compute R - Y
-		const bool sign = _sub(x, size / 2);
-		_sign = (_sign != sign);
+		cl_uint m = cl_uint(size / 4);
+		cl_uint rindex = m + m / 4 + m / 16;
+		m /= 64;
 
-		// x size is size / 2
-		_mul(x, size / 2, a);
+		while (m > 256)
+		{
+			_device.ntt64_u(m / 16, rindex);
+			rindex += m + m / 4 + m / 16;
+			m /= 64;
+		}
 
-		_device.writeMemory_x(x);
+		while (m > 1)
+		{
+			_device.ntt4_u(m, rindex);
+			rindex += m;
+			m /= 4;
+		}
+	}
 
-		// x size is size / 2 + 1
+public:
+	void mul()
+	{
+		const size_t size = _size;
+
+		// if R - Y < 0 then the result a * (R - Y) < 0 => error
+		// if R < Y then add k.2^n + 1 to R. We have 0 < R - Y + k.2^n + 1 <= k.2^n
+		_device.set_positive();
+
+		_device.sub_ntt64();
+
+		cl_uint m = cl_uint(size / 4);
+		cl_uint rindex = m + m / 4 + m / 16;
+		m /= 64;
+
+		while (m > 256)
+		{
+			_device.ntt64(m / 16, rindex);
+			rindex += m + m / 4 + m / 16;
+			m /= 64;
+		}
+
+		size_t n4 = 0;
+		while (m > 4)
+		{
+			_device.ntt4(m, rindex);
+			rindex += m;
+			m /= 4;
+			++n4;
+		}
+
+		_device.ntt4(m, rindex);
+		if (m == 4) _device.mul4(); else _device.mul2();
+		_device.intt4(m, rindex);
+
+		for (; n4 != 0; --n4)
+		{
+			m *= 4;
+			rindex -= m;
+			_device.intt4(m, rindex);
+		}
+
+		while (m < cl_uint(size / 4))
+		{
+			m *= 64;
+			rindex -= m + m / 4 + m / 16;
+			_device.intt64(m / 16, rindex);
+		}
+
+		_device.poly2int0();
+		_device.poly2int1();
 
 		split();
-
-		// Now x size is size / 2, _x[0] = R, _x[1] = Y such that X = R - Y and -k.2^n < R - Y < k.2^n
 	}
 
 public:
 	bool isMinusOne(uint64_t & res64)
 	{
 		const size_t size = _size;
-		cl_uint2 * const x = _x;
+		cl_uint2 * const x = _mem;
 
 		_device.readMemory_x(x);
 
@@ -361,14 +434,13 @@ public:
 
 		// _x[0] = R, _x[1] = Y; compute R - Y
 		bool sign = _sub(x, size / 2);
-		_sign = (_sign != sign);
 
-		const bool b = (_sign && _isOne(x, size / 2));
+		const bool b = (sign && _isOne(x, size / 2));
 
-		if (_sign)
+		if (sign)
 		{
-			_add(x, size / 2, _k, _n);
-			_sign = false;
+			_neg(x, size / 2, _k, _n);
+			sign = false;
 		}
 
 		res64 = _getRes64(x, size / 2) + 1;
@@ -451,25 +523,6 @@ private:
 	}
 
 private:
-	static void _mul(cl_uint2 * const a, const size_t size, const uint32_t d)
-	{
-		uint64_t l = 0;
-		for (size_t i = 0; i < size; ++i)
-		{
-			l += a[i].s[0] * uint64_t(d);
-			a[i].s[0] = uint32_t(l) & digit_mask;
-			a[i + size].s[0] = 0;
-			l >>= digit_bit;
-		}
-
-		for (size_t i = size; l != 0; ++i)
-		{
- 			a[i].s[0] = uint32_t(l) & digit_mask;
-			l >>= digit_bit;
-		}
-	}
-
-private:
 	static bool _sub(cl_uint2 * const a, const size_t size)
 	{
 		int32_t carry = 0;
@@ -491,7 +544,7 @@ private:
 	}
 
 private:
-	static void _add(cl_uint2 * const a, const size_t size, const uint32_t k, const uint32_t n)
+	static void _neg(cl_uint2 * const a, const size_t size, const uint32_t k, const uint32_t n)
 	{
 		const uint32_t e = n / digit_bit, s = n % digit_bit;
 		const uint64_t ks = uint64_t(k) << s;

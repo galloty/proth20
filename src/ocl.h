@@ -202,15 +202,17 @@ private:
 	cl_command_queue _queue = nullptr;
 	cl_program _program = nullptr;
 	size_t _size = 0, _constant_size = 0;
-	cl_mem _x = nullptr, _y = nullptr, _t = nullptr, _cr = nullptr, _err = nullptr;
+	cl_mem _x = nullptr, _y = nullptr, _t = nullptr, _cr = nullptr, _u = nullptr, _err = nullptr;
 	cl_mem _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr1ir1 = nullptr, _cr2ir2 = nullptr, _bp = nullptr, _ibp = nullptr;
-	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr;
+	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr, _ntt4 = nullptr, _intt4 = nullptr;
 	cl_kernel _square32 = nullptr, _square64 = nullptr, _square128 = nullptr, _square256 = nullptr,_square512 = nullptr, _square1024 = nullptr;
+	cl_kernel _mul2 = nullptr, _mul4 = nullptr;
 	cl_kernel _poly2int0 = nullptr, _poly2int1 = nullptr;
 	cl_kernel _reduce_upsweep64 = nullptr, _reduce_downsweep64 = nullptr;
 	cl_kernel _reduce_topsweep32 = nullptr, _reduce_topsweep64 = nullptr, _reduce_topsweep128 = nullptr;
 	cl_kernel _reduce_topsweep256 = nullptr, _reduce_topsweep512 = nullptr, _reduce_topsweep1024 = nullptr;
 	cl_kernel _reduce_i = nullptr, _reduce_o = nullptr, _reduce_f = nullptr;
+	cl_kernel _set_positive = nullptr;
 
 	enum class EVendor { Unknown, NVIDIA, AMD, INTEL };
 
@@ -385,6 +387,7 @@ public:
 		_y = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * (size / 2));
 		_t = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * 2 * (size / 2));
 		_cr = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_long) * size / P2I_BLK);
+		_u = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);
 		_err = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_int));
 
 		_r1ir1 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * size);
@@ -410,6 +413,7 @@ public:
 			_releaseBuffer(_y);
 			_releaseBuffer(_t);
 			_releaseBuffer(_cr);
+			_releaseBuffer(_u);
 			_releaseBuffer(_err);
 
 			_releaseBuffer(_r1ir1);
@@ -482,6 +486,8 @@ public:
 		_sub_ntt64 = _createNttKernel("sub_ntt64", true);
 		_ntt64 = _createNttKernel("ntt64", true);
 		_intt64 = _createNttKernel("intt64", false);
+		_ntt4 = _createNttKernel("ntt4", true);
+		_intt4 = _createNttKernel("intt4", false);
 
 		_square32 = _createSquareKernel("square32");
 		_square64 = _createSquareKernel("square64");
@@ -489,6 +495,14 @@ public:
 		_square256 = _createSquareKernel("square256");
 		_square512 = _createSquareKernel("square512");
 		_square1024 = _createSquareKernel("square1024");
+
+		_mul2 = _createKernel("mul2");
+		_setKernelArg(_mul2, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(_mul2, 1, sizeof(cl_mem), &_u);
+
+		_mul4 = _createKernel("mul4");
+		_setKernelArg(_mul4, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(_mul4, 1, sizeof(cl_mem), &_u);
 
 		_poly2int0 = _createKernel("poly2int0");
 		_setKernelArg(_poly2int0, 0, sizeof(cl_mem), &_x);
@@ -520,6 +534,13 @@ public:
 		_setKernelArg(_reduce_f, 2, sizeof(cl_uint), &n);
 		_setKernelArg(_reduce_f, 3, sizeof(cl_uint), &e);
 		_setKernelArg(_reduce_f, 4, sizeof(cl_int), &s);
+
+		_set_positive = _createKernel("set_positive");
+		_setKernelArg(_set_positive, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(_set_positive, 1, sizeof(cl_uint), &n);
+		_setKernelArg(_set_positive, 2, sizeof(cl_uint), &e);
+		const cl_ulong ds = cl_ulong(d) << s;
+		_setKernelArg(_set_positive, 3, sizeof(cl_ulong), &ds);
 	}
 
 public:
@@ -531,6 +552,8 @@ public:
 		_releaseKernel(_sub_ntt64);
 		_releaseKernel(_ntt64);
 		_releaseKernel(_intt64);
+		_releaseKernel(_ntt4);
+		_releaseKernel(_intt4);
 
 		_releaseKernel(_square32);
 		_releaseKernel(_square64);
@@ -538,6 +561,9 @@ public:
 		_releaseKernel(_square256);
 		_releaseKernel(_square512);
 		_releaseKernel(_square1024);
+
+		_releaseKernel(_mul2);
+		_releaseKernel(_mul4);
 
 		_releaseKernel(_poly2int0);
 		_releaseKernel(_poly2int1);
@@ -555,6 +581,8 @@ public:
 		_releaseKernel(_reduce_i);
 		_releaseKernel(_reduce_o);
 		_releaseKernel(_reduce_f);
+
+		_releaseKernel(_set_positive);
 	}
 
 public:
@@ -569,6 +597,13 @@ public:
 	{
 		_sync();
 		oclFatal(clEnqueueWriteBuffer(_queue, _x, CL_TRUE, 0, sizeof(cl_uint2) * _size, ptr, 0, nullptr, nullptr));
+	}
+
+public:
+	void writeMemory_u(const cl_uint2 * const ptr)
+	{
+		_sync();
+		oclFatal(clEnqueueWriteBuffer(_queue, _u, CL_TRUE, 0, sizeof(cl_uint2) * _size, ptr, 0, nullptr, nullptr));
 	}
 
 public:
@@ -616,8 +651,7 @@ public:
 private:
 	inline void _executeNttKernel(cl_kernel kernel, const cl_uint m, const cl_uint rindex)
 	{
-		const cl_uint m_16 = (m / 16);
-		_setKernelArg(kernel, 3, sizeof(cl_uint), &m_16);
+		_setKernelArg(kernel, 3, sizeof(cl_uint), &m);
 		_setKernelArg(kernel, 4, sizeof(cl_uint), &rindex);
 		_executeKernel(kernel, _size / 4, CHUNK64 * (64 / 4));
 	}
@@ -625,6 +659,32 @@ private:
 public:
 	void ntt64(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_ntt64, m, rindex); }
 	void intt64(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_intt64, m, rindex); }
+	void ntt4(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_ntt4, m, rindex); }
+	void intt4(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_intt4, m, rindex); }
+
+public:
+	void sub_ntt64_u()
+	{
+		_setKernelArg(_sub_ntt64, 0, sizeof(cl_mem), &_u);
+		_executeKernel(_sub_ntt64, _size / 4, CHUNK64 * (64 / 4));
+		_setKernelArg(_sub_ntt64, 0, sizeof(cl_mem), &_x);
+	}
+
+public:
+	void ntt64_u(const cl_uint m, const cl_uint rindex)
+	{
+		_setKernelArg(_ntt64, 0, sizeof(cl_mem), &_u);
+		_executeNttKernel(_ntt64, m, rindex);
+		_setKernelArg(_ntt64, 0, sizeof(cl_mem), &_x);
+	}
+
+public:
+	void ntt4_u(const cl_uint m, const cl_uint rindex)
+	{
+		_setKernelArg(_ntt4, 0, sizeof(cl_mem), &_u);
+		_executeNttKernel(_ntt4, m, rindex);
+		_setKernelArg(_ntt4, 0, sizeof(cl_mem), &_x);
+	}
 
 public:
 	void square32() { _executeKernel(_square32, _size / 4, BLK32 * 32 / 4); }
@@ -633,6 +693,10 @@ public:
 	void square256() { _executeKernel(_square256, _size / 4, BLK256 * 256 / 4); }
 	void square512() { _executeKernel(_square512, _size / 4, 512 / 4); }
 	void square1024() { _executeKernel(_square1024, _size / 4, 1024 / 4); }
+
+public:
+	void mul2() { _executeKernel(_mul2, _size / 4); }
+	void mul4() { _executeKernel(_mul4, _size / 4); }
 
 public:
 	void poly2int0() { _executeKernel(_poly2int0, _size / P2I_BLK, P2I_WGS); }
@@ -669,6 +733,9 @@ public:
 	void reduce_i() { _executeKernel(_reduce_i, _size / 2); }
 	void reduce_o() { _executeKernel(_reduce_o, _size / 2); }
 	void reduce_f() { _executeKernel(_reduce_f, 1); }
+
+public:
+	void set_positive() { _executeKernel(_set_positive, 1); }
 
 private:
 	void _sync()

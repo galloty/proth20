@@ -35,10 +35,9 @@ public:
 		if (args.empty())	// print usage, display devices and exit
 		{
 			std::cout << "Usage: proth20 [options]  options may be specified in any order" << std::endl;
-			std::cout << "  -b                      run benchmark" << std::endl;
-			std::cout << "  -d <n> or --device <n>  set device number=<n> (default 0)" << std::endl;
 			std::cout << "  -q \"k*2^n+1\"            test expression primality" << std::endl;
-			std::cout << "  -t                      run tests on known prime and composite numbers" << std::endl;
+			std::cout << "  -d <n> or --device <n>  set device number=<n> (default 0)" << std::endl;
+			std::cout << "  -b                      run benchmark" << std::endl;
 			std::cout << "  -v or -V                print the startup banner and immediately exit" << std::endl;
 			std::cout << std::endl;
 		}
@@ -47,7 +46,7 @@ public:
 		engine.displayDevices();
 		std::cout << std::endl;
 
-		bool bBench = false, bTest = false, bPrime = false;
+		bool bBench = false, bPrime = false;
 		uint32_t k = 0, n = 0;
 		size_t d = 0;
 		// parse args
@@ -56,7 +55,6 @@ public:
 			const std::string & arg = args[i];
 
 			if (arg == "-b") bBench = true;
-			if (arg == "-t") bTest = true;
 			if (arg.substr(0, 2) == "-q")
 			{
 				const std::string exp = ((arg == "-q") && (i + 1 < size)) ? args[++i] : arg.substr(2);
@@ -66,7 +64,7 @@ public:
 				if ((n_start != std::string::npos) && (n_end != std::string::npos)) n = std::atoi(exp.substr(n_start + 1, n_end).c_str());
 				if ((k < 3) || (n == 0)) throw std::runtime_error("invalid expression");
 
-				if (k > 9999) throw std::runtime_error("max k = 9999");
+				if (k >= 250000) throw std::runtime_error("max k = 249999");
 				if (n > 5500000) throw std::runtime_error("max n = 5500000");
 
 				bPrime = true;
@@ -85,20 +83,13 @@ public:
 			proth::bench(device);
 		}
 
-		if (bTest)
-		{
-			ocl::Device device(engine, d);
-			proth::test_composite(device);
-			proth::test_prime(device);
-		}
-
 		if (bPrime)
 		{
 			ocl::Device device(engine, d);
 			proth::check(k, n, device);
 		}
 
-		// ocl::Device device0(engine, 0);
+		ocl::Device device0(engine, 0);
 
 		// test Intel GPU
 		// ocl::Device device1(engine, 1);
@@ -112,8 +103,8 @@ public:
 		// proth::test_composite(device0, true);
 
 		// true test
-		// proth::test_composite(device0);
-		// proth::test_prime(device0);
+		proth::test_composite(device0);
+		proth::test_prime(device0);
 
 		// too large
 		// proth::check(3, 5505020, device0);
