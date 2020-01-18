@@ -305,11 +305,10 @@ public:
 		cl_uint rindex = m + m / 4 + m / 16;
 		m /= 64;
 
-		while (m > 256)
+		for (; m > 256; m /= 64)
 		{
 			_device.ntt64(m / 16, rindex);
 			rindex += m + m / 4 + m / 16;
-			m /= 64;
 		}
 
 		if (m == 256)        _device.square1024();
@@ -351,18 +350,16 @@ public:
 		cl_uint rindex = m + m / 4 + m / 16;
 		m /= 64;
 
-		while (m > 256)
+		for (; m > 256; m /= 64)
 		{
 			_device.ntt64_u(m / 16, rindex);
 			rindex += m + m / 4 + m / 16;
-			m /= 64;
 		}
 
-		while (m > 1)
+		for (; m > 1; m /= 4)
 		{
 			_device.ntt4_u(m, rindex);
 			rindex += m;
-			m /= 4;
 		}
 	}
 
@@ -381,19 +378,17 @@ public:
 		cl_uint rindex = m + m / 4 + m / 16;
 		m /= 64;
 
-		while (m > 256)
+		for (; m > 256; m /= 64)
 		{
 			_device.ntt64(m / 16, rindex);
 			rindex += m + m / 4 + m / 16;
-			m /= 64;
 		}
 
 		size_t n4 = 0;
-		while (m > 4)
+		for (; m > 4; m /= 4)
 		{
 			_device.ntt4(m, rindex);
 			rindex += m;
-			m /= 4;
 			++n4;
 		}
 
@@ -473,26 +468,25 @@ private:
 
 		const cl_uint n = cl_uint(_size / 2);
 		cl_uint j = 4;		// alignment (cl_uint4)
-		cl_uint s = n / 64;
-		for (; true; s /= 64)
+		cl_uint s = n / 4;
+		for (; s > 256; s /= 64)
 		{
-			_device.reduce_upsweep64(s, j);
-			j += ((5 * 4 + 5) * 4 + 5) * s;
-			if (s <= 1024) break;
+			_device.reduce_upsweep64(s / 16, j);
+			j += 5 * (s + s / 4 + s / 16);
 		}
 
-		if (s == 1024)        _device.reduce_topsweep1024(j);
-		else if (s == 512)    _device.reduce_topsweep512(j);
-		else if (s == 256)    _device.reduce_topsweep256(j);
-		else if (s == 128)    _device.reduce_topsweep128(j);
-		else if (s == 64)     _device.reduce_topsweep64(j);
-		else if (s == 32)     _device.reduce_topsweep32(j);
-		else /*if (s == 16)*/ _device.reduce_topsweep16(j);		// 2048 / 2 / 64 = 16
+		if (s == 256)        _device.reduce_topsweep1024(j);
+		else if (s == 128)   _device.reduce_topsweep512(j);
+		else if (s == 64)    _device.reduce_topsweep256(j);
+		else if (s == 32)    _device.reduce_topsweep128(j);
+		else if (s == 16)    _device.reduce_topsweep64(j);
+		else /*if (s == 8)*/ _device.reduce_topsweep32(j);
 
-		for (; s <= n / 64; s *= 64)
+		while (s < n / 4)
 		{
-			j -= ((5 * 4 + 5) * 4 + 5) * s;
-			_device.reduce_downsweep64(s, j);
+			s *= 64;
+			j -= 5 * (s + s / 4 + s / 16);
+			_device.reduce_downsweep64(s / 16, j);
 		}
 
 		// t[4 + k] remainders y[k + 1] / d, t[0] = remainder y[0] / d

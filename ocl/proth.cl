@@ -670,21 +670,6 @@ inline void _reduce_topsweep4(__global uint * restrict const t, __local uint * r
 	T[0] = u123; T[1] = u23; T[2] = u3; T[3] = 0;
 }
 
-#define	S16		(16 / 4)
-__kernel __attribute__((reqd_work_group_size(S16, 1, 1)))
-void reduce_topsweep16(__global uint * restrict const t, const uint d, const uint j)
-{
-	__local uint T[64];
-
-	const size_t i = get_local_id(0);
-
-	_reduce_upsweep4i(T, &t[j], d, S16, i);
-	barrier(CLK_LOCAL_MEM_FENCE);
-	if (i == 0) _reduce_topsweep4(t, &T[S16], d);
-	barrier(CLK_LOCAL_MEM_FENCE);
-	_reduce_downsweep4o(&t[j], T, d, S16, i);
-}
-
 #define	S32		(32 / 4)
 __kernel __attribute__((reqd_work_group_size(S32, 1, 1)))
 void reduce_topsweep32(__global uint * restrict const t, const uint d, const uint j)

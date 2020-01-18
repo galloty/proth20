@@ -209,7 +209,7 @@ private:
 	cl_kernel _mul2 = nullptr, _mul4 = nullptr;
 	cl_kernel _poly2int0 = nullptr, _poly2int1 = nullptr;
 	cl_kernel _reduce_upsweep64 = nullptr, _reduce_downsweep64 = nullptr;
-	cl_kernel _reduce_topsweep16 = nullptr, _reduce_topsweep32 = nullptr, _reduce_topsweep64 = nullptr, _reduce_topsweep128 = nullptr;
+	cl_kernel _reduce_topsweep32 = nullptr, _reduce_topsweep64 = nullptr, _reduce_topsweep128 = nullptr;
 	cl_kernel _reduce_topsweep256 = nullptr, _reduce_topsweep512 = nullptr, _reduce_topsweep1024 = nullptr;
 	cl_kernel _reduce_i = nullptr, _reduce_o = nullptr, _reduce_f = nullptr, _reduce_x = nullptr;
 	cl_kernel _set_positive = nullptr, _add1 = nullptr;
@@ -517,7 +517,6 @@ public:
 		_reduce_upsweep64 = _createSweepKernel("reduce_upsweep64", d);
 		_reduce_downsweep64 = _createSweepKernel("reduce_downsweep64", d);
 
-		_reduce_topsweep16 = _createSweepKernel("reduce_topsweep16", d);
 		_reduce_topsweep32 = _createSweepKernel("reduce_topsweep32", d);
 		_reduce_topsweep64 = _createSweepKernel("reduce_topsweep64", d);
 		_reduce_topsweep128 = _createSweepKernel("reduce_topsweep128", d);
@@ -580,7 +579,6 @@ public:
 		_releaseKernel(_reduce_upsweep64);
 		_releaseKernel(_reduce_downsweep64);
 
-		_releaseKernel(_reduce_topsweep16);
 		_releaseKernel(_reduce_topsweep32);
 		_releaseKernel(_reduce_topsweep64);
 		_releaseKernel(_reduce_topsweep128);
@@ -734,7 +732,6 @@ private:
 	}
 
 public:
-	void reduce_topsweep16(const cl_uint j) { _executeTopsweepKernel(_reduce_topsweep16, j, 16); }
 	void reduce_topsweep32(const cl_uint j) { _executeTopsweepKernel(_reduce_topsweep32, j, 32); }
 	void reduce_topsweep64(const cl_uint j) { _executeTopsweepKernel(_reduce_topsweep64, j, 64); }
 	void reduce_topsweep128(const cl_uint j) { _executeTopsweepKernel(_reduce_topsweep128, j, 128); }

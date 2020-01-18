@@ -678,21 +678,6 @@ static const char * const src_proth_ocl = \
 "	T[0] = u123; T[1] = u23; T[2] = u3; T[3] = 0;\n" \
 "}\n" \
 "\n" \
-"#define	S16		(16 / 4)\n" \
-"__kernel __attribute__((reqd_work_group_size(S16, 1, 1)))\n" \
-"void reduce_topsweep16(__global uint * restrict const t, const uint d, const uint j)\n" \
-"{\n" \
-"	__local uint T[64];\n" \
-"\n" \
-"	const size_t i = get_local_id(0);\n" \
-"\n" \
-"	_reduce_upsweep4i(T, &t[j], d, S16, i);\n" \
-"	barrier(CLK_LOCAL_MEM_FENCE);\n" \
-"	if (i == 0) _reduce_topsweep4(t, &T[S16], d);\n" \
-"	barrier(CLK_LOCAL_MEM_FENCE);\n" \
-"	_reduce_downsweep4o(&t[j], T, d, S16, i);\n" \
-"}\n" \
-"\n" \
 "#define	S32		(32 / 4)\n" \
 "__kernel __attribute__((reqd_work_group_size(S32, 1, 1)))\n" \
 "void reduce_topsweep32(__global uint * restrict const t, const uint d, const uint j)\n" \
