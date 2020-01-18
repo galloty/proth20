@@ -83,6 +83,7 @@ public:
 				X.mul();				// x = iNTT(NTT(x).tu)
 			}
 		}
+		X.norm();
 		X.copy_x_v();
 
 		// X *= a^k, right-to-left algorithm
@@ -99,7 +100,9 @@ public:
 			X.square();
 			X.swap_x_u();				// u = u^2
 		}
-		X.compare_x_v();
+		X.norm();
+		X.copy_x_u();
+		X.compare_u_v();
 
 		if (X.getError() != 0)	// Sync GPU before benchmark
 		{
@@ -107,13 +110,16 @@ public:
 			return false;
 		}
 
+		const uint32_t L = 1024, L2 = L * L;
+
 		// X = X^(2^(n - 1))
 		Timer::Time startBenchTime = Timer::currentTime();
 		const uint32_t benchCount = (n < 100000) ? 20000 : 10000000 / (n / 1000);
-		for (uint32_t i = 0; i < n - 1; ++i)
+		for (uint32_t i = 1; i < n; ++i)
 		{
 			X.square();
-			if (i == benchCount - 1)
+
+			if (i == benchCount)
 			{
 				X.getError();
 				const double elapsedTime = Timer::diffTime(Timer::currentTime(), startBenchTime);
@@ -124,6 +130,24 @@ public:
 					std::cout << std::endl;
 					return true;
 				}
+			}
+
+			// Robert Gerbicz error checking algorithm
+			// u is d(t) and v is u(0). They must be set before the loop
+			// if (i == 2 * benchCount) X.set_bug();	// test
+			if (i % L == 0)
+			{
+				if ((i % L2 == 0) || (i + L >= n))
+				{
+					X.GerbiczL2(L);
+					if (X.getError() != 0)
+					{
+						std::cout << " error detected!" << std::endl;
+						return false;
+					}
+				}
+
+				X.GerbiczL();
 			}
 		}
 
@@ -172,7 +196,7 @@ public:
 	{
 		std::vector<Number>	primeList;
 		primeList.push_back(Number(1035, 301));
-		primeList.push_back(Number(955, 636, 2));
+		primeList.push_back(Number(955, 636));
 		primeList.push_back(Number(969, 1307));
 		primeList.push_back(Number(1139, 2641));
 		primeList.push_back(Number(1035, 5336));

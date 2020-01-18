@@ -202,7 +202,7 @@ private:
 	cl_command_queue _queue = nullptr;
 	cl_program _program = nullptr;
 	size_t _size = 0, _constant_size = 0;
-	cl_mem _x = nullptr, _y = nullptr, _t = nullptr, _cr = nullptr, _u = nullptr, _tu = nullptr, _v = nullptr, _err = nullptr;
+	cl_mem _x = nullptr, _y = nullptr, _t = nullptr, _cr = nullptr, _u = nullptr, _tu = nullptr, _v = nullptr, _s1 = nullptr, _s2 = nullptr, _err = nullptr;
 	cl_mem _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr1ir1 = nullptr, _cr2ir2 = nullptr, _bp = nullptr, _ibp = nullptr;
 	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr;
 	cl_kernel _square32 = nullptr, _square64 = nullptr, _square128 = nullptr, _square256 = nullptr,_square512 = nullptr, _square1024 = nullptr;
@@ -210,7 +210,7 @@ private:
 	cl_kernel _reduce_upsweep64 = nullptr, _reduce_downsweep64 = nullptr;
 	cl_kernel _reduce_topsweep32 = nullptr, _reduce_topsweep64 = nullptr, _reduce_topsweep128 = nullptr;
 	cl_kernel _reduce_topsweep256 = nullptr, _reduce_topsweep512 = nullptr, _reduce_topsweep1024 = nullptr;
-	cl_kernel _reduce_i = nullptr, _reduce_o = nullptr, _reduce_f = nullptr, _reduce_x = nullptr;
+	cl_kernel _reduce_i = nullptr, _reduce_o = nullptr, _reduce_f = nullptr, _reduce_x = nullptr, _reduce_z = nullptr;
 	cl_kernel _ntt4 = nullptr, _intt4 = nullptr, _mul2 = nullptr, _mul4 = nullptr;
 	cl_kernel _set_positive = nullptr, _add1 = nullptr, _swap = nullptr, _copy = nullptr, _compare = nullptr;
 
@@ -391,6 +391,8 @@ public:
 		_u = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);
 		_tu = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);
 		_v = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);
+		_s1 = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);
+		_s2 = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);
 		_err = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_int));
 
 		_r1ir1 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * size);
@@ -419,6 +421,8 @@ public:
 			_releaseBuffer(_u);
 			_releaseBuffer(_tu);
 			_releaseBuffer(_v);
+			_releaseBuffer(_s1);
+			_releaseBuffer(_s2);
 			_releaseBuffer(_err);
 
 			_releaseBuffer(_r1ir1);
@@ -535,6 +539,11 @@ public:
 		_setKernelArg(_reduce_x, 1, sizeof(cl_uint), &n);
 		_setKernelArg(_reduce_x, 2, sizeof(cl_mem), &_err);
 
+		_reduce_z = _createKernel("reduce_z");
+		_setKernelArg(_reduce_z, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(_reduce_z, 1, sizeof(cl_uint), &n);
+		_setKernelArg(_reduce_z, 2, sizeof(cl_mem), &_err);
+
 		_ntt4 = _createNttKernel("ntt4", true);
 		_intt4 = _createNttKernel("intt4", false);
 
@@ -555,6 +564,8 @@ public:
 
 		_add1 = _createKernel("add1");
 		_setKernelArg(_add1, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(_add1, 1, sizeof(cl_uint), &e);
+		_setKernelArg(_add1, 2, sizeof(cl_ulong), &ds);
 
 		_swap = _createKernel("swap");
 		_copy = _createKernel("copy");
@@ -596,6 +607,7 @@ public:
 		_releaseKernel(_reduce_o);
 		_releaseKernel(_reduce_f);
 		_releaseKernel(_reduce_x);
+		_releaseKernel(_reduce_z);
 
 		_releaseKernel(_ntt4);
 		_releaseKernel(_intt4);
@@ -758,50 +770,63 @@ public:
 	void reduce_o() { _executeKernel(_reduce_o, _size / 2); }
 	void reduce_f() { _executeKernel(_reduce_f, 1); }
 	void reduce_x() { _executeKernel(_reduce_x, 1); }
+	void reduce_z() { _executeKernel(_reduce_z, 1); }
 
 public:
 	void set_positive() { _executeKernel(_set_positive, 1); }
 	void add1() { _executeKernel(_add1, 1); }
 
 public:
-	void set_positive_u()
+	void set_positive_tu()
 	{
-		_setKernelArg(_set_positive, 0, sizeof(cl_mem), &_u);
+		_setKernelArg(_set_positive, 0, sizeof(cl_mem), &_tu);
 		_executeKernel(_set_positive, 1);
 		_setKernelArg(_set_positive, 0, sizeof(cl_mem), &_x);
 	}
 
-public:
-	void swap_x_u()
+private:
+	void _executeSwapKernel(const void * const arg_x, const void * const arg_y)
 	{
-		_setKernelArg(_swap, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_swap, 1, sizeof(cl_mem), &_u);
+		_setKernelArg(_swap, 0, sizeof(cl_mem), arg_x);
+		_setKernelArg(_swap, 1, sizeof(cl_mem), arg_y);
 		_executeKernel(_swap, _size / 2);
 	}
 
 public:
-	void copy_x_v()
+	void swap_x_u() { _executeSwapKernel(&_x, &_u); }
+	void swap_x_s1() { _executeSwapKernel(&_x, &_s1); }
+	void swap_x_s2() { _executeSwapKernel(&_x, &_s2); }
+
+private:
+	void _executeCopyKernel(const void * const arg_x, const void * const arg_y)
 	{
-		_setKernelArg(_copy, 0, sizeof(cl_mem), &_v);
-		_setKernelArg(_copy, 1, sizeof(cl_mem), &_x);
+		_setKernelArg(_copy, 0, sizeof(cl_mem), arg_x);
+		_setKernelArg(_copy, 1, sizeof(cl_mem), arg_y);
 		_executeKernel(_copy, _size / 2);
 	}
 
 public:
-	void copy_u_tu()
-	{
-		_setKernelArg(_copy, 0, sizeof(cl_mem), &_tu);
-		_setKernelArg(_copy, 1, sizeof(cl_mem), &_u);
-		_executeKernel(_copy, _size / 2);
-	}
+	void copy_x_u() { _executeCopyKernel(&_u, &_x); }
+	void copy_x_v() { _executeCopyKernel(&_v, &_x); }
+	void copy_x_s1() { _executeCopyKernel(&_s1, &_x); }
+	void copy_x_s2() { _executeCopyKernel(&_s2, &_x); }
+	void copy_u_x() { _executeCopyKernel(&_x, &_u); }
+	void copy_u_s1() { _executeCopyKernel(&_s1, &_u); }
+	void copy_u_tu() { _executeCopyKernel(&_tu, &_u); }
+	void copy_v_u() { _executeCopyKernel(&_u, &_v); }
+	void copy_s1_u() { _executeCopyKernel(&_u, &_s1); }
 
-public:
-	void compare_x_v()
+private:
+	void _executeCompareKernel(const void * const arg_x, const void * const arg_y)
 	{
-		_setKernelArg(_compare, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_compare, 1, sizeof(cl_mem), &_v);
+		_setKernelArg(_compare, 0, sizeof(cl_mem), arg_x);
+		_setKernelArg(_compare, 1, sizeof(cl_mem), arg_y);
 		_executeKernel(_compare, _size / 2);
 	}
+
+public:
+	void compare_u_v() { _executeCompareKernel(&_u, &_v); }
+	void compare_s1_s2() { _executeCompareKernel(&_s1, &_s2); }
 
 private:
 	void _sync()

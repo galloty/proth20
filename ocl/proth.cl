@@ -815,6 +815,32 @@ void reduce_x(__global uint2 * restrict const x, const uint n, __global int * co
 }
 
 __kernel
+void reduce_z(__global uint2 * restrict const x, const uint n, __global int * const err)
+{
+	// s0 = x, s1 = k.2^n + 1
+	// if s0 >= s1, s0 -= s1;
+
+	for (size_t i = 0; i < n; ++i)
+	{
+		const size_t j = n - 1 - i;
+		const uint2 x_j = x[j];
+		if (x_j.s0 < x_j.s1) return;
+		if (x_j.s0 > x_j.s1) break;
+	}
+
+	int c = 0;
+	for (size_t k = 0; k < n; ++k)
+	{
+		const uint2 x_k = x[k];
+		c += x_k.s0 - x_k.s1;
+		x[k] = (uint2)((uint)(c) & digit_mask, 0);
+		c >>= digit_bit;
+	}
+
+	if (c != 0) atomic_or(err, c);
+}
+
+__kernel
 void ntt4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
 {
 	const size_t k = get_global_id(0);
@@ -882,7 +908,7 @@ void mul4(__global uint2 * restrict const x, __global const uint2 * restrict con
 __kernel
 void set_positive(__global uint2 * restrict const x, const uint n, const uint e, const ulong ds)
 {
-	//_x.s0 = R, _x.s1 = Y
+	// x.s0 = R, x.s1 = Y
 	// if R < Y then add k.2^n + 1 to R.
 
 	for (size_t i = 0; i < n; ++i)
@@ -896,9 +922,8 @@ void set_positive(__global uint2 * restrict const x, const uint n, const uint e,
 			uint c = 1;
 			for (size_t k = 0; c != 0; ++k)
 			{
-				const uint2 x_k = x[k];
-				c += x_k.s0;
-				x[k] = (uint2)(c & digit_mask, x_k.s1);
+				c += x[k].s0;
+				x[k].s0 = c & digit_mask;
 				c >>= digit_bit;
 			}
 
@@ -906,9 +931,8 @@ void set_positive(__global uint2 * restrict const x, const uint n, const uint e,
 			ulong l = ds;
 			for (size_t k = e; l != 0; ++k)
 			{
-				const uint2 x_k = x[k];
-				l += x_k.s0;
-				x[k] = (uint2)((uint)(l) & digit_mask, x_k.s1);
+				l += x[k].s0;
+				x[k].s0 = (uint)(l) & digit_mask;
 				l >>= digit_bit;
 			}
 
@@ -918,15 +942,26 @@ void set_positive(__global uint2 * restrict const x, const uint n, const uint e,
 }
 
 __kernel
-void add1(__global uint2 * restrict const x)
+void add1(__global uint2 * restrict const x, const uint e, const ulong ds)
 {
 	uint c = 1;
 	for (size_t k = 0; c != 0; ++k)
 	{
 		const uint2 x_k = x[k];
-		c += x_k.s0;
-		x[k] = (uint2)((uint)(c) & digit_mask, x_k.s1);
+		c += x[k].s0;
+		x[k].s0 = (uint)(c) & digit_mask;
 		c >>= digit_bit;
+	}
+
+	// s1: 0 => k.2^n + 1 for reduce_z step
+
+	x[0].s1 = 1;
+
+	ulong l = ds;
+	for (size_t k = e; l != 0; ++k)
+	{
+		x[k].s1 = (uint)(l) & digit_mask;
+		l >>= digit_bit;
 	}
 }
 

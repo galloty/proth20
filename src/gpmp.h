@@ -304,9 +304,29 @@ public:
 	}
 
 public:
+	void set_bug()
+	{
+		cl_uint2 * const x = _mem;
+		_device.readMemory_x(x);
+		x[_size / 3].s[0] += 1;
+		_device.writeMemory_x(x);
+	}
+
+public:
+	void norm()
+	{
+		// if R < Y then add k.2^n + 1 to R. We have 0 <= R - Y + k.2^n + 1 <= k.2^n
+		_device.set_positive();
+
+		// _x[0] = R, _x[1] = Y; compute R - Y
+		_device.reduce_x();
+	}
+
+public:
 	void swap_x_u() { _device.swap_x_u(); }
-	void copy_x_v() { _device.set_positive(); _device.reduce_x(); _device.copy_x_v(); }
-	void compare_x_v() { _device.set_positive(); _device.reduce_x(); _device.compare_x_v(); }
+	void copy_x_u() { _device.copy_x_u(); }
+	void copy_x_v() { _device.copy_x_v(); }
+	void compare_u_v() { _device.compare_u_v(); }
 
 public:
 	void square()
@@ -354,8 +374,8 @@ public:
 public:
 	void setMultiplicand()
 	{
-		_device.set_positive_u();
 		_device.copy_u_tu();
+		_device.set_positive_tu();
 
 		_device.sub_ntt64_u();
 
@@ -432,13 +452,10 @@ public:
 public:
 	bool isMinusOne(uint64_t & res64)
 	{
+		norm();
+
 		_device.add1();
-
-		// if R < Y then add k.2^n + 1 to R. We have 0 <= R - Y + k.2^n + 1 <= k.2^n
-		_device.set_positive();
-
-		// _x[0] = R, _x[1] = Y; compute R - Y
-		_device.reduce_x();
+		_device.reduce_z();
 
 		cl_uint2 * const x = _mem;
 
@@ -456,6 +473,41 @@ public:
 
 		res64 = r;
 		return isPrime;
+	}
+
+public:
+	void GerbiczL()
+	{
+		// u *= x;
+		swap_x_u();
+		setMultiplicand();
+		mul();
+		swap_x_u();
+	}
+
+public:
+	void GerbiczL2(const size_t L)
+	{
+		// v * u^(2^L)
+		_device.copy_u_s1();		// s1 = u
+		_device.copy_x_s2();		// s1 = u, s2 = x
+		_device.copy_u_x();
+		for (size_t i = 0; i < L; ++i) square();	// x = u^(2^L)
+		_device.copy_v_u();
+		setMultiplicand();
+		mul();			// x = v * u^(2^L)
+		norm();
+		_device.swap_x_s2();		// s1 = u, s2 = v * u^(2^L)
+		_device.copy_s1_u();		// s2 = v * u^(2^L)
+
+		// u * x;
+		_device.copy_x_s1();		// s1 = x
+		setMultiplicand();
+		mul();
+		norm();
+		_device.swap_x_s1();		// s1 = u * x, s2 = v * u^(2^L)
+
+		_device.compare_s1_s2();
 	}
 
 private:

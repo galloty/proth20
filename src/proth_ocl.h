@@ -823,6 +823,32 @@ static const char * const src_proth_ocl = \
 "}\n" \
 "\n" \
 "__kernel\n" \
+"void reduce_z(__global uint2 * restrict const x, const uint n, __global int * const err)\n" \
+"{\n" \
+"	// s0 = x, s1 = k.2^n + 1\n" \
+"	// if s0 >= s1, s0 -= s1;\n" \
+"\n" \
+"	for (size_t i = 0; i < n; ++i)\n" \
+"	{\n" \
+"		const size_t j = n - 1 - i;\n" \
+"		const uint2 x_j = x[j];\n" \
+"		if (x_j.s0 < x_j.s1) return;\n" \
+"		if (x_j.s0 > x_j.s1) break;\n" \
+"	}\n" \
+"\n" \
+"	int c = 0;\n" \
+"	for (size_t k = 0; k < n; ++k)\n" \
+"	{\n" \
+"		const uint2 x_k = x[k];\n" \
+"		c += x_k.s0 - x_k.s1;\n" \
+"		x[k] = (uint2)((uint)(c) & digit_mask, 0);\n" \
+"		c >>= digit_bit;\n" \
+"	}\n" \
+"\n" \
+"	if (c != 0) atomic_or(err, c);\n" \
+"}\n" \
+"\n" \
+"__kernel\n" \
 "void ntt4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)\n" \
 "{\n" \
 "	const size_t k = get_global_id(0);\n" \
@@ -890,7 +916,7 @@ static const char * const src_proth_ocl = \
 "__kernel\n" \
 "void set_positive(__global uint2 * restrict const x, const uint n, const uint e, const ulong ds)\n" \
 "{\n" \
-"	//_x.s0 = R, _x.s1 = Y\n" \
+"	// x.s0 = R, x.s1 = Y\n" \
 "	// if R < Y then add k.2^n + 1 to R.\n" \
 "\n" \
 "	for (size_t i = 0; i < n; ++i)\n" \
@@ -904,9 +930,8 @@ static const char * const src_proth_ocl = \
 "			uint c = 1;\n" \
 "			for (size_t k = 0; c != 0; ++k)\n" \
 "			{\n" \
-"				const uint2 x_k = x[k];\n" \
-"				c += x_k.s0;\n" \
-"				x[k] = (uint2)(c & digit_mask, x_k.s1);\n" \
+"				c += x[k].s0;\n" \
+"				x[k].s0 = c & digit_mask;\n" \
 "				c >>= digit_bit;\n" \
 "			}\n" \
 "\n" \
@@ -914,9 +939,8 @@ static const char * const src_proth_ocl = \
 "			ulong l = ds;\n" \
 "			for (size_t k = e; l != 0; ++k)\n" \
 "			{\n" \
-"				const uint2 x_k = x[k];\n" \
-"				l += x_k.s0;\n" \
-"				x[k] = (uint2)((uint)(l) & digit_mask, x_k.s1);\n" \
+"				l += x[k].s0;\n" \
+"				x[k].s0 = (uint)(l) & digit_mask;\n" \
 "				l >>= digit_bit;\n" \
 "			}\n" \
 "\n" \
@@ -926,15 +950,26 @@ static const char * const src_proth_ocl = \
 "}\n" \
 "\n" \
 "__kernel\n" \
-"void add1(__global uint2 * restrict const x)\n" \
+"void add1(__global uint2 * restrict const x, const uint e, const ulong ds)\n" \
 "{\n" \
 "	uint c = 1;\n" \
 "	for (size_t k = 0; c != 0; ++k)\n" \
 "	{\n" \
 "		const uint2 x_k = x[k];\n" \
-"		c += x_k.s0;\n" \
-"		x[k] = (uint2)((uint)(c) & digit_mask, x_k.s1);\n" \
+"		c += x[k].s0;\n" \
+"		x[k].s0 = (uint)(c) & digit_mask;\n" \
 "		c >>= digit_bit;\n" \
+"	}\n" \
+"\n" \
+"	// s1: 0 => k.2^n + 1 for reduce_z step\n" \
+"\n" \
+"	x[0].s1 = 1;\n" \
+"\n" \
+"	ulong l = ds;\n" \
+"	for (size_t k = e; l != 0; ++k)\n" \
+"	{\n" \
+"		x[k].s1 = (uint)(l) & digit_mask;\n" \
+"		l >>= digit_bit;\n" \
 "	}\n" \
 "}\n" \
 "\n" \
