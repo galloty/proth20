@@ -204,15 +204,16 @@ private:
 	size_t _size = 0, _constant_size = 0;
 	cl_mem _x = nullptr, _y = nullptr, _t = nullptr, _cr = nullptr, _u = nullptr, _err = nullptr;
 	cl_mem _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr1ir1 = nullptr, _cr2ir2 = nullptr, _bp = nullptr, _ibp = nullptr;
-	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr, _ntt4 = nullptr, _intt4 = nullptr;
+	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr;
 	cl_kernel _square32 = nullptr, _square64 = nullptr, _square128 = nullptr, _square256 = nullptr,_square512 = nullptr, _square1024 = nullptr;
-	cl_kernel _mul2 = nullptr, _mul4 = nullptr;
 	cl_kernel _poly2int0 = nullptr, _poly2int1 = nullptr;
 	cl_kernel _reduce_upsweep64 = nullptr, _reduce_downsweep64 = nullptr;
 	cl_kernel _reduce_topsweep32 = nullptr, _reduce_topsweep64 = nullptr, _reduce_topsweep128 = nullptr;
 	cl_kernel _reduce_topsweep256 = nullptr, _reduce_topsweep512 = nullptr, _reduce_topsweep1024 = nullptr;
 	cl_kernel _reduce_i = nullptr, _reduce_o = nullptr, _reduce_f = nullptr, _reduce_x = nullptr;
+	cl_kernel _ntt4 = nullptr, _intt4 = nullptr, _mul2 = nullptr, _mul4 = nullptr;
 	cl_kernel _set_positive = nullptr, _add1 = nullptr;
+
 
 	enum class EVendor { Unknown, NVIDIA, AMD, INTEL };
 
@@ -486,8 +487,6 @@ public:
 		_sub_ntt64 = _createNttKernel("sub_ntt64", true);
 		_ntt64 = _createNttKernel("ntt64", true);
 		_intt64 = _createNttKernel("intt64", false);
-		_ntt4 = _createNttKernel("ntt4", true);
-		_intt4 = _createNttKernel("intt4", false);
 
 		_square32 = _createSquareKernel("square32");
 		_square64 = _createSquareKernel("square64");
@@ -495,14 +494,6 @@ public:
 		_square256 = _createSquareKernel("square256");
 		_square512 = _createSquareKernel("square512");
 		_square1024 = _createSquareKernel("square1024");
-
-		_mul2 = _createKernel("mul2");
-		_setKernelArg(_mul2, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_mul2, 1, sizeof(cl_mem), &_u);
-
-		_mul4 = _createKernel("mul4");
-		_setKernelArg(_mul4, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_mul4, 1, sizeof(cl_mem), &_u);
 
 		_poly2int0 = _createKernel("poly2int0");
 		_setKernelArg(_poly2int0, 0, sizeof(cl_mem), &_x);
@@ -540,6 +531,17 @@ public:
 		_setKernelArg(_reduce_x, 1, sizeof(cl_uint), &n);
 		_setKernelArg(_reduce_x, 2, sizeof(cl_mem), &_err);
 
+		_ntt4 = _createNttKernel("ntt4", true);
+		_intt4 = _createNttKernel("intt4", false);
+
+		_mul2 = _createKernel("mul2");
+		_setKernelArg(_mul2, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(_mul2, 1, sizeof(cl_mem), &_u);
+
+		_mul4 = _createKernel("mul4");
+		_setKernelArg(_mul4, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(_mul4, 1, sizeof(cl_mem), &_u);
+
 		_set_positive = _createKernel("set_positive");
 		_setKernelArg(_set_positive, 0, sizeof(cl_mem), &_x);
 		_setKernelArg(_set_positive, 1, sizeof(cl_uint), &n);
@@ -560,8 +562,6 @@ public:
 		_releaseKernel(_sub_ntt64);
 		_releaseKernel(_ntt64);
 		_releaseKernel(_intt64);
-		_releaseKernel(_ntt4);
-		_releaseKernel(_intt4);
 
 		_releaseKernel(_square32);
 		_releaseKernel(_square64);
@@ -569,9 +569,6 @@ public:
 		_releaseKernel(_square256);
 		_releaseKernel(_square512);
 		_releaseKernel(_square1024);
-
-		_releaseKernel(_mul2);
-		_releaseKernel(_mul4);
 
 		_releaseKernel(_poly2int0);
 		_releaseKernel(_poly2int1);
@@ -591,6 +588,10 @@ public:
 		_releaseKernel(_reduce_f);
 		_releaseKernel(_reduce_x);
 
+		_releaseKernel(_ntt4);
+		_releaseKernel(_intt4);
+		_releaseKernel(_mul2);
+		_releaseKernel(_mul4);
 		_releaseKernel(_set_positive);
 		_releaseKernel(_add1);
 	}

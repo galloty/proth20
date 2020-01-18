@@ -98,7 +98,7 @@ public:
 
 		// bench
 		// proth::bench(device0);
-		// proth::test_prime(device0, true);
+		proth::test_prime(device0, true);
 		// proth::test_composite(device0, true);
 
 		// true test

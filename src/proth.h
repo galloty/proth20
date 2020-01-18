@@ -83,6 +83,12 @@ public:
 			}
 		}
 
+		if (X.getError() != 0)	// Sync GPU before benchmark
+		{
+			std::cout << " error detected!" << std::endl;
+			return false;
+		}
+
 		// X = X^(2^(n - 1))
 		Timer::Time startBenchTime = Timer::currentTime();
 		const uint32_t benchCount = (n < 100000) ? 20000 : 10000000 / (n / 1000);
@@ -105,8 +111,7 @@ public:
 
 		uint64_t res64;
 		const bool isPrime = X.isMinusOne(res64);
-		const int err = X.getError();
-		if (err != 0)
+		if (X.getError() != 0)
 		{
 			std::cout << " error detected!" << std::endl;
 			return false;

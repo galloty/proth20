@@ -185,7 +185,6 @@ inline void _square4(__local uint2 * restrict const X)
 	X[0] = addmod(t0, t2); X[2] = submod(t0, t2); X[1] = addmod(t1, t3); X[3] = submod(t1, t3);
 }
 
-
 __kernel  __attribute__((reqd_work_group_size(64 / 4 * CHUNK64, 1, 1)))
 void sub_ntt64(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2)
 {
@@ -278,39 +277,6 @@ void intt64(__global uint2 * restrict const x, __global const uint4 * restrict c
 	_backward4i(CHUNK64, &X[i_m], m, &xo[k_m], ir2[rindex + 16 * m + 4 * m + j_m], r1ir1[rindex + 16 * m + 4 * m + j_m]);
 	_backward4(4 * CHUNK64, &X[i_4m], ir2[rindex + 16 * m + j_4m], r1ir1[rindex + 16 * m + j_4m]);
 	_backward4o(16 * m, &xo[k_16m], 16 * CHUNK64, &X[i_16m], ir2[rindex + j_16m], r1ir1[rindex + j_16m]);
-}
-
-__kernel
-void ntt4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
-{
-	const size_t k = get_global_id(0);
-
-	const size_t i = k & (m - 1), j = 4 * k - 3 * i;
-
-	const uint2 r2_i = r2[rindex + i];
-	const uint4 r1ir1_i = r1ir1[rindex + i];
-
-	const uint2 u0 = x[j + 0 * m], u2 = x[j + 2 * m], u1 = x[j + 1 * m], u3 = x[j + 3 * m];
-	const uint2 v0 = addmod(u0, u2), v2 = submod(u0, u2), v1 = addmod(u1, u3), v3 = mulI(submod(u3, u1));
-	x[j + 0 * m] = addmod(v0, v1); x[j + 1 * m] = mulmod(submod(v0, v1), r2_i);
-	x[j + 2 * m] = mulmod(addmod(v2, v3), r1ir1_i.s23); x[j + 3 * m] = mulmod(submod(v2, v3), r1ir1_i.s01);
-}
-
-
-__kernel
-void intt4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2, const uint m, const uint rindex)
-{
-	const size_t k = get_global_id(0);
-
-	const size_t i = k & (m - 1), j = 4 * k - 3 * i;
-
-	const uint2 ir2_i = ir2[rindex + i];
-	const uint4 r1ir1_i = r1ir1[rindex + i];
-
-	const uint2 v0 = x[j + 0 * m], v1 = mulmod(x[j + 1 * m], ir2_i), v2 = mulmod(x[j + 2 * m], r1ir1_i.s01), v3 = mulmod(x[j + 3 * m], r1ir1_i.s23);
-	const uint2 u0 = addmod(v0, v1), u2 = addmod(v2, v3), u1 = submod(v0, v1), u3 = mulI(submod(v2, v3));
-	x[j + 0 * m] = addmod(u0, u2); x[j + 2 * m] = submod(u0, u2);
-	x[j + 1 * m] = addmod(u1, u3); x[j + 3 * m] = submod(u1, u3);
 }
 
 __kernel __attribute__((reqd_work_group_size(32 / 4 * BLK32, 1, 1)))
@@ -433,38 +399,6 @@ void square1024(__global uint2 * restrict const x, __constmem const uint4 * rest
 	_backward4(16, &X[i16], r2ir2[j16].s23, r1ir1[j16]);
 	_backward4(64, &X[i64], r2ir2[j64].s23, r1ir1[j64]);
 	_backward4o(256, &x[k256], 256, &X[i256], r2ir2[j256].s23, r1ir1[j256]);
-}
-
-__kernel
-void mul2(__global uint2 * restrict const x, __global const uint2 * restrict const y)
-{
-	const size_t k = get_global_id(0);
-
-	const size_t i = 4 * k;
-
-	const uint2 ux0 = x[i + 0], ux1 = x[i + 1], ux2 = x[i + 2], ux3 = x[i + 3];
-	const uint2 vx0 = addmod(ux0, ux1), vx1 = submod(ux0, ux1), vx2 = addmod(ux2, ux3), vx3 = submod(ux2, ux3);
-	const uint2 uy0 = y[i + 0], uy1 = y[i + 1], uy2 = y[i + 2], uy3 = y[i + 3];
-	const uint2 vy0 = addmod(uy0, uy1), vy1 = submod(uy0, uy1), vy2 = addmod(uy2, uy3), vy3 = submod(uy2, uy3);
-	const uint2 s0 = mulmod(vx0, vy0), s1 = mulmod(vx1, vy1), s2 = mulmod(vx2, vy2), s3 = mulmod(vx3, vy3);
-	x[i + 0] = addmod(s0, s1); x[i + 1] = submod(s0, s1); x[i + 2] = addmod(s2, s3); x[i + 3] = submod(s2, s3);
-}
-
-__kernel
-void mul4(__global uint2 * restrict const x, __global const uint2 * restrict const y)
-{
-	const size_t k = get_global_id(0);
-
-	const size_t i = 4 * k;
-
-	const uint2 ux0 = x[i + 0], ux2 = x[i + 2], ux1 = x[i + 1], ux3 = x[i + 3];
-	const uint2 vx0 = addmod(ux0, ux2), vx2 = submod(ux0, ux2), vx1 = addmod(ux1, ux3), vx3 = mulI(submod(ux3, ux1));
-	const uint2 uy0 = y[i + 0], uy2 = y[i + 2], uy1 = y[i + 1], uy3 = y[i + 3];
-	const uint2 vy0 = addmod(uy0, uy2), vy2 = submod(uy0, uy2), vy1 = addmod(uy1, uy3), vy3 = mulI(submod(uy3, uy1));
-	const uint2 s0 = mulmod(addmod(vx0, vx1), addmod(vy0, vy1)), s1 = mulmod(submod(vx0, vx1), submod(vy0, vy1));
-	const uint2 s2 = mulmod(addmod(vx2, vx3), addmod(vy2, vy3)), s3 = mulmod(submod(vx2, vx3), submod(vy2, vy3));
-	const uint2 t0 = addmod(s0, s1), t2 = addmod(s2, s3), t1 = submod(s0, s1), t3 = mulI(submod(s2, s3));
-	x[i + 0] = addmod(t0, t2); x[i + 2] = submod(t0, t2); x[i + 1] = addmod(t1, t3); x[i + 3] = submod(t1, t3);
 }
 
 __kernel __attribute__((reqd_work_group_size(P2I_WGS, 1, 1)))
@@ -878,6 +812,71 @@ void reduce_x(__global uint2 * restrict const x, const uint n, __global int * co
 	}
 
 	if (c != 0) atomic_or(err, c);
+}
+
+__kernel
+void ntt4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
+{
+	const size_t k = get_global_id(0);
+
+	const size_t i = k & (m - 1), j = 4 * k - 3 * i;
+
+	const uint2 r2_i = r2[rindex + i];
+	const uint4 r1ir1_i = r1ir1[rindex + i];
+
+	const uint2 u0 = x[j + 0 * m], u2 = x[j + 2 * m], u1 = x[j + 1 * m], u3 = x[j + 3 * m];
+	const uint2 v0 = addmod(u0, u2), v2 = submod(u0, u2), v1 = addmod(u1, u3), v3 = mulI(submod(u3, u1));
+	x[j + 0 * m] = addmod(v0, v1); x[j + 1 * m] = mulmod(submod(v0, v1), r2_i);
+	x[j + 2 * m] = mulmod(addmod(v2, v3), r1ir1_i.s23); x[j + 3 * m] = mulmod(submod(v2, v3), r1ir1_i.s01);
+}
+
+
+__kernel
+void intt4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2, const uint m, const uint rindex)
+{
+	const size_t k = get_global_id(0);
+
+	const size_t i = k & (m - 1), j = 4 * k - 3 * i;
+
+	const uint2 ir2_i = ir2[rindex + i];
+	const uint4 r1ir1_i = r1ir1[rindex + i];
+
+	const uint2 v0 = x[j + 0 * m], v1 = mulmod(x[j + 1 * m], ir2_i), v2 = mulmod(x[j + 2 * m], r1ir1_i.s01), v3 = mulmod(x[j + 3 * m], r1ir1_i.s23);
+	const uint2 u0 = addmod(v0, v1), u2 = addmod(v2, v3), u1 = submod(v0, v1), u3 = mulI(submod(v2, v3));
+	x[j + 0 * m] = addmod(u0, u2); x[j + 2 * m] = submod(u0, u2);
+	x[j + 1 * m] = addmod(u1, u3); x[j + 3 * m] = submod(u1, u3);
+}
+
+__kernel
+void mul2(__global uint2 * restrict const x, __global const uint2 * restrict const y)
+{
+	const size_t k = get_global_id(0);
+
+	const size_t i = 4 * k;
+
+	const uint2 ux0 = x[i + 0], ux1 = x[i + 1], ux2 = x[i + 2], ux3 = x[i + 3];
+	const uint2 vx0 = addmod(ux0, ux1), vx1 = submod(ux0, ux1), vx2 = addmod(ux2, ux3), vx3 = submod(ux2, ux3);
+	const uint2 uy0 = y[i + 0], uy1 = y[i + 1], uy2 = y[i + 2], uy3 = y[i + 3];
+	const uint2 vy0 = addmod(uy0, uy1), vy1 = submod(uy0, uy1), vy2 = addmod(uy2, uy3), vy3 = submod(uy2, uy3);
+	const uint2 s0 = mulmod(vx0, vy0), s1 = mulmod(vx1, vy1), s2 = mulmod(vx2, vy2), s3 = mulmod(vx3, vy3);
+	x[i + 0] = addmod(s0, s1); x[i + 1] = submod(s0, s1); x[i + 2] = addmod(s2, s3); x[i + 3] = submod(s2, s3);
+}
+
+__kernel
+void mul4(__global uint2 * restrict const x, __global const uint2 * restrict const y)
+{
+	const size_t k = get_global_id(0);
+
+	const size_t i = 4 * k;
+
+	const uint2 ux0 = x[i + 0], ux2 = x[i + 2], ux1 = x[i + 1], ux3 = x[i + 3];
+	const uint2 vx0 = addmod(ux0, ux2), vx2 = submod(ux0, ux2), vx1 = addmod(ux1, ux3), vx3 = mulI(submod(ux3, ux1));
+	const uint2 uy0 = y[i + 0], uy2 = y[i + 2], uy1 = y[i + 1], uy3 = y[i + 3];
+	const uint2 vy0 = addmod(uy0, uy2), vy2 = submod(uy0, uy2), vy1 = addmod(uy1, uy3), vy3 = mulI(submod(uy3, uy1));
+	const uint2 s0 = mulmod(addmod(vx0, vx1), addmod(vy0, vy1)), s1 = mulmod(submod(vx0, vx1), submod(vy0, vy1));
+	const uint2 s2 = mulmod(addmod(vx2, vx3), addmod(vy2, vy3)), s3 = mulmod(submod(vx2, vx3), submod(vy2, vy3));
+	const uint2 t0 = addmod(s0, s1), t2 = addmod(s2, s3), t1 = submod(s0, s1), t3 = mulI(submod(s2, s3));
+	x[i + 0] = addmod(t0, t2); x[i + 2] = submod(t0, t2); x[i + 1] = addmod(t1, t3); x[i + 3] = submod(t1, t3);
 }
 
 __kernel
