@@ -929,3 +929,26 @@ void add1(__global uint2 * restrict const x)
 		c >>= digit_bit;
 	}
 }
+
+__kernel
+void swap(__global uint2 * restrict const x, __global uint2 * restrict const y)
+{
+	const size_t k = get_global_id(0);
+	const uint2 x_k = x[k], y_k = y[k];
+	x[k] = y_k; y[k] = x_k;
+}
+
+__kernel
+void copy(__global uint2 * restrict const x, __global const uint2 * restrict const y)
+{
+	const size_t k = get_global_id(0);
+	x[k] = y[k];
+}
+
+__kernel
+void compare(__global const uint2 * restrict const x, __global const uint2 * restrict const y, __global int * const err)
+{
+	const size_t k = get_global_id(0);
+	const uint2 x_k = x[k], y_k = y[k];
+	if ((x_k.s0 != y_k.s0) || (x_k.s1 != y_k.s1)) atomic_or(err, 1);
+}

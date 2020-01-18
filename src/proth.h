@@ -65,23 +65,41 @@ public:
 		}
 		if (a >= 10000) return false;
 
-		gpmp X(k, n, device);	// X = 1
+		gpmp X(k, n, device);
 
 		std::cout << "Testing " << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits (size = "	<< X.getSize() << ")," << std::flush;
 
 		// X *= a^k, left-to-right algorithm
 		bool s = false;
-		X.setMultiplicand(a);
+		X.init(a);						// x = 1, u = a
+		X.setMultiplicand();			// x = 1, tu = NTT(u)
 		for (int b = 0; b < 32; ++b)
 		{
-			if (s) X.square();
+			if (s) X.square();			// x = iNTT(NTT(x)^2)
 
 			if ((k & (uint32_t(1) << (31 - b))) != 0)
 			{
 				s = true;
-				X.mul();
+				X.mul();				// x = iNTT(NTT(x).tu)
 			}
 		}
+		X.copy_x_v();
+
+		// X *= a^k, right-to-left algorithm
+		X.init(a);						// x = 1, u = a
+		for (uint32_t b = 1; b <= uint32_t(k); b *= 2)
+		{
+			if ((k & b) != 0)
+			{
+				X.setMultiplicand();	// tu = NTT(u)
+				X.mul();				// x = iNTT(NTT(x).tu)
+			}
+
+			X.swap_x_u();				// x <-> u
+			X.square();
+			X.swap_x_u();				// u = u^2
+		}
+		X.compare_x_v();
 
 		if (X.getError() != 0)	// Sync GPU before benchmark
 		{

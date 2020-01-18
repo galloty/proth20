@@ -202,7 +202,7 @@ private:
 	cl_command_queue _queue = nullptr;
 	cl_program _program = nullptr;
 	size_t _size = 0, _constant_size = 0;
-	cl_mem _x = nullptr, _y = nullptr, _t = nullptr, _cr = nullptr, _u = nullptr, _err = nullptr;
+	cl_mem _x = nullptr, _y = nullptr, _t = nullptr, _cr = nullptr, _u = nullptr, _tu = nullptr, _v = nullptr, _err = nullptr;
 	cl_mem _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr1ir1 = nullptr, _cr2ir2 = nullptr, _bp = nullptr, _ibp = nullptr;
 	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr;
 	cl_kernel _square32 = nullptr, _square64 = nullptr, _square128 = nullptr, _square256 = nullptr,_square512 = nullptr, _square1024 = nullptr;
@@ -212,7 +212,7 @@ private:
 	cl_kernel _reduce_topsweep256 = nullptr, _reduce_topsweep512 = nullptr, _reduce_topsweep1024 = nullptr;
 	cl_kernel _reduce_i = nullptr, _reduce_o = nullptr, _reduce_f = nullptr, _reduce_x = nullptr;
 	cl_kernel _ntt4 = nullptr, _intt4 = nullptr, _mul2 = nullptr, _mul4 = nullptr;
-	cl_kernel _set_positive = nullptr, _add1 = nullptr;
+	cl_kernel _set_positive = nullptr, _add1 = nullptr, _swap = nullptr, _copy = nullptr, _compare = nullptr;
 
 
 	enum class EVendor { Unknown, NVIDIA, AMD, INTEL };
@@ -389,6 +389,8 @@ public:
 		_t = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * 2 * (size / 2));
 		_cr = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_long) * size / P2I_BLK);
 		_u = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);
+		_tu = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);
+		_v = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);
 		_err = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_int));
 
 		_r1ir1 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * size);
@@ -415,6 +417,8 @@ public:
 			_releaseBuffer(_t);
 			_releaseBuffer(_cr);
 			_releaseBuffer(_u);
+			_releaseBuffer(_tu);
+			_releaseBuffer(_v);
 			_releaseBuffer(_err);
 
 			_releaseBuffer(_r1ir1);
@@ -536,11 +540,11 @@ public:
 
 		_mul2 = _createKernel("mul2");
 		_setKernelArg(_mul2, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_mul2, 1, sizeof(cl_mem), &_u);
+		_setKernelArg(_mul2, 1, sizeof(cl_mem), &_tu);
 
 		_mul4 = _createKernel("mul4");
 		_setKernelArg(_mul4, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_mul4, 1, sizeof(cl_mem), &_u);
+		_setKernelArg(_mul4, 1, sizeof(cl_mem), &_tu);
 
 		_set_positive = _createKernel("set_positive");
 		_setKernelArg(_set_positive, 0, sizeof(cl_mem), &_x);
@@ -551,6 +555,11 @@ public:
 
 		_add1 = _createKernel("add1");
 		_setKernelArg(_add1, 0, sizeof(cl_mem), &_x);
+
+		_swap = _createKernel("swap");
+		_copy = _createKernel("copy");
+		_compare = _createKernel("compare");
+		_setKernelArg(_compare, 2, sizeof(cl_mem), &_err);
 	}
 
 public:
@@ -594,6 +603,10 @@ public:
 		_releaseKernel(_mul4);
 		_releaseKernel(_set_positive);
 		_releaseKernel(_add1);
+
+		_releaseKernel(_swap);
+		_releaseKernel(_copy);
+		_releaseKernel(_compare);
 	}
 
 public:
@@ -676,7 +689,7 @@ public:
 public:
 	void sub_ntt64_u()
 	{
-		_setKernelArg(_sub_ntt64, 0, sizeof(cl_mem), &_u);
+		_setKernelArg(_sub_ntt64, 0, sizeof(cl_mem), &_tu);
 		_executeKernel(_sub_ntt64, _size / 4, CHUNK64 * (64 / 4));
 		_setKernelArg(_sub_ntt64, 0, sizeof(cl_mem), &_x);
 	}
@@ -684,7 +697,7 @@ public:
 public:
 	void ntt64_u(const cl_uint m, const cl_uint rindex)
 	{
-		_setKernelArg(_ntt64, 0, sizeof(cl_mem), &_u);
+		_setKernelArg(_ntt64, 0, sizeof(cl_mem), &_tu);
 		_executeNttKernel(_ntt64, m, rindex);
 		_setKernelArg(_ntt64, 0, sizeof(cl_mem), &_x);
 	}
@@ -692,7 +705,7 @@ public:
 public:
 	void ntt4_u(const cl_uint m, const cl_uint rindex)
 	{
-		_setKernelArg(_ntt4, 0, sizeof(cl_mem), &_u);
+		_setKernelArg(_ntt4, 0, sizeof(cl_mem), &_tu);
 		_executeNttKernel(_ntt4, m, rindex);
 		_setKernelArg(_ntt4, 0, sizeof(cl_mem), &_x);
 	}
@@ -749,6 +762,46 @@ public:
 public:
 	void set_positive() { _executeKernel(_set_positive, 1); }
 	void add1() { _executeKernel(_add1, 1); }
+
+public:
+	void set_positive_u()
+	{
+		_setKernelArg(_set_positive, 0, sizeof(cl_mem), &_u);
+		_executeKernel(_set_positive, 1);
+		_setKernelArg(_set_positive, 0, sizeof(cl_mem), &_x);
+	}
+
+public:
+	void swap_x_u()
+	{
+		_setKernelArg(_swap, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(_swap, 1, sizeof(cl_mem), &_u);
+		_executeKernel(_swap, _size / 2);
+	}
+
+public:
+	void copy_x_v()
+	{
+		_setKernelArg(_copy, 0, sizeof(cl_mem), &_v);
+		_setKernelArg(_copy, 1, sizeof(cl_mem), &_x);
+		_executeKernel(_copy, _size / 2);
+	}
+
+public:
+	void copy_u_tu()
+	{
+		_setKernelArg(_copy, 0, sizeof(cl_mem), &_tu);
+		_setKernelArg(_copy, 1, sizeof(cl_mem), &_u);
+		_executeKernel(_copy, _size / 2);
+	}
+
+public:
+	void compare_x_v()
+	{
+		_setKernelArg(_compare, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(_compare, 1, sizeof(cl_mem), &_v);
+		_executeKernel(_compare, _size / 2);
+	}
 
 private:
 	void _sync()

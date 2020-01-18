@@ -177,11 +177,6 @@ public:
 		const cl_int k_shift = cl_int(log2(k) - 1);
 		_device.createKernels(norm, cl_uint(n / digit_bit), cl_int(n % digit_bit), cl_uint(k), cl_uint((uint64_t(1) << (32 + k_shift)) / k), k_shift);
 
-		cl_uint2 * const x = _mem;
-		x[0] = { 1, 0 };
-		for (size_t i = 1; i < size; ++i) x[i] = { 0, 0 };
-		_device.writeMemory_x(x);
-
 		// (size + 2) / 3 roots
 		cl_uint4 * const r1ir1 = new cl_uint4[size];
 		cl_uint2 * const r2 = new cl_uint2[size];
@@ -293,6 +288,27 @@ public:
 	// }
 
 public:
+	void init(const uint32_t a)
+	{
+		const size_t size = _size;
+
+		cl_uint2 * const x = _mem;
+		x[0] = { 1, 0 };
+		for (size_t i = 1; i < size; ++i) x[i] = { 0, 0 };
+		_device.writeMemory_x(x);
+
+		cl_uint2 * const u = _mem;
+		u[0] = { a, 0 };
+		for (size_t i = 1; i < size; ++i) u[i] = { 0, 0 };
+		_device.writeMemory_u(u);
+	}
+
+public:
+	void swap_x_u() { _device.swap_x_u(); }
+	void copy_x_v() { _device.set_positive(); _device.reduce_x(); _device.copy_x_v(); }
+	void compare_x_v() { _device.set_positive(); _device.reduce_x(); _device.compare_x_v(); }
+
+public:
 	void square()
 	{
 		const size_t size = _size;
@@ -336,17 +352,14 @@ public:
 	}
 
 public:
-	void setMultiplicand(const uint32_t a)
+	void setMultiplicand()
 	{
-		const size_t size = _size;
-		cl_uint2 * const u = _mem;
-		u[0] = { a, 0 };
-		for (size_t i = 1; i < size; ++i) u[i] = { 0, 0 };
-		_device.writeMemory_u(u);
+		_device.set_positive_u();
+		_device.copy_u_tu();
 
 		_device.sub_ntt64_u();
 
-		cl_uint m = cl_uint(size / 4);
+		cl_uint m = cl_uint(_size / 4);
 		cl_uint rindex = m + m / 4 + m / 16;
 		m /= 64;
 

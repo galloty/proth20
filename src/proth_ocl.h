@@ -937,4 +937,27 @@ static const char * const src_proth_ocl = \
 "		c >>= digit_bit;\n" \
 "	}\n" \
 "}\n" \
+"\n" \
+"__kernel\n" \
+"void swap(__global uint2 * restrict const x, __global uint2 * restrict const y)\n" \
+"{\n" \
+"	const size_t k = get_global_id(0);\n" \
+"	const uint2 x_k = x[k], y_k = y[k];\n" \
+"	x[k] = y_k; y[k] = x_k;\n" \
+"}\n" \
+"\n" \
+"__kernel\n" \
+"void copy(__global uint2 * restrict const x, __global const uint2 * restrict const y)\n" \
+"{\n" \
+"	const size_t k = get_global_id(0);\n" \
+"	x[k] = y[k];\n" \
+"}\n" \
+"\n" \
+"__kernel\n" \
+"void compare(__global const uint2 * restrict const x, __global const uint2 * restrict const y, __global int * const err)\n" \
+"{\n" \
+"	const size_t k = get_global_id(0);\n" \
+"	const uint2 x_k = x[k], y_k = y[k];\n" \
+"	if ((x_k.s0 != y_k.s0) || (x_k.s1 != y_k.s1)) atomic_or(err, 1);\n" \
+"}\n" \
 ;
