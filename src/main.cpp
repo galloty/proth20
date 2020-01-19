@@ -65,7 +65,7 @@ public:
 				if ((k < 3) || (n == 0)) throw std::runtime_error("invalid expression");
 
 				if (k > 99999999) throw std::runtime_error("max k = 99999999");
-				if (n > 5500000) throw std::runtime_error("max n = 5500000");
+				if (n > 99999999) throw std::runtime_error("max n = 99999999");
 
 				bPrime = true;
 			}

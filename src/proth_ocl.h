@@ -17,7 +17,6 @@ static const char * const src_proth_ocl = \
 "//#define __constmem	__constant\n" \
 "#define __constmem	__global\n" \
 "\n" \
-"#define	digit_bit		21\n" \
 "#define digit_mask		((1u << digit_bit) - 1)\n" \
 "\n" \
 "#define	P1			2130706433u		// 127 * 2^24 + 1 = 2^31 - 2^24 + 1\n" \

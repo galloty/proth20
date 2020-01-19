@@ -16,11 +16,11 @@ Please give feedback to the authors if improvement is realized. It is distribute
 
 #include "proth_ocl.h"
 
+inline constexpr int ilog2(const size_t n) { return (n > 1) ? 1 + ilog2(n >> 1) : 0; }
+
 class gpmp
 {
 private:
-	static const int digit_bit = 21;
-
 	static const uint32_t P1 = 2130706433u;		// 127 * 2^24 + 1 = 2^31 - 2^24 + 1
 	static const uint32_t P2 = 2013265921u;		//  15 * 2^27 + 1 = 2^31 - 2^27 + 1
 	static const uint32_t P1_PRIM_ROOT = 3u;
@@ -28,9 +28,6 @@ private:
 	static const uint64_t P1P2 = (P1 * uint64_t(P2));
 
 	// 2^20 / 2 * (2^21 - 1)^2 > P1P2 / 2 > 2^19 / 2 * (2^21 - 1)^2 => max size = 2^19
-
-private:
-	static constexpr int log2(const size_t n) { return (n > 1) ? 1 + log2(n >> 1) : 0; }
 
 private:
 	static constexpr uint32_t invert(const uint32_t n, const uint32_t m)
@@ -54,7 +51,7 @@ private:
 	}
 
 private:
-	static constexpr size_t transformSize(const uint32_t k, const uint32_t n)
+	static constexpr size_t transformSize(const uint32_t k, const uint32_t n, const int digit_bit)
 	{
 		// P = k.2^n + 1 = k.2^s * (2^digit_bit)^e + 1
 		const size_t e = n / digit_bit;
@@ -63,7 +60,7 @@ private:
 		// a < P => X = a^2 <= (P - 1)^2 = (k.2^s)^2 * (2^digit_bit)^{2e}
 		// X_hi = [X / (2^digit_bit)^e] <= (k.2^s)^2 * (2^digit_bit)^e
 		// bit size of X_hi < 2 * (log2(k) + 1 + s) + digit_bit * e
-		const size_t x_hi_size = e + (2 * (log2(k) + 1 + s) + digit_bit - 1) / digit_bit;
+		const size_t x_hi_size = e + (2 * (ilog2(k) + 1 + s) + digit_bit - 1) / digit_bit;
 
 		// Power of 2 such that size >= 2 * X_hi_size (we have to compute X^2 such that X < P)
 		size_t size = 2048;
@@ -72,6 +69,19 @@ private:
 	}
 
 private:
+	static constexpr int digitBit(const uint32_t k, const uint32_t n)
+	{
+		for (int digit_bit = 21; digit_bit > 1; --digit_bit)
+		{
+			const size_t size = transformSize(k, n, digit_bit);
+			const double max_digit = double((uint32_t(1) << digit_bit) - 1);
+			if ((size / 2) * max_digit * max_digit < P1P2 / 2) return digit_bit;
+		}
+		return 1;
+	}
+
+private:
+	const int _digit_bit;
 	const size_t _size;
 	const uint32_t _k, _n;
 	ocl::Device & _device;
@@ -126,13 +136,13 @@ private:
 
 public:
 	gpmp(const uint32_t k, const uint32_t n, ocl::Device & device) :
-		_size(transformSize(k, n)), _k(k), _n(n), _device(device), _mem(new cl_uint2[_size])
+		_digit_bit(digitBit(k, n)), _size(transformSize(k, n, _digit_bit)), _k(k), _n(n), _device(device), _mem(new cl_uint2[_size])
 	{
 		const size_t size = _size;
 		const size_t constant_max_m = 256;
 		const size_t constant_size = 256 + 64 + 16 + 4;	// 340 * 2 * sizeof(cl_uint4) = 10880 bytes
 
-		const double max_digit = double((uint32_t(1) << digit_bit) - 1);
+		const double max_digit = double((uint32_t(1) << _digit_bit) - 1);
 		if ((size / 2) * max_digit * max_digit >= P1P2 / 2)
 		{
 			std::stringstream msg; msg << getDigits() << "-digit numbers are not supported.";
@@ -140,6 +150,7 @@ public:
 		}
 
 		std::stringstream src;
+		src << "#define\tdigit_bit\t" << _digit_bit << std::endl << std::endl;
 
 		std::ifstream clFile("ocl/proth.cl"); 
 		if (clFile.is_open())	// if proth.cl file exists then generate proth_ocl.h
@@ -174,8 +185,8 @@ public:
 
 		_device.allocMemory(size, constant_size);
 		const cl_uint2 norm = { cl_uint(P1 - (P1 - 1) / size), cl_uint(P2 - (P2 - 1) / size) };
-		const cl_int k_shift = cl_int(log2(k) - 1);
-		_device.createKernels(norm, cl_uint(n / digit_bit), cl_int(n % digit_bit), cl_uint(k), cl_uint((uint64_t(1) << (32 + k_shift)) / k), k_shift);
+		const cl_int k_shift = cl_int(ilog2(k) - 1);
+		_device.createKernels(norm, cl_uint(n / _digit_bit), cl_int(n % _digit_bit), cl_uint(k), cl_uint((uint64_t(1) << (32 + k_shift)) / k), k_shift);
 
 		// (size + 2) / 3 roots
 		cl_uint4 * const r1ir1 = new cl_uint4[size];
@@ -217,13 +228,13 @@ public:
 
 		cl_uint * const bp = new cl_uint[size / 2];
 		cl_uint * const ibp = new uint32_t[size / 2];
-		const uint32_t ib = invert(uint32_t(1) << digit_bit, k);
+		const uint32_t ib = invert(uint32_t(1) << _digit_bit, k);
 		uint32_t bp_i = 1, ibp_i = ib;
 		for (size_t i = 0; i < size / 2; ++i)
 		{
 			bp[i] = cl_uint(bp_i);
 			ibp[i] = cl_uint(ibp_i);
-			bp_i = uint32_t((uint64_t(bp_i) << digit_bit) % k);
+			bp_i = uint32_t((uint64_t(bp_i) << _digit_bit) % k);
 			ibp_i = uint32_t((uint64_t(ibp_i) * ib) % k);
 		}
 		_device.writeMemory_bp(bp, ibp);
@@ -246,6 +257,7 @@ public:
 
 public:
 	size_t getSize() const { return _size; }
+	size_t getDigitBit() const { return _digit_bit; }
 	size_t getDigits() const { return size_t(std::ceil(std::log10(_k) + _n * std::log10(2))); }
 
 public:
@@ -277,12 +289,12 @@ public:
 	// 	const size_t size = _size;
 	// 	cl_uint2 * const x = _mem;
 
-	// 	for (size_t i = 0; i < size / 2; ++i) x[i] =  { (uint32_t(1) << digit_bit) - 1, 0 };
+	// 	for (size_t i = 0; i < size / 2; ++i) x[i] =  { (uint32_t(1) << _digit_bit) - 1, 0 };
 	// 	for (size_t i = size / 2; i < size; ++i) x[i] = { 0, 0 };
 	// 	square();
 
-	// 	for (size_t i = 0 * size / 4; i < 1 * size / 4; ++i) x[i] = { (uint32_t(1) << digit_bit) - 1, 0 };
-	// 	for (size_t i = 1 * size / 4; i < 2 * size / 4; ++i) x[i] = { 0, (uint32_t(1) << digit_bit) - 1 };
+	// 	for (size_t i = 0 * size / 4; i < 1 * size / 4; ++i) x[i] = { (uint32_t(1) << _digit_bit) - 1, 0 };
+	// 	for (size_t i = 1 * size / 4; i < 2 * size / 4; ++i) x[i] = { 0, (uint32_t(1) << _digit_bit) - 1 };
 	// 	for (size_t i = size / 2; i < size; ++i) x[i] = { 0, 0 };
 	// 	square();
 	// }
@@ -473,7 +485,7 @@ public:
 		for (size_t i = 0; b != 0; ++i)
 		{
 			r += res[i].s[0] * b;
-			b <<= digit_bit;
+			b <<= _digit_bit;
 		}
 
 		res64 = r;

@@ -73,7 +73,8 @@ public:
 
 		gpmp X(k, n, device);
 
-		std::cout << "Testing " << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits (size = "	<< X.getSize() << ")," << std::flush;
+		std::cout << "Testing " << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^"
+			<< ilog2(X.getSize()) << " x " << X.getDigitBit() << " bits" << std::endl;
 
 		// X *= a^k, left-to-right algorithm
 		bool s = false;
@@ -112,11 +113,11 @@ public:
 
 		checkError(X);	// Sync GPU before benchmark
 
-		const uint32_t L = 16384, LC = 1048576;
+		const uint32_t L = 1 << (ilog2(n) / 2);
 
 		// X = X^(2^(n - 1))
 		Timer::Time startBenchTime = Timer::currentTime();
-		const uint32_t benchCount = (n < 100000) ? 20000 : 10000000 / (n / 1000);
+		const uint32_t benchCount = (n < 100000) ? 20000 : 20000000 / (n / 1000);
 		for (uint32_t i = 1; i < n; ++i)
 		{
 			X.square();
@@ -126,7 +127,7 @@ public:
 				checkError(X);
 				const double elapsedTime = Timer::diffTime(Timer::currentTime(), startBenchTime);
 				const double mulTime = elapsedTime / benchCount, estimatedTime = mulTime * n;
-				std::cout << " estimated time is " << Timer::formatTime(estimatedTime) << ", " << std::setprecision(3) << mulTime * 1e3 << " ms/mul." << std::flush;
+				std::cout << "estimated time is " << Timer::formatTime(estimatedTime) << ", " << std::setprecision(3) << mulTime * 1e3 << " ms/mul." << std::flush;
 				if (bench)
 				{
 					std::cout << std::endl;
@@ -136,16 +137,15 @@ public:
 
 			// Robert Gerbicz error checking algorithm
 			// u is d(t) and v is u(0). They must be set before the loop
-			// if (i == 100) X.set_bug();	// test
 			// if (i == n - 1) X.set_bug();	// test
-			if (i % L == 0)
+			if ((i & (L - 1)) == 0)
 			{
-				if (i % LC == 0)
-				{
-					X.Gerbicz_check(L);
-					checkError(X);
-				}
-
+			// 	if (i % (L * L) == 0)
+			// 	{
+			// 		X.Gerbicz_check(L);
+			// 		checkError(X);
+			// 		std::cout << "Gerbicz_checked" << std::endl;
+			// 	}
 				X.Gerbicz_step();
 			}
 		}
@@ -160,7 +160,7 @@ public:
 		{
 			X.square();
 
-			if (i % L == 0)
+			if ((i & (L - 1)) == 0)
 			{
 				X.Gerbicz_check(L);
 				checkError(X);
@@ -172,8 +172,8 @@ public:
 
 		const std::string res = (isPrime) ? "                        " : std::string(", RES64 = ") + res64String(res64);
 
-		std::stringstream ss; ss << k << " * 2^" << n << " + 1 is " << (isPrime ? "prime" : "composite") << ", a = " << a << ", " 
-			<< X.getDigits() << " digits (size = "	<< X.getSize() << "), time = " << Timer::formatTime(elapsedTime) << res << std::endl;
+		std::stringstream ss; ss << k << " * 2^" << n << " + 1 is " << (isPrime ? "prime" : "composite")
+			 << ", a = " << a << ", time = " << Timer::formatTime(elapsedTime) << res << std::endl;
 
 		std::cout << "\r" << ss.str();
 		std::ofstream resFile("presults.txt", std::ios::app);
@@ -249,11 +249,11 @@ public:
 		benchList.push_back(Number(7649,     1553995));		// PPSE
 		benchList.push_back(Number(595,      2833406));		// PPS
 		benchList.push_back(Number(45,       5308037));		// DIV
-		// benchList.push_back(Number(6679881,  6679881));		// Cullen
-		// benchList.push_back(Number(3,       10829346));		// 321
-		// benchList.push_back(Number(99739,   14019102));		// ESP
-		// benchList.push_back(Number(168451,  19375200));		// PSP
-		// benchList.push_back(Number(10223,   31172165));		// SOB
+		benchList.push_back(Number(6679881,  6679881));		// Cullen
+		benchList.push_back(Number(3,       10829346));		// 321
+		benchList.push_back(Number(99739,   14019102));		// ESP
+		benchList.push_back(Number(168451,  19375200));		// PSP
+		benchList.push_back(Number(10223,   31172165));		// SOB
 
 		for (const auto & b : benchList) proth::check(b.k, b.n, device, true);
 		std::cout << std::endl;

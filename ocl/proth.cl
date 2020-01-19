@@ -9,7 +9,6 @@ Please give feedback to the authors if improvement is realized. It is distribute
 //#define __constmem	__constant
 #define __constmem	__global
 
-#define	digit_bit		21
 #define digit_mask		((1u << digit_bit) - 1)
 
 #define	P1			2130706433u		// 127 * 2^24 + 1 = 2^31 - 2^24 + 1
