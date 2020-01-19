@@ -145,7 +145,7 @@ public:
 		if (clFile.is_open())	// if proth.cl file exists then generate proth_ocl.h
 		{
 			std::ofstream hFile("src/proth_ocl.h");
-			if (!hFile.is_open()) throw std::runtime_error("cannot with 'proth_ocl.h' file.");
+			if (!hFile.is_open()) throw std::runtime_error("cannot write 'proth_ocl.h' file.");
 
 			hFile << "/*" << std::endl;
 			hFile << "Copyright 2020, Yves Gallot" << std::endl << std::endl;
@@ -454,20 +454,25 @@ public:
 	{
 		norm();
 
-		_device.add1();
-		_device.reduce_z();
+		// res is x + 1 such that 0 <= res < k*2^n + 1
+		_device.copy_x_m1();
+		_device.add1_m1();
+		_device.reduce_z_m1();
 
-		cl_uint2 * const x = _mem;
+		cl_uint2 * const res = _mem;
 
-		_device.readMemory_x(x);
+		_device.readMemory_m1(res);
 
-		uint64_t r = 0, b = 1;
 		bool isPrime = true;
 		for (size_t i = 0, n = _size / 2; i < n; ++i)
 		{
-			uint32_t x_i = x[i].s[0];
-			isPrime &= (x_i == 0);
-			r += x_i * b;
+			isPrime &= (res[i].s[0] == 0);
+		}
+
+		uint64_t r = 0, b = 1;
+		for (size_t i = 0; b != 0; ++i)
+		{
+			r += res[i].s[0] * b;
 			b <<= digit_bit;
 		}
 
@@ -476,7 +481,7 @@ public:
 	}
 
 public:
-	void GerbiczL()
+	void Gerbicz_step()
 	{
 		// u *= x;
 		swap_x_u();
@@ -486,28 +491,28 @@ public:
 	}
 
 public:
-	void GerbiczL2(const size_t L)
+	void Gerbicz_check(const size_t L)
 	{
 		// v * u^(2^L)
-		_device.copy_u_s1();		// s1 = u
-		_device.copy_x_s2();		// s1 = u, s2 = x
+		_device.copy_u_m1();		// m1 = u
+		_device.copy_x_m2();		// m1 = u, m2 = x
 		_device.copy_u_x();
 		for (size_t i = 0; i < L; ++i) square();	// x = u^(2^L)
 		_device.copy_v_u();
 		setMultiplicand();
 		mul();			// x = v * u^(2^L)
 		norm();
-		_device.swap_x_s2();		// s1 = u, s2 = v * u^(2^L)
-		_device.copy_s1_u();		// s2 = v * u^(2^L)
+		_device.swap_x_m2();		// m1 = u, m2 = v * u^(2^L)
+		_device.copy_m1_u();		// m2 = v * u^(2^L)
 
 		// u * x;
-		_device.copy_x_s1();		// s1 = x
+		_device.copy_x_m1();		// m1 = x
 		setMultiplicand();
 		mul();
 		norm();
-		_device.swap_x_s1();		// s1 = u * x, s2 = v * u^(2^L)
+		_device.swap_x_m1();		// m1 = u * x, m2 = v * u^(2^L)
 
-		_device.compare_s1_s2();
+		_device.compare_m1_m2();
 	}
 
 private:

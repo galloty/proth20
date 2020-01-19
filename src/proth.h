@@ -46,6 +46,12 @@ private:
 	}
 
 public:
+	static void checkError(gpmp & X)
+	{
+		if (X.getError() != 0) throw std::runtime_error("GPU error detected!");
+	}
+
+public:
 	static bool check(const uint32_t k, const uint32_t n, ocl::Device & device, const bool bench = false, const bool checkRes = false, const uint64_t r64 = 0)
 	{
 		const Timer::Time startTime = Timer::currentTime();
@@ -104,13 +110,9 @@ public:
 		X.copy_x_u();
 		X.compare_u_v();
 
-		if (X.getError() != 0)	// Sync GPU before benchmark
-		{
-			std::cout << " error detected!" << std::endl;
-			return false;
-		}
+		checkError(X);	// Sync GPU before benchmark
 
-		const uint32_t L = 1024, L2 = L * L;
+		const uint32_t L = 16384, LC = 1048576;
 
 		// X = X^(2^(n - 1))
 		Timer::Time startBenchTime = Timer::currentTime();
@@ -121,7 +123,7 @@ public:
 
 			if (i == benchCount)
 			{
-				X.getError();
+				checkError(X);
 				const double elapsedTime = Timer::diffTime(Timer::currentTime(), startBenchTime);
 				const double mulTime = elapsedTime / benchCount, estimatedTime = mulTime * n;
 				std::cout << " estimated time is " << Timer::formatTime(estimatedTime) << ", " << std::setprecision(3) << mulTime * 1e3 << " ms/mul." << std::flush;
@@ -134,29 +136,36 @@ public:
 
 			// Robert Gerbicz error checking algorithm
 			// u is d(t) and v is u(0). They must be set before the loop
-			// if (i == 2 * benchCount) X.set_bug();	// test
+			// if (i == 100) X.set_bug();	// test
+			// if (i == n - 1) X.set_bug();	// test
 			if (i % L == 0)
 			{
-				if ((i % L2 == 0) || (i + L >= n))
+				if (i % LC == 0)
 				{
-					X.GerbiczL2(L);
-					if (X.getError() != 0)
-					{
-						std::cout << " error detected!" << std::endl;
-						return false;
-					}
+					X.Gerbicz_check(L);
+					checkError(X);
 				}
 
-				X.GerbiczL();
+				X.Gerbicz_step();
 			}
 		}
 
 		uint64_t res64;
 		const bool isPrime = X.isMinusOne(res64);
-		if (X.getError() != 0)
+		checkError(X);
+
+		// Gerbicz last check point is i % L == 0 and i >= n - L
+		// It is extended to i % L == 0 and i >= n
+		for (uint32_t i = n; true; ++i)
 		{
-			std::cout << " error detected!" << std::endl;
-			return false;
+			X.square();
+
+			if (i % L == 0)
+			{
+				X.Gerbicz_check(L);
+				checkError(X);
+				break;
+			}
 		}
 
 		const double elapsedTime = Timer::diffTime(Timer::currentTime(), startTime);

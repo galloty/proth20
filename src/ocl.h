@@ -202,7 +202,7 @@ private:
 	cl_command_queue _queue = nullptr;
 	cl_program _program = nullptr;
 	size_t _size = 0, _constant_size = 0;
-	cl_mem _x = nullptr, _y = nullptr, _t = nullptr, _cr = nullptr, _u = nullptr, _tu = nullptr, _v = nullptr, _s1 = nullptr, _s2 = nullptr, _err = nullptr;
+	cl_mem _x = nullptr, _y = nullptr, _t = nullptr, _cr = nullptr, _u = nullptr, _tu = nullptr, _v = nullptr, _m1 = nullptr, _m2 = nullptr, _err = nullptr;
 	cl_mem _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr1ir1 = nullptr, _cr2ir2 = nullptr, _bp = nullptr, _ibp = nullptr;
 	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr;
 	cl_kernel _square32 = nullptr, _square64 = nullptr, _square128 = nullptr, _square256 = nullptr,_square512 = nullptr, _square1024 = nullptr;
@@ -384,26 +384,28 @@ public:
 		std::cerr << "Alloc gpu memory." << std::endl;
 #endif
 		_size = size;
-		_x = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);
-		_y = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * (size / 2));
-		_t = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * 2 * (size / 2));
-		_cr = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_long) * size / P2I_BLK);
-		_u = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);
-		_tu = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);
-		_v = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);
-		_s1 = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);
-		_s2 = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);
-		_err = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_int));
+		_x = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);				// main buffer, square & mul multiplier, NTT => size
+		_y = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * (size / 2));		// reduce
+		_t = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * 2 * (size / 2));	// reduce: division algorithm
+		_cr = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_long) * size / P2I_BLK);	// carry
+		_u = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);				// mul multiplicand, NTT => size. d(t) in Gerbicz error checking
+		_tu = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);			// NTT of mul multiplicand
+		_v = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size / 2);			// u(0) in Gerbicz error checking
+		_m1 = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * (size / 2));		// memory register #1
+		_m2 = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * (size / 2));		// memory register #2
+		_err = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_int));					// error checking
 
-		_r1ir1 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * size);
-		_r2 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint2) * size);
-		_ir2 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint2) * size);
-		_bp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint) * size / 2);
-		_ibp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint) * size / 2);
+		_r1ir1 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * size);			// NTT roots
+		_r2 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint2) * size);				// NTT roots (square)
+		_ir2 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint2) * size);			// NTT roots (inverse square)
+		_bp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint) * size / 2);			// b^i mod k (division algorithm)
+		_ibp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint) * size / 2);			// (1/b)^(i+1) mod k (division algorithm)
 
 		_constant_size = constant_size;
-		_cr1ir1 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * constant_size);
-		_cr2ir2 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * constant_size);
+		_cr1ir1 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * constant_size);	// small NTT roots: squaring
+		_cr2ir2 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * constant_size);	// small NTT roots (square): squaring
+
+		// allocated size ~ (1 * 4 + 5 * 2 + 4 * 1 + 3 * 1/2) * sizeof(cl_uint) * size = 78 * size bytes
 	}
 
 public:
@@ -421,8 +423,8 @@ public:
 			_releaseBuffer(_u);
 			_releaseBuffer(_tu);
 			_releaseBuffer(_v);
-			_releaseBuffer(_s1);
-			_releaseBuffer(_s2);
+			_releaseBuffer(_m1);
+			_releaseBuffer(_m2);
 			_releaseBuffer(_err);
 
 			_releaseBuffer(_r1ir1);
@@ -492,6 +494,9 @@ public:
 #if ocl_debug
 		std::cerr << "Create ocl kernels." << std::endl;
 #endif
+		const cl_uint n = cl_uint(_size / 2);
+		const cl_ulong ds = cl_ulong(d) << s;
+
 		_sub_ntt64 = _createNttKernel("sub_ntt64", true);
 		_ntt64 = _createNttKernel("ntt64", true);
 		_intt64 = _createNttKernel("intt64", false);
@@ -529,7 +534,6 @@ public:
 		_reduce_f = _createKernel("reduce_f");
 		_setKernelArg(_reduce_f, 0, sizeof(cl_mem), &_x);
 		_setKernelArg(_reduce_f, 1, sizeof(cl_mem), &_t);
-		const cl_uint n = cl_uint(_size / 2);
 		_setKernelArg(_reduce_f, 2, sizeof(cl_uint), &n);
 		_setKernelArg(_reduce_f, 3, sizeof(cl_uint), &e);
 		_setKernelArg(_reduce_f, 4, sizeof(cl_int), &s);
@@ -540,7 +544,7 @@ public:
 		_setKernelArg(_reduce_x, 2, sizeof(cl_mem), &_err);
 
 		_reduce_z = _createKernel("reduce_z");
-		_setKernelArg(_reduce_z, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(_reduce_z, 0, sizeof(cl_mem), &_m1);
 		_setKernelArg(_reduce_z, 1, sizeof(cl_uint), &n);
 		_setKernelArg(_reduce_z, 2, sizeof(cl_mem), &_err);
 
@@ -559,11 +563,10 @@ public:
 		_setKernelArg(_set_positive, 0, sizeof(cl_mem), &_x);
 		_setKernelArg(_set_positive, 1, sizeof(cl_uint), &n);
 		_setKernelArg(_set_positive, 2, sizeof(cl_uint), &e);
-		const cl_ulong ds = cl_ulong(d) << s;
 		_setKernelArg(_set_positive, 3, sizeof(cl_ulong), &ds);
 
 		_add1 = _createKernel("add1");
-		_setKernelArg(_add1, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(_add1, 0, sizeof(cl_mem), &_m1);
 		_setKernelArg(_add1, 1, sizeof(cl_uint), &e);
 		_setKernelArg(_add1, 2, sizeof(cl_ulong), &ds);
 
@@ -622,63 +625,33 @@ public:
 	}
 
 public:
-	void readMemory_x(cl_uint2 * const ptr)
-	{
-		_sync();
-		oclFatal(clEnqueueReadBuffer(_queue, _x, CL_TRUE, 0, sizeof(cl_uint2) * _size, ptr, 0, nullptr, nullptr));
-	}
-
-public:
-	void writeMemory_x(const cl_uint2 * const ptr)
-	{
-		_sync();
-		oclFatal(clEnqueueWriteBuffer(_queue, _x, CL_TRUE, 0, sizeof(cl_uint2) * _size, ptr, 0, nullptr, nullptr));
-	}
-
-public:
-	void writeMemory_u(const cl_uint2 * const ptr)
-	{
-		_sync();
-		oclFatal(clEnqueueWriteBuffer(_queue, _u, CL_TRUE, 0, sizeof(cl_uint2) * _size, ptr, 0, nullptr, nullptr));
-	}
+	void readMemory_x(cl_uint2 * const ptr) { _readBuffer(_x, ptr, sizeof(cl_uint2) * _size); }
+	void writeMemory_x(const cl_uint2 * const ptr) { _writeBuffer(_x, ptr, sizeof(cl_uint2) * _size); }
+	void writeMemory_u(const cl_uint2 * const ptr) { _writeBuffer(_u, ptr, sizeof(cl_uint2) * _size); }
+	void readMemory_m1(cl_uint2 * const ptr) { _readBuffer(_m1, ptr, sizeof(cl_uint2) * _size / 2); }
+	void readMemory_err(cl_int * const ptr) { _readBuffer(_err, ptr, sizeof(cl_int)); }
+	void writeMemory_err(const cl_int * const ptr) { _writeBuffer(_err, ptr, sizeof(cl_int)); }
 
 public:
 	void writeMemory_r(const cl_uint4 * const ptr_r1ir1, const cl_uint2 * const ptr_r2, const cl_uint2 * const ptr_ir2)
 	{
-		_sync();
-		oclFatal(clEnqueueWriteBuffer(_queue, _r1ir1, CL_TRUE, 0, sizeof(cl_uint4) * _size, ptr_r1ir1, 0, nullptr, nullptr));
-		oclFatal(clEnqueueWriteBuffer(_queue, _r2, CL_TRUE, 0, sizeof(cl_uint2) * _size, ptr_r2, 0, nullptr, nullptr));
-		oclFatal(clEnqueueWriteBuffer(_queue, _ir2, CL_TRUE, 0, sizeof(cl_uint2) * _size, ptr_ir2, 0, nullptr, nullptr));
+		_writeBuffer(_r1ir1, ptr_r1ir1, sizeof(cl_uint4) * _size);
+		_writeBuffer(_r2, ptr_r2, sizeof(cl_uint2) * _size);
+		_writeBuffer(_ir2, ptr_ir2, sizeof(cl_uint2) * _size);
 	}
 
 public:
 	void writeMemory_cr(const cl_uint4 * const ptr_cr1ir1, const cl_uint4 * const ptr_cr2ir2)
 	{
-		_sync();
-		oclFatal(clEnqueueWriteBuffer(_queue, _cr1ir1, CL_TRUE, 0, sizeof(cl_uint4) * _constant_size, ptr_cr1ir1, 0, nullptr, nullptr));
-		oclFatal(clEnqueueWriteBuffer(_queue, _cr2ir2, CL_TRUE, 0, sizeof(cl_uint4) * _constant_size, ptr_cr2ir2, 0, nullptr, nullptr));
+		_writeBuffer(_cr1ir1, ptr_cr1ir1, sizeof(cl_uint4) * _constant_size);
+		_writeBuffer(_cr2ir2, ptr_cr2ir2, sizeof(cl_uint4) * _constant_size);
 	}
 
 public:
 	void writeMemory_bp(const cl_uint * const ptr_bp, const cl_uint * const ptr_ibp)
 	{
-		_sync();
-		oclFatal(clEnqueueWriteBuffer(_queue, _bp, CL_TRUE, 0, sizeof(cl_uint) * _size / 2, ptr_bp, 0, nullptr, nullptr));
-		oclFatal(clEnqueueWriteBuffer(_queue, _ibp, CL_TRUE, 0, sizeof(cl_uint) * _size / 2, ptr_ibp, 0, nullptr, nullptr));
-	}
-
-public:
-	void readMemory_err(cl_int * const ptr)
-	{
-		_sync();
-		oclFatal(clEnqueueReadBuffer(_queue, _err, CL_TRUE, 0, sizeof(cl_int), ptr, 0, nullptr, nullptr));
-	}
-
-public:
-	void writeMemory_err(const cl_int * const ptr)
-	{
-		_sync();
-		oclFatal(clEnqueueWriteBuffer(_queue, _err, CL_TRUE, 0, sizeof(cl_int), ptr, 0, nullptr, nullptr));
+		_writeBuffer(_bp, ptr_bp, sizeof(cl_uint) * _size / 2);
+		_writeBuffer(_ibp, ptr_ibp, sizeof(cl_uint) * _size / 2);
 	}
 
 public:
@@ -770,11 +743,11 @@ public:
 	void reduce_o() { _executeKernel(_reduce_o, _size / 2); }
 	void reduce_f() { _executeKernel(_reduce_f, 1); }
 	void reduce_x() { _executeKernel(_reduce_x, 1); }
-	void reduce_z() { _executeKernel(_reduce_z, 1); }
+	void reduce_z_m1() { _executeKernel(_reduce_z, 1); }
 
 public:
 	void set_positive() { _executeKernel(_set_positive, 1); }
-	void add1() { _executeKernel(_add1, 1); }
+	void add1_m1() { _executeKernel(_add1, 1); }
 
 public:
 	void set_positive_tu()
@@ -794,8 +767,8 @@ private:
 
 public:
 	void swap_x_u() { _executeSwapKernel(&_x, &_u); }
-	void swap_x_s1() { _executeSwapKernel(&_x, &_s1); }
-	void swap_x_s2() { _executeSwapKernel(&_x, &_s2); }
+	void swap_x_m1() { _executeSwapKernel(&_x, &_m1); }
+	void swap_x_m2() { _executeSwapKernel(&_x, &_m2); }
 
 private:
 	void _executeCopyKernel(const void * const arg_x, const void * const arg_y)
@@ -808,13 +781,13 @@ private:
 public:
 	void copy_x_u() { _executeCopyKernel(&_u, &_x); }
 	void copy_x_v() { _executeCopyKernel(&_v, &_x); }
-	void copy_x_s1() { _executeCopyKernel(&_s1, &_x); }
-	void copy_x_s2() { _executeCopyKernel(&_s2, &_x); }
+	void copy_x_m1() { _executeCopyKernel(&_m1, &_x); }
+	void copy_x_m2() { _executeCopyKernel(&_m2, &_x); }
 	void copy_u_x() { _executeCopyKernel(&_x, &_u); }
-	void copy_u_s1() { _executeCopyKernel(&_s1, &_u); }
+	void copy_u_m1() { _executeCopyKernel(&_m1, &_u); }
 	void copy_u_tu() { _executeCopyKernel(&_tu, &_u); }
 	void copy_v_u() { _executeCopyKernel(&_u, &_v); }
-	void copy_s1_u() { _executeCopyKernel(&_u, &_s1); }
+	void copy_m1_u() { _executeCopyKernel(&_u, &_m1); }
 
 private:
 	void _executeCompareKernel(const void * const arg_x, const void * const arg_y)
@@ -826,7 +799,7 @@ private:
 
 public:
 	void compare_u_v() { _executeCompareKernel(&_u, &_v); }
-	void compare_s1_s2() { _executeCompareKernel(&_s1, &_s2); }
+	void compare_m1_m2() { _executeCompareKernel(&_m1, &_m2); }
 
 private:
 	void _sync()
@@ -859,6 +832,20 @@ private:
 			oclFatal(clReleaseMemObject(mem));
 			mem = nullptr;
 		}
+	}
+
+private:
+	void _readBuffer(cl_mem & mem, void * const ptr, const size_t size)
+	{
+		_sync();
+		oclFatal(clEnqueueReadBuffer(_queue, mem, CL_TRUE, 0, size, ptr, 0, nullptr, nullptr));
+	}
+
+private:
+	void _writeBuffer(cl_mem & mem, const void * const ptr, const size_t size)
+	{
+		_sync();
+		oclFatal(clEnqueueWriteBuffer(_queue, mem, CL_TRUE, 0, size, ptr, 0, nullptr, nullptr));
 	}
 
 private:
