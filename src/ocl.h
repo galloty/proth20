@@ -809,7 +809,7 @@ private:
 	}
 
 private:
-	cl_mem _createBuffer(const cl_mem_flags flags, const size_t size, const bool debug = true) const
+	cl_mem _createBuffer(const cl_mem_flags flags, const size_t size, const bool debug = false) const
 	{
 		cl_int err;
 		cl_mem mem = clCreateBuffer(_context, flags, size, nullptr, &err);

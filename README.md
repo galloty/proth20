@@ -17,8 +17,6 @@ An OpenCL SDK is not required. OpenCL header files are included in the project a
 
 ## TODO
 
-- add Robert Gerbicz error checking and add error detection to the computation of a^k
 - save & restore context
-- add BOINC interface
-- extend the limit (n > 5500000)
 - add auto-tuning of kernel function parameters
+- add BOINC interface

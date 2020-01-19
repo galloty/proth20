@@ -21,7 +21,7 @@ public:
 public:
 	static void run(const std::vector<std::string> & args)
 	{
-		std::cout << "proth20 0.1.0" << std::endl;
+		std::cout << "proth20 0.2.0" << std::endl;
 		std::cout << "Copyright (c) 2020, Yves Gallot" << std::endl;
 		std::cout << "proth20 is free source code, under the MIT license." << std::endl;
 
@@ -89,7 +89,7 @@ public:
 			proth::check(k, n, device);
 		}
 
-		ocl::Device device0(engine, 0);
+		// ocl::Device device0(engine, 0);
 		// test Intel GPU
 		// ocl::Device device1(engine, 1);
 
@@ -98,12 +98,12 @@ public:
 
 		// bench
 		// proth::bench(device0);
-		proth::test_prime(device0, true);
+		// proth::test_prime(device0, true);
 		// proth::test_composite(device0, true);
 
 		// true test
-		proth::test_composite(device0);
-		proth::test_prime(device0);
+		// proth::test_composite(device0);
+		// proth::test_prime(device0);
 
 		// too large
 		// proth::check(3, 5505020, device0);
