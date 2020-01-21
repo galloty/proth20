@@ -7,7 +7,12 @@ Please give feedback to the authors if improvement is realized. It is distribute
 
 #pragma once
 
-#include <CL/cl.h>
+#ifdef __APPLE__
+	#include <OpenCL/cl.h>
+	#include <OpenCL/cl_ext.h>
+#else
+	#include <CL/cl.h>
+#endif
 
 #include <string>
 #include <vector>
@@ -625,10 +630,18 @@ public:
 	}
 
 public:
-	void readMemory_x(cl_uint2 * const ptr) { _readBuffer(_x, ptr, sizeof(cl_uint2) * _size); }
+	// read half the size
+	void readMemory_x(cl_uint2 * const ptr) { _readBuffer(_x, ptr, sizeof(cl_uint2) * _size / 2); }
+	void readMemory_u(cl_uint2 * const ptr) { _readBuffer(_u, ptr, sizeof(cl_uint2) * _size / 2); }
+	// write full size
 	void writeMemory_x(const cl_uint2 * const ptr) { _writeBuffer(_x, ptr, sizeof(cl_uint2) * _size); }
 	void writeMemory_u(const cl_uint2 * const ptr) { _writeBuffer(_u, ptr, sizeof(cl_uint2) * _size); }
+
+	void readMemory_v(cl_uint2 * const ptr) { _readBuffer(_v, ptr, sizeof(cl_uint2) * _size / 2); }
+	void writeMemory_v(const cl_uint2 * const ptr) { _writeBuffer(_v, ptr, sizeof(cl_uint2) * _size / 2); }
+
 	void readMemory_m1(cl_uint2 * const ptr) { _readBuffer(_m1, ptr, sizeof(cl_uint2) * _size / 2); }
+
 	void readMemory_err(cl_int * const ptr) { _readBuffer(_err, ptr, sizeof(cl_int)); }
 	void writeMemory_err(const cl_int * const ptr) { _writeBuffer(_err, ptr, sizeof(cl_int)); }
 

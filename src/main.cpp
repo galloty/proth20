@@ -12,14 +12,53 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #include <stdexcept>
 #include <vector>
 
-class Application
+#if defined (_WIN32)
+#include <Windows.h>
+#else
+#include <signal.h>
+#endif
+
+class application
 {
-public:
-	Application() {}
-	virtual ~Application() {}
+private:
+	struct deleter { void operator()(const application * const p) { delete p; } };
+
+private:
+	static void quit(int)
+	{
+		proth::getInstance().quit();
+	}
+
+private:
+#if defined (_WIN32)
+	static BOOL WINAPI HandlerRoutine(DWORD)
+	{
+		quit(1);
+		return TRUE;
+	}
+#endif
 
 public:
-	static void run(const std::vector<std::string> & args)
+	application()
+	{
+#if defined (_WIN32)
+		SetConsoleCtrlHandler(HandlerRoutine, TRUE);
+#else
+		signal(SIGTERM, quit);
+		signal(SIGINT, quit);
+#endif
+	}
+
+	virtual ~application() {}
+
+	static application & getInstance()
+	{
+		static std::unique_ptr<application, deleter> pInstance(new application());
+		return *pInstance;
+	}
+
+public:
+	void run(const std::vector<std::string> & args)
 	{
 		std::cout << "proth20 0.2.0" << std::endl;
 		std::cout << "Copyright (c) 2020, Yves Gallot" << std::endl;
@@ -62,10 +101,10 @@ public:
 				if (k_end != std::string::npos) k = std::atoi(exp.substr(0, k_end).c_str());
 				auto n_start = exp.find('^'), n_end = exp.find('+');
 				if ((n_start != std::string::npos) && (n_end != std::string::npos)) n = std::atoi(exp.substr(n_start + 1, n_end).c_str());
-				if ((k < 3) || (n == 0)) throw std::runtime_error("invalid expression");
+				if ((k < 3) || (n < 32)) throw std::runtime_error("invalid expression");
 
-				if (k > 99999999) throw std::runtime_error("max k = 99999999");
-				if (n > 99999999) throw std::runtime_error("max n = 99999999");
+				if (k > 99999999) throw std::runtime_error("k > 99999999 is not supported");
+				if (n > 99999999) throw std::runtime_error("n > 99999999 is not supported");
 
 				bPrime = true;
 			}
@@ -80,33 +119,35 @@ public:
 		if (bBench)
 		{
 			ocl::Device device(engine, d);
-			proth::bench(device);
+			proth::getInstance().bench(device);
 		}
 
 		if (bPrime)
 		{
 			ocl::Device device(engine, d);
-			proth::check(k, n, device);
+			proth::getInstance().check(k, n, device);
 		}
+
+		// gpmp::printRanges(10000);
+
+		// proth & p = proth::getInstance();
 
 		// ocl::Device device0(engine, 0);
 		// test Intel GPU
 		// ocl::Device device1(engine, 1);
 
 		// profile: ocl_profile must be defined (ocl.h)
-		// proth::profile(45, 5308037, device0);
+		// p.profile(45, 5308037, device0);
+		// p.profile(99739, 14019102, device0);
 
 		// bench
-		// proth::bench(device0);
-		// proth::test_prime(device0, true);
-		// proth::test_composite(device0, true);
+		// p.bench(device0);
+		// p.test_prime(device0, true);
+		// p.test_composite(device0, true);
 
 		// true test
-		// proth::test_composite(device0);
-		// proth::test_prime(device0);
-
-		// too large
-		// proth::check(3, 5505020, device0);
+		// p.test_composite(device0);
+		// p.test_prime(device0);
 	}
 };
 
@@ -114,9 +155,11 @@ int main(int argc, char * argv[])
 {
 	try
 	{
+		application & app = application::getInstance();
+
 		std::vector<std::string> args;
 		for (int i = 1; i < argc; ++i) args.push_back(argv[i]);
-		Application::run(args);
+		app.run(args);
 	}
 	catch (const std::runtime_error & e)
 	{

@@ -32,15 +32,15 @@ private:
 private:
 	static constexpr uint32_t invert(const uint32_t n, const uint32_t m)
 	{
-		__int64 s0 = 1, s1 = 0, d0 = n % m, d1 = m;
+		int64_t s0 = 1, s1 = 0, d0 = n % m, d1 = m;
 		
 		while (d1 != 0)
 		{
-			const __int64 q = d0 / d1;
+			const int64_t q = d0 / d1;
 			d0 -= q * d1;
-			const __int64 t1 = d0; d0 = d1; d1 = t1;
+			const int64_t t1 = d0; d0 = d1; d1 = t1;
 			s0 -= q * s1;
-			const __int64 t2 = s0; s0 = s1; s1 = t2;
+			const int64_t t2 = s0; s0 = s1; s1 = t2;
 		}
 		
 		if (d0 != 1) return 0;
@@ -155,7 +155,7 @@ public:
 		std::ifstream clFile("ocl/proth.cl"); 
 		if (clFile.is_open())	// if proth.cl file exists then generate proth_ocl.h
 		{
-			std::ofstream hFile("src/proth_ocl.h");
+			std::ofstream hFile("src/proth_ocl.h", std::ios::binary);	// binary: don't convert line endings to `CRLF` 
 			if (!hFile.is_open()) throw std::runtime_error("cannot write 'proth_ocl.h' file.");
 
 			hFile << "/*" << std::endl;
@@ -276,6 +276,35 @@ public:
 	}
 
 public:
+	static void printRanges(const uint32_t k)
+	{
+		std::vector<std::pair<uint32_t, uint32_t>> range(32, std::make_pair(0u, 0u));
+		uint32_t n_min = 100000, n_max = 2 * n_min;
+		while (n_max < 1000000000)
+		{
+			while (n_max - n_min > 1)
+			{
+				const size_t s_min = transformSize(k, n_min, digitBit(k, n_min));
+				const size_t s_max = transformSize(k, n_max, digitBit(k, n_max));
+
+				const uint32_t m = (n_min + n_max) / 2;
+				const size_t s = transformSize(k, m, digitBit(k, m));
+				if (s == s_min) n_min = m;
+				if (s == s_max) n_max = m;
+			}
+			const size_t ls_min = ilog2(transformSize(k, n_min, digitBit(k, n_min)));
+			const size_t ls_max = ilog2(transformSize(k, n_max, digitBit(k, n_max)));
+			range[ls_min].second = n_min;
+			range[ls_max].first = n_max;
+			n_min = n_max; n_max = 2 * n_min + 1000;
+		}
+		for (size_t i = 17; i <= 24; ++i)
+		{
+			std::cout << "2^" << i << ": [" << range[i].first << "-" << range[i].second << "]" << std::endl;
+		}
+	}
+
+public:
 	int getError() const
 	{
 		cl_int err = 0;
@@ -298,6 +327,103 @@ public:
 	// 	for (size_t i = size / 2; i < size; ++i) x[i] = { 0, 0 };
 	// 	square();
 	// }
+
+private:
+	static bool _writeContext(std::ofstream & cFile, const char * const ptr, const size_t size)
+	{
+		cFile.write(ptr, size);
+		if (!cFile.good())
+		{
+			cFile.close();
+			return false;
+		}
+		return true;
+	}
+
+	static bool _readContext(std::ifstream & cFile, char * const ptr, const size_t size)
+	{
+		cFile.read(ptr, size);
+		if (!cFile.good())
+		{
+			cFile.close();
+			return false;
+		}
+		return true;
+	}
+
+public:
+	bool saveContext(const uint32_t i)
+	{
+		std::ofstream cFile("proth.ctx", std::ios::binary);
+		if (!cFile.is_open())
+		{
+			std::cerr << "cannot write 'proth.ctx' file" << std::endl;
+			return false;
+		}
+
+		const size_t size = _size;
+		cl_uint2 * const mem = _mem;
+
+		const uint32_t version = 0;
+		if (!_writeContext(cFile, reinterpret_cast<const char *>(&version), sizeof(version))) return false;
+		const uint32_t digit_bit = uint32_t(_digit_bit);
+		if (!_writeContext(cFile, reinterpret_cast<const char *>(&digit_bit), sizeof(digit_bit))) return false;
+		const uint32_t sz = uint32_t(size);
+		if (!_writeContext(cFile, reinterpret_cast<const char *>(&sz), sizeof(sz))) return false;
+		if (!_writeContext(cFile, reinterpret_cast<const char *>(&_k), sizeof(_k))) return false;
+		if (!_writeContext(cFile, reinterpret_cast<const char *>(&_n), sizeof(_n))) return false;
+
+		if (!_writeContext(cFile, reinterpret_cast<const char *>(&i), sizeof(i))) return false;
+
+		_device.readMemory_x(mem);
+		if (!_writeContext(cFile, reinterpret_cast<const char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
+		_device.readMemory_u(mem);
+		if (!_writeContext(cFile, reinterpret_cast<const char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
+		_device.readMemory_v(mem);
+		if (!_writeContext(cFile, reinterpret_cast<const char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
+
+		cFile.close();
+		return true;
+	}
+
+public:
+	bool restoreContext(uint32_t & i)
+	{
+		std::ifstream cFile("proth.ctx", std::ios::binary);
+		if (!cFile.is_open()) return false;
+
+		const size_t size = _size;
+		cl_uint2 * const mem = _mem;
+		for (size_t k = 0; k < size; ++k) mem[k] = { 0, 0 };	// read size / 2, the upper part must be zero
+
+		uint32_t version = 0;
+		if (!_readContext(cFile, reinterpret_cast<char *>(&version), sizeof(version))) return false;
+		if (version != 0) return false;
+		uint32_t digit_bit = 0;
+		if (!_readContext(cFile, reinterpret_cast<char *>(&digit_bit), sizeof(digit_bit))) return false;
+		if (digit_bit != uint32_t(_digit_bit)) return false;
+		uint32_t sz = 0;
+		if (!_readContext(cFile, reinterpret_cast<char *>(&sz), sizeof(sz))) return false;
+		if (sz != uint32_t(size)) return false;
+		uint32_t k = 0;
+		if (!_readContext(cFile, reinterpret_cast<char *>(&k), sizeof(k))) return false;
+		if (k != _k) return false;
+		uint32_t n = 0;
+		if (!_readContext(cFile, reinterpret_cast<char *>(&n), sizeof(n))) return false;
+		if (n != _n) return false;
+
+		if (!_readContext(cFile, reinterpret_cast<char *>(&i), sizeof(i))) return false;
+
+		if (!_readContext(cFile, reinterpret_cast<char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
+		_device.writeMemory_x(mem);
+		if (!_readContext(cFile, reinterpret_cast<char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
+		_device.writeMemory_u(mem);
+		if (!_readContext(cFile, reinterpret_cast<char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
+		_device.writeMemory_v(mem);
+
+		cFile.close();
+		return true;
+	}
 
 public:
 	void init(const uint32_t a)

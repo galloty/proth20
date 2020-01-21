@@ -14,15 +14,31 @@ Please give feedback to the authors if improvement is realized. It is distribute
 class proth
 {
 private:
-	static int jacobi(const uint64_t x, const uint64_t y)	// y is an odd number
+	struct deleter { void operator()(const proth * const p) { delete p; } };
+
+public:
+	proth() {}
+	virtual ~proth() {}
+
+	static proth & getInstance()
+	{
+		static std::unique_ptr<proth, deleter> pInstance(new proth());
+		return *pInstance;
+	}
+
+	void quit() { _quit = true; }
+
+private:
+	volatile bool _quit = false;
+
+private:
+	static int jacobi(const uint64_t x, const uint64_t y)
 	{
 		uint64_t m = x, n = y;
 
 		int k = 1;
-		while (true)
+		while (m != 0)
 		{
-			if (m == 0) return 0;	// (0/n) = 0
-
 			// (2/n) = (-1)^((n^2-1)/8)
 			bool odd = false;
 			while (m % 2 == 0) { m /= 2; odd = !odd; }
@@ -36,6 +52,41 @@ private:
 
 			m %= n;	// (m/n) = (m mod n / n)
 		}
+
+		return n;	// x and y are not coprime, return their gcd
+	}
+
+private:
+	static bool find_a(const uint32_t k, const uint32_t n, uint32_t & ra)
+	{
+		// Proth's theorem: a such that (a/P) = -1
+		// Note that P = k*2^n + 1 and a is odd => (a/P) * (P/a) = 1 if P = 1 (mod 4)
+		// Then (P/a) = (P mod a / a)
+
+		uint32_t a = 3;
+		for (; a < (1u << 31); a += 2)
+		{
+			bool isPrime = true;
+			for (uint32_t d = 3; d < a; d += 2) if (a % d == 0) isPrime = false;
+			if (!isPrime) continue;
+
+			uint32_t pmoda = k % a;
+			if (pmoda == 0) continue;
+			for (uint32_t i = 0; i < n; ++i) { pmoda += pmoda; if (pmoda >= a) pmoda -= a; }
+			pmoda += 1; if (pmoda >= a) pmoda -= a;
+
+			if (pmoda == 0) { ra = a; return false; }
+			if (pmoda == 1) continue;
+
+			const int jac = jacobi(pmoda, a);
+			if (jac > 1) { ra = jac; return false; }
+
+			if (jac == -1) break;
+		}
+
+		if (a >= (1u << 31)) { ra = 0; return false; }
+		ra = a;
+		return true;
 	}
 
 private:
@@ -45,38 +96,16 @@ private:
 		return ss.str();
 	}
 
-public:
+private:
 	static void checkError(gpmp & X)
 	{
 		if (X.getError() != 0) throw std::runtime_error("GPU error detected!");
 	}
 
 public:
-	static bool check(const uint32_t k, const uint32_t n, ocl::Device & device, const bool bench = false, const bool checkRes = false, const uint64_t r64 = 0)
+	static void apowk(gpmp & X, const uint32_t a, const uint32_t k)
 	{
-		const Timer::Time startTime = Timer::currentTime();
-
-		// Proth's theorem: a such that (a/P) = -1
-		// Note that P = k*2^n + 1 and a is odd => (a/P) * (P/a) = 1 if P = 1 (mod 4)
-		// Then (P/a) = (P mod a / a)
-		uint32_t a = 3;
-		for (; a < 10000; a += 2)
-		{
-			uint32_t pmoda = k % a;
-			if (pmoda == 0) continue;
-			for (uint32_t i = 0; i < n; ++i) { pmoda += pmoda; if (pmoda >= a) pmoda -= a; }
-			pmoda += 1; if (pmoda >= a) pmoda -= a;
-			if (pmoda <= 1) continue;
-			if (jacobi(pmoda, a) == -1) break;
-		}
-		if (a >= 10000) return false;
-
-		gpmp X(k, n, device);
-
-		std::cout << "Testing " << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^"
-			<< ilog2(X.getSize()) << " x " << X.getDigitBit() << " bits" << std::endl;
-
-		// X *= a^k, left-to-right algorithm
+		// X = a^k, left-to-right algorithm
 		bool s = false;
 		X.init(a);						// x = 1, u = a
 		X.setMultiplicand();			// x = 1, tu = NTT(u)
@@ -93,7 +122,7 @@ public:
 		X.norm();
 		X.copy_x_v();
 
-		// X *= a^k, right-to-left algorithm
+		// X = a^k, right-to-left algorithm
 		X.init(a);						// x = 1, u = a
 		for (uint32_t b = 1; b <= uint32_t(k); b *= 2)
 		{
@@ -110,29 +139,63 @@ public:
 		X.norm();
 		X.copy_x_u();
 		X.compare_u_v();
+	}
 
-		checkError(X);	// Sync GPU before benchmark
+public:
+	bool check(const uint32_t k, const uint32_t n, ocl::Device & device, const bool bench = false, const bool checkRes = false, const uint64_t r64 = 0)
+	{
+		const Timer::Time startTime = Timer::currentTime();
+
+		uint32_t a = 0;
+		if (!find_a(k, n, a))
+		{
+			std::cout << k << " * 2^" << n << " + 1 is divisible by " << a << std::endl;
+			return true;
+		}
+
+		gpmp X(k, n, device);
+
+		uint32_t i0;
+		const bool found = X.restoreContext(i0);
+
+		std::cout << (found ? "Resuming from a checkpoint " : "Testing ");
+		std::cout << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^" << ilog2(X.getSize()) << " x " << X.getDigitBit() << " bits" << std::endl;
+
+		if (!found)
+		{
+			i0 = 0;
+			apowk(X, a, k);
+			checkError(X);	// Sync GPU before benchmark
+		}
 
 		const uint32_t L = 1 << (ilog2(n) / 2);
 
-		// X = X^(2^(n - 1))
+		const uint32_t benchCount = (n < 100000) ? 50000 : 50000000 / (n / 1000);
 		Timer::Time startBenchTime = Timer::currentTime();
-		const uint32_t benchCount = (n < 100000) ? 20000 : 20000000 / (n / 1000);
-		for (uint32_t i = 1; i < n; ++i)
+		uint32_t benchIter = benchCount;
+
+		Timer::Time recordTime = startTime;
+
+		// X = X^(2^(n - 1))
+		for (uint32_t i = i0 + 1; i < n; ++i)
 		{
 			X.square();
 
-			if (i == benchCount)
+			if (--benchIter == 0)
 			{
-				checkError(X);
-				const double elapsedTime = Timer::diffTime(Timer::currentTime(), startBenchTime);
-				const double mulTime = elapsedTime / benchCount, estimatedTime = mulTime * n;
-				std::cout << "estimated time is " << Timer::formatTime(estimatedTime) << ", " << std::setprecision(3) << mulTime * 1e3 << " ms/mul." << std::flush;
+				if (bench) checkError(X);	// Sync GPU
+				const Timer::Time time = Timer::currentTime();
+				const double elapsedTime = Timer::diffTime(time, startBenchTime);
+				const double mulTime = elapsedTime / benchCount, estimatedTime = mulTime * (n - i);
+				std::cout << Timer::formatTime(estimatedTime) << " remaining, " << std::setprecision(3) << mulTime * 1e3 << " ms/mul.";
 				if (bench)
 				{
 					std::cout << std::endl;
 					return true;
 				}
+				std::cout << "        \r" << std::flush;
+				startBenchTime = time;
+				benchIter = benchCount;
 			}
 
 			// Robert Gerbicz error checking algorithm
@@ -147,6 +210,23 @@ public:
 			// 		std::cout << "Gerbicz_checked" << std::endl;
 			// 	}
 				X.Gerbicz_step();
+			}
+
+			if (i % 1024 == 0)
+			{
+				const double elapsedTime = Timer::diffTime(Timer::currentTime(), recordTime);
+				if (elapsedTime > 600)
+				{
+					checkError(X);
+					X.saveContext(i);
+				}
+			}
+
+			if (_quit)
+			{
+				checkError(X);
+				X.saveContext(i);
+				return false;
 			}
 		}
 
@@ -186,7 +266,6 @@ public:
 		if (checkRes)
 		{
 			if (res64 != r64) std::cout << "Error: " << res64String(res64) << " != " << res64String(r64) << std::endl;
-			return false;
 		}
 
 		return true;
@@ -201,7 +280,7 @@ private:
 	};
 
 public:
-	static void test_prime(ocl::Device & device, const bool bench = false)
+	void test_prime(ocl::Device & device, const bool bench = false)
 	{
 		std::vector<Number>	primeList;
 		primeList.push_back(Number(1035, 301));
@@ -220,10 +299,10 @@ public:
 		primeList.push_back(Number(1089, 2746155));	// size = 256k, square64,   0.571  0.556
 		primeList.push_back(Number(45, 5308037));	// size = 512k, square128,  1.09   1.06  ms
 
-		for (const auto & p : primeList) proth::check(p.k, p.n, device, bench, true);
+		for (const auto & p : primeList) if (!check(p.k, p.n, device, bench, true)) return;
 	}
 
-	static void test_composite(ocl::Device & device, const bool bench = false)
+	void test_composite(ocl::Device & device, const bool bench = false)
 	{
 		std::vector<Number>	compositeList;
 		compositeList.push_back(Number(536870911,    298, 0x35461D17F60DA78Aull));
@@ -240,10 +319,10 @@ public:
 		compositeList.push_back(Number(536870911, 685618, 0x84C7E4E7F1344902ull));	// size = 64k
 
 		// check residues
-		for (const auto & c : compositeList) proth::check(c.k, c.n, device, bench, true, c.res64);
+		for (const auto & c : compositeList) if (!check(c.k, c.n, device, bench, true, c.res64)) return;
 	}
 
-	static void bench(ocl::Device & device)
+	void bench(ocl::Device & device)
 	{
 		std::vector<Number>	benchList;
 		benchList.push_back(Number(7649,     1553995));		// PPSE
@@ -255,12 +334,10 @@ public:
 		benchList.push_back(Number(168451,  19375200));		// PSP
 		benchList.push_back(Number(10223,   31172165));		// SOB
 
-		for (const auto & b : benchList) proth::check(b.k, b.n, device, true);
-		std::cout << std::endl;
-		for (const auto & b : benchList) proth::check(b.k, b.n, device);
+		for (const auto & b : benchList) if (!check(b.k, b.n, device, true)) return;
 	}
 
-	static void profile(const uint32_t k, const uint32_t n, ocl::Device & device)	// ocl_profile must be defined (ocl.h)
+	void profile(const uint32_t k, const uint32_t n, ocl::Device & device)	// ocl_profile must be defined (ocl.h)
 	{
 		gpmp X(k, n, device);
 		const size_t pCount = 1000;
@@ -284,5 +361,22 @@ public:
 		// - reduce_o: 1, 7.13 %, 76430 (76430)
 		// - reduce_f: 1, 0.274 %, 2943 (2943)
 		// REDUCE: 18.6 %
+
+		// Size = 2097152
+		// - sub_ntt64: 1, 10.6 %, 466566 (466566)
+		// - ntt64: 1, 12 %, 525783 (525783)
+		// - intt64: 2, 23.2 %, 1018108 (509054)
+		// - square512: 1, 23.9 %, 1050873 (1050873)
+		// NTT: 69.7 %
+		// - poly2int0: 1, 10.9 %, 480425 (480425)
+		// - poly2int1: 1, 3.41 %, 149497 (149497)
+		// POLY2INT: 14.3 %
+		// - reduce_upsweep64: 2, 1.81 %, 79589 (39794)
+		// - reduce_downsweep64: 2, 2.83 %, 124330 (62165)
+		// - reduce_topsweep256: 1, 0.103 %, 4507 (4507)
+		// - reduce_i: 1, 4.91 %, 215512 (215512)
+		// - reduce_o: 1, 6.18 %, 271477 (271477)
+		// - reduce_f: 1, 0.065 %, 2853 (2853)
+		// REDUCE: 16.0 %
 	}
 };
