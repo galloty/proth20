@@ -84,7 +84,7 @@ private:
 	const int _digit_bit;
 	const size_t _size;
 	const uint32_t _k, _n;
-	ocl::Device & _device;
+	ocl::device & _device;
 	cl_uint2 * const _mem;
 
 private:
@@ -135,7 +135,7 @@ private:
 	};
 
 public:
-	gpmp(const uint32_t k, const uint32_t n, ocl::Device & device) :
+	gpmp(const uint32_t k, const uint32_t n, ocl::device & device) :
 		_digit_bit(digitBit(k, n)), _size(transformSize(k, n, _digit_bit)), _k(k), _n(n), _device(device), _mem(new cl_uint2[_size])
 	{
 		const size_t size = _size;
@@ -352,7 +352,7 @@ private:
 	}
 
 public:
-	bool saveContext(const uint32_t i)
+	bool saveContext(const uint32_t i, const double elapsedTime)
 	{
 		std::ofstream cFile("proth.ctx", std::ios::binary);
 		if (!cFile.is_open())
@@ -366,6 +366,7 @@ public:
 
 		const uint32_t version = 0;
 		if (!_writeContext(cFile, reinterpret_cast<const char *>(&version), sizeof(version))) return false;
+		if (!_writeContext(cFile, reinterpret_cast<const char *>(&elapsedTime), sizeof(elapsedTime))) return false;
 		const uint32_t digit_bit = uint32_t(_digit_bit);
 		if (!_writeContext(cFile, reinterpret_cast<const char *>(&digit_bit), sizeof(digit_bit))) return false;
 		const uint32_t sz = uint32_t(size);
@@ -387,7 +388,7 @@ public:
 	}
 
 public:
-	bool restoreContext(uint32_t & i)
+	bool restoreContext(uint32_t & i, double & elapsedTime)
 	{
 		std::ifstream cFile("proth.ctx", std::ios::binary);
 		if (!cFile.is_open()) return false;
@@ -399,6 +400,7 @@ public:
 		uint32_t version = 0;
 		if (!_readContext(cFile, reinterpret_cast<char *>(&version), sizeof(version))) return false;
 		if (version != 0) return false;
+		if (!_readContext(cFile, reinterpret_cast<char *>(&elapsedTime), sizeof(elapsedTime))) return false;
 		uint32_t digit_bit = 0;
 		if (!_readContext(cFile, reinterpret_cast<char *>(&digit_bit), sizeof(digit_bit))) return false;
 		if (digit_bit != uint32_t(_digit_bit)) return false;

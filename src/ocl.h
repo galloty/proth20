@@ -117,19 +117,19 @@ protected:
 	}
 };
 
-class Engine : oclObject
+class engine : oclObject
 {
 private:
-	struct SDevice
+	struct deviceDesc
 	{
 		cl_platform_id platform_id;
 		cl_device_id device_id;
 		std::string name;
 	};
-	std::vector<SDevice> _devices;
+	std::vector<deviceDesc> _devices;
 
 public:
-	Engine()
+	engine()
 	{
 #if ocl_debug
 		std::cerr << "Create ocl engine." << std::endl;
@@ -152,7 +152,7 @@ public:
 				char deviceVendor[1024]; oclFatal(clGetDeviceInfo(devices[d], CL_DEVICE_VENDOR, 1024, deviceVendor, nullptr));
 
 				std::stringstream ss; ss << "device '" << deviceName << "', vendor '" << deviceVendor << "', platform '" << platformName << "'";
-				SDevice device;
+				deviceDesc device;
 				device.platform_id = platforms[p];
 				device.device_id = devices[d];
 				device.name = ss.str();
@@ -162,7 +162,7 @@ public:
 	}
 
 public:
-	virtual ~Engine()
+	virtual ~engine()
 	{
 #if ocl_debug
 		std::cerr << "Delete ocl engine." << std::endl;
@@ -186,10 +186,10 @@ public:
 	cl_device_id getDevice(const size_t d) const { return _devices[d].device_id; }
 };
 
-class Device : oclObject
+class device : oclObject
 {
 private:
-	const Engine & _engine;
+	const engine & _engine;
 	const size_t _d;
 	const cl_platform_id _platform;
 	const cl_device_id _device;
@@ -222,22 +222,22 @@ private:
 
 	enum class EVendor { Unknown, NVIDIA, AMD, INTEL };
 
-	struct Profile
+	struct profile
 	{
 		std::string name;
 		size_t count;
 		cl_ulong time;
 
-		Profile() {}
-		Profile(const std::string & name) : name(name), count(0), time(0.0) {}
+		profile() {}
+		profile(const std::string & name) : name(name), count(0), time(0.0) {}
 	};
-	std::map<cl_kernel, Profile> _profileMap;
+	std::map<cl_kernel, profile> _profileMap;
 
 	// Must be identical to ocl defines
 	static const size_t CHUNK64 = 16, BLK32 = 8, BLK64 = 4, BLK128 = 2, BLK256 = 1, P2I_WGS = 16, P2I_BLK = 16, RED_BLK = 4;
 
 public:
-	Device(const Engine & engine, const size_t d) : _engine(engine), _d(d), _platform(engine.getPlatform(d)), _device(engine.getDevice(d))
+	device(const engine & parent, const size_t d) : _engine(parent), _d(d), _platform(parent.getPlatform(d)), _device(parent.getDevice(d))
 	{
 #if ocl_debug
 		std::cerr << "Create ocl device " << d << "." << std::endl;
@@ -277,7 +277,7 @@ public:
 	}
 
 public:
-	virtual ~Device()
+	virtual ~device()
 	{
 #if ocl_debug
 		std::cerr << "Delete ocl device " << _d << "." << std::endl;
@@ -310,12 +310,12 @@ public:
 
 		for (auto it : _profileMap)
 		{
-			const Profile & profile = it.second;
-			if (profile.count != 0)
+			const profile & prof = it.second;
+			if (prof.count != 0)
 			{
-				const size_t ncount = profile.count / count;
-				const cl_ulong ntime = profile.time / count;
-				std::cout << "- " << profile.name << ": " << ncount << ", " << std::setprecision(3)
+				const size_t ncount = prof.count / count;
+				const cl_ulong ntime = prof.time / count;
+				std::cout << "- " << prof.name << ": " << ncount << ", " << std::setprecision(3)
 					<< ntime * 100.0 / ptime << " %, " << ntime << " (" << (ntime / ncount) << ")" << std::endl;
 			}
 		}
@@ -867,7 +867,7 @@ private:
 		cl_int err;
 		cl_kernel kernel = clCreateKernel(_program, kernelName, &err);
 		oclFatal(err);
-		_profileMap[kernel] = Profile(kernelName);
+		_profileMap[kernel] = profile(kernelName);
 		return kernel;
 	}
 
@@ -926,9 +926,9 @@ private:
 		}
 		clReleaseEvent(evt);
 
-		Profile & profile = _profileMap[kernel];
-		profile.count++;
-		profile.time += dt;
+		profile & prof = _profileMap[kernel];
+		prof.count++;
+		prof.time += dt;
 	}
 };
 

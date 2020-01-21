@@ -31,6 +31,22 @@ public:
 private:
 	volatile bool _quit = false;
 
+	struct pendulum
+	{
+		double previousTime;
+		timer::time startTime;
+		timer::time startBenchTime;
+		timer::time startRecordTime;
+
+		double getElapsedTime() const { return previousTime + timer::diffTime(timer::currentTime(), startTime); }
+		double getBenchTime() const { return timer::diffTime(timer::currentTime(), startBenchTime); }
+		double getRecordTime() const { return timer::diffTime(timer::currentTime(), startRecordTime); }
+
+		void resetTime() { startTime = timer::currentTime(); }
+		void resetBenchTime() { startBenchTime = timer::currentTime(); }
+		void resetRecordTime() { startRecordTime = timer::currentTime(); }
+	};
+
 private:
 	static int jacobi(const uint64_t x, const uint64_t y)
 	{
@@ -142,10 +158,8 @@ public:
 	}
 
 public:
-	bool check(const uint32_t k, const uint32_t n, ocl::Device & device, const bool bench = false, const bool checkRes = false, const uint64_t r64 = 0)
+	bool check(const uint32_t k, const uint32_t n, ocl::device & device, const bool bench = false, const bool checkRes = false, const uint64_t r64 = 0)
 	{
-		const Timer::Time startTime = Timer::currentTime();
-
 		uint32_t a = 0;
 		if (!find_a(k, n, a))
 		{
@@ -154,16 +168,20 @@ public:
 		}
 
 		gpmp X(k, n, device);
+		pendulum chrono;
 
 		uint32_t i0;
-		const bool found = X.restoreContext(i0);
+		const bool found = X.restoreContext(i0, chrono.previousTime);
 
 		std::cout << (found ? "Resuming from a checkpoint " : "Testing ");
 		std::cout << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^" << ilog2(X.getSize()) << " x " << X.getDigitBit() << " bits" << std::endl;
 
+		chrono.resetTime();
+
 		if (!found)
 		{
 			i0 = 0;
+			chrono.previousTime = 0;
 			apowk(X, a, k);
 			checkError(X);	// Sync GPU before benchmark
 		}
@@ -171,10 +189,9 @@ public:
 		const uint32_t L = 1 << (ilog2(n) / 2);
 
 		const uint32_t benchCount = (n < 100000) ? 50000 : 50000000 / (n / 1000);
-		Timer::Time startBenchTime = Timer::currentTime();
 		uint32_t benchIter = benchCount;
-
-		Timer::Time recordTime = startTime;
+		chrono.resetBenchTime();
+		chrono.resetRecordTime();
 
 		// X = X^(2^(n - 1))
 		for (uint32_t i = i0 + 1; i < n; ++i)
@@ -184,18 +201,18 @@ public:
 			if (--benchIter == 0)
 			{
 				if (bench) checkError(X);	// Sync GPU
-				const Timer::Time time = Timer::currentTime();
-				const double elapsedTime = Timer::diffTime(time, startBenchTime);
+				const double elapsedTime = chrono.getBenchTime();
 				const double mulTime = elapsedTime / benchCount, estimatedTime = mulTime * (n - i);
-				std::cout << Timer::formatTime(estimatedTime) << " remaining, " << std::setprecision(3) << mulTime * 1e3 << " ms/mul.";
+				std::cout << std::setprecision(3) << " " << i * 100.0 / n << "% done, "
+					<< timer::formatTime(estimatedTime) << " remaining, " <<  mulTime * 1e3 << " ms/mul.";
 				if (bench)
 				{
 					std::cout << std::endl;
 					return true;
 				}
 				std::cout << "        \r" << std::flush;
-				startBenchTime = time;
 				benchIter = benchCount;
+				chrono.resetBenchTime();
 			}
 
 			// Robert Gerbicz error checking algorithm
@@ -214,18 +231,19 @@ public:
 
 			if (i % 1024 == 0)
 			{
-				const double elapsedTime = Timer::diffTime(Timer::currentTime(), recordTime);
+				const double elapsedTime = chrono.getRecordTime();
 				if (elapsedTime > 600)
 				{
 					checkError(X);
-					X.saveContext(i);
+					X.saveContext(i, chrono.getElapsedTime());
+					chrono.resetRecordTime();
 				}
 			}
 
 			if (_quit)
 			{
 				checkError(X);
-				X.saveContext(i);
+				X.saveContext(i, chrono.getElapsedTime());
 				return false;
 			}
 		}
@@ -248,12 +266,10 @@ public:
 			}
 		}
 
-		const double elapsedTime = Timer::diffTime(Timer::currentTime(), startTime);
-
 		const std::string res = (isPrime) ? "                        " : std::string(", RES64 = ") + res64String(res64);
 
 		std::stringstream ss; ss << k << " * 2^" << n << " + 1 is " << (isPrime ? "prime" : "composite")
-			 << ", a = " << a << ", time = " << Timer::formatTime(elapsedTime) << res << std::endl;
+			 << ", a = " << a << ", time = " << timer::formatTime(chrono.getElapsedTime()) << res << std::endl;
 
 		std::cout << "\r" << ss.str();
 		std::ofstream resFile("presults.txt", std::ios::app);
@@ -272,72 +288,72 @@ public:
 	}
 
 private:
-	struct Number
+	struct number
 	{
 		uint32_t k, n;
 		uint64_t res64;
-		Number(const uint32_t k, const uint32_t n, const uint64_t res64 = 0) : k(k), n(n), res64(res64) {}
+		number(const uint32_t k, const uint32_t n, const uint64_t res64 = 0) : k(k), n(n), res64(res64) {}
 	};
 
 public:
-	void test_prime(ocl::Device & device, const bool bench = false)
+	void test_prime(ocl::device & device, const bool bench = false)
 	{
-		std::vector<Number>	primeList;
-		primeList.push_back(Number(1035, 301));
-		primeList.push_back(Number(955, 636));
-		primeList.push_back(Number(969, 1307));
-		primeList.push_back(Number(1139, 2641));
-		primeList.push_back(Number(1035, 5336));
-		primeList.push_back(Number(965, 10705));
-		primeList.push_back(Number(1027, 21468));	// size = 2k,   square32
-		primeList.push_back(Number(1109, 42921));	// size = 4k,   square64
-		primeList.push_back(Number(1085, 85959));	// size = 8k,   square128	64-bit 32-bit
-		primeList.push_back(Number(1015, 171214));	// size = 16k,  square256,  0.072  0.072
-		primeList.push_back(Number(1197, 343384));	// size = 32k,  square512,  0.105  0.101
-		primeList.push_back(Number(1089, 685641));	// size = 64k,  square1024, 0.177  0.168
-		primeList.push_back(Number(1005, 1375758));	// size = 128k, square32,   0.319  0.306
-		primeList.push_back(Number(1089, 2746155));	// size = 256k, square64,   0.571  0.556
-		primeList.push_back(Number(45, 5308037));	// size = 512k, square128,  1.09   1.06  ms
+		std::vector<number>	primeList;
+		primeList.push_back(number(1035, 301));
+		primeList.push_back(number(955, 636));
+		primeList.push_back(number(969, 1307));
+		primeList.push_back(number(1139, 2641));
+		primeList.push_back(number(1035, 5336));
+		primeList.push_back(number(965, 10705));
+		primeList.push_back(number(1027, 21468));	// size = 2k,   square32
+		primeList.push_back(number(1109, 42921));	// size = 4k,   square64
+		primeList.push_back(number(1085, 85959));	// size = 8k,   square128	64-bit 32-bit
+		primeList.push_back(number(1015, 171214));	// size = 16k,  square256,  0.072  0.072
+		primeList.push_back(number(1197, 343384));	// size = 32k,  square512,  0.105  0.101
+		primeList.push_back(number(1089, 685641));	// size = 64k,  square1024, 0.177  0.168
+		primeList.push_back(number(1005, 1375758));	// size = 128k, square32,   0.319  0.306
+		primeList.push_back(number(1089, 2746155));	// size = 256k, square64,   0.571  0.556
+		primeList.push_back(number(45, 5308037));	// size = 512k, square128,  1.09   1.06  ms
 
 		for (const auto & p : primeList) if (!check(p.k, p.n, device, bench, true)) return;
 	}
 
-	void test_composite(ocl::Device & device, const bool bench = false)
+	void test_composite(ocl::device & device, const bool bench = false)
 	{
-		std::vector<Number>	compositeList;
-		compositeList.push_back(Number(536870911,    298, 0x35461D17F60DA78Aull));
-		compositeList.push_back(Number(536870905,    626, 0x06543644B033FF0Cull));
-		compositeList.push_back(Number(536870411,   1307, 0x7747B2D2351394EFull));
-		compositeList.push_back(Number(536850911,   2631, 0x3A08775B698EEB34ull));
-		compositeList.push_back(Number(536870911,   5336, 0xDA3B38B4E68F0445ull));
-		compositeList.push_back(Number(536770911,  10705, 0x030EECBE0A5E77A6ull));
-		compositeList.push_back(Number(526870911,  21432, 0xD86853C587F1D537ull));	// size = 2k
-		compositeList.push_back(Number(436870911,  42921, 0x098AD2BD01F485BCull));	// size = 4k
-		compositeList.push_back(Number(535970911,  85942, 0x2D19C7E7E7553AD6ull));	// size = 8k
-		compositeList.push_back(Number(536860911, 171213, 0x99EFB220EE2289A0ull));	// size = 16k
-		compositeList.push_back(Number(536870911, 343386, 0x5D6A1D483910E48Full));	// size = 32k
-		compositeList.push_back(Number(536870911, 685618, 0x84C7E4E7F1344902ull));	// size = 64k
+		std::vector<number>	compositeList;
+		compositeList.push_back(number(536870911,    298, 0x35461D17F60DA78Aull));
+		compositeList.push_back(number(536870905,    626, 0x06543644B033FF0Cull));
+		compositeList.push_back(number(536870411,   1307, 0x7747B2D2351394EFull));
+		compositeList.push_back(number(536850911,   2631, 0x3A08775B698EEB34ull));
+		compositeList.push_back(number(536870911,   5336, 0xDA3B38B4E68F0445ull));
+		compositeList.push_back(number(536770911,  10705, 0x030EECBE0A5E77A6ull));
+		compositeList.push_back(number(526870911,  21432, 0xD86853C587F1D537ull));	// size = 2k
+		compositeList.push_back(number(436870911,  42921, 0x098AD2BD01F485BCull));	// size = 4k
+		compositeList.push_back(number(535970911,  85942, 0x2D19C7E7E7553AD6ull));	// size = 8k
+		compositeList.push_back(number(536860911, 171213, 0x99EFB220EE2289A0ull));	// size = 16k
+		compositeList.push_back(number(536870911, 343386, 0x5D6A1D483910E48Full));	// size = 32k
+		compositeList.push_back(number(536870911, 685618, 0x84C7E4E7F1344902ull));	// size = 64k
 
 		// check residues
 		for (const auto & c : compositeList) if (!check(c.k, c.n, device, bench, true, c.res64)) return;
 	}
 
-	void bench(ocl::Device & device)
+	void bench(ocl::device & device)
 	{
-		std::vector<Number>	benchList;
-		benchList.push_back(Number(7649,     1553995));		// PPSE
-		benchList.push_back(Number(595,      2833406));		// PPS
-		benchList.push_back(Number(45,       5308037));		// DIV
-		benchList.push_back(Number(6679881,  6679881));		// Cullen
-		benchList.push_back(Number(3,       10829346));		// 321
-		benchList.push_back(Number(99739,   14019102));		// ESP
-		benchList.push_back(Number(168451,  19375200));		// PSP
-		benchList.push_back(Number(10223,   31172165));		// SOB
+		std::vector<number>	benchList;
+		benchList.push_back(number(7649,     1553995));		// PPSE
+		benchList.push_back(number(595,      2833406));		// PPS
+		benchList.push_back(number(45,       5308037));		// DIV
+		benchList.push_back(number(6679881,  6679881));		// Cullen
+		benchList.push_back(number(3,       10829346));		// 321
+		benchList.push_back(number(99739,   14019102));		// ESP
+		benchList.push_back(number(168451,  19375200));		// PSP
+		benchList.push_back(number(10223,   31172165));		// SOB
 
 		for (const auto & b : benchList) if (!check(b.k, b.n, device, true)) return;
 	}
 
-	void profile(const uint32_t k, const uint32_t n, ocl::Device & device)	// ocl_profile must be defined (ocl.h)
+	void profile(const uint32_t k, const uint32_t n, ocl::device & device)	// ocl_profile must be defined (ocl.h)
 	{
 		gpmp X(k, n, device);
 		const size_t pCount = 1000;

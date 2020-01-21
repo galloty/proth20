@@ -17,15 +17,15 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #include <sys/time.h>
 #endif
 
-struct Timer
+struct timer
 {
 #if defined (_WIN32)
-	typedef LARGE_INTEGER Time;
+	typedef LARGE_INTEGER time;
 #else
-	typedef timeval Time;
+	typedef timeval time;
 #endif
 
-	static Time currentTime()
+	static time currentTime()
 	{
 #if defined (_WIN32)
 		LARGE_INTEGER time; QueryPerformanceCounter(&time);
@@ -35,7 +35,7 @@ struct Timer
 		return time;
 	}
 
-	static double diffTime(const Time & end, const Time & start)
+	static double diffTime(const time & end, const time & start)
 	{
 #if defined (_WIN32)
 		LARGE_INTEGER freq; QueryPerformanceFrequency(&freq);

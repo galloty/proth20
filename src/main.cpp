@@ -81,7 +81,7 @@ public:
 			std::cout << std::endl;
 		}
 
-		ocl::Engine engine;
+		ocl::engine engine;
 		engine.displayDevices();
 		std::cout << std::endl;
 
@@ -118,23 +118,23 @@ public:
 
 		if (bBench)
 		{
-			ocl::Device device(engine, d);
+			ocl::device device(engine, d);
 			proth::getInstance().bench(device);
 		}
 
 		if (bPrime)
 		{
-			ocl::Device device(engine, d);
+			ocl::device device(engine, d);
 			proth::getInstance().check(k, n, device);
 		}
 
 		// gpmp::printRanges(10000);
 
-		// proth & p = proth::getInstance();
-
-		// ocl::Device device0(engine, 0);
+		// ocl::device device0(engine, 0);
 		// test Intel GPU
-		// ocl::Device device1(engine, 1);
+		// ocl::device device1(engine, 1);
+
+		// proth & p = proth::getInstance();
 
 		// profile: ocl_profile must be defined (ocl.h)
 		// p.profile(45, 5308037, device0);
