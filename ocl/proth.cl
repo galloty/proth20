@@ -537,7 +537,7 @@ void reduce_downsweep64(__global uint * restrict const t, const uint d, const ui
 
 	barrier(CLK_LOCAL_MEM_FENCE);
 
-	__global uint4 * const tj1_4 = (__global const uint4 *)&tj[0];
+	__global uint4 * const tj1_4 = (__global uint4 *)&tj[0];
 	const uint u2 = tj[4 * (16 * s) + k], u0 = T[i], u02 = _addmod(u0, u2, d);
 	const uint4 u13 = tj1_4[k];
 	const uint u012 = _addmod(u02, u13.s1, d), u03 = _addmod(u0, u13.s3, d);
@@ -743,12 +743,12 @@ void reduce_topsweep1024(__global uint * restrict const t, const uint d, const u
 
 __kernel
 void reduce_i(__global const uint2 * restrict const x, __global uint * restrict const y, __global uint * restrict const t,
-	__global const uint * restrict const bp, const uint3 e_d_d_inv, const int2 s_d_shift)
+	__global const uint * restrict const bp, const uint4 e_d_d_inv_d_shift, const int s)
 {
 	const size_t k = get_global_id(0);
 
-	const uint e = e_d_d_inv.s0, d = e_d_d_inv.s1, d_inv = e_d_d_inv.s2;
-	const int s = s_d_shift.s0, d_shift = s_d_shift.s1;
+	const uint e = e_d_d_inv_d_shift.s0, d = e_d_d_inv_d_shift.s1, d_inv = e_d_d_inv_d_shift.s2;
+	const int d_shift = (int)(e_d_d_inv_d_shift.s3);
 
 	const uint xs = ((x[e + k + 1].s0 << (digit_bit - s)) | (x[e + k].s0 >> s)) & digit_mask;
 	const uint u = _rem(xs * (ulong)(bp[k]), d, d_inv, d_shift);
@@ -759,12 +759,12 @@ void reduce_i(__global const uint2 * restrict const x, __global uint * restrict 
 
 __kernel
 void reduce_o(__global uint2 * restrict const x, __global const uint * restrict const y, __global const uint * restrict const t,
-	__global const uint * restrict const ibp, const uint3 e_d_d_inv, const int2 s_d_shift)
+	__global const uint * restrict const ibp, const uint4 e_d_d_inv_d_shift)
 {
 	const size_t n = get_global_size(0), k = get_global_id(0);
 
-	const uint e = e_d_d_inv.s0, d = e_d_d_inv.s1, d_inv = e_d_d_inv.s2;
-	const int s = s_d_shift.s0, d_shift = s_d_shift.s1;
+	const uint e = e_d_d_inv_d_shift.s0, d = e_d_d_inv_d_shift.s1, d_inv = e_d_d_inv_d_shift.s2;
+	const int d_shift = (int)(e_d_d_inv_d_shift.s3);
 
 	const uint tk = t[k + 4];
 	//const uint rbk_prev = (k + 1 != n) ? tk : 0;	// NVidia compiler generates a conditionnal branch instruction then the code must be written with a mask
@@ -946,7 +946,6 @@ void add1(__global uint2 * restrict const x, const uint e, const ulong ds)
 	uint c = 1;
 	for (size_t k = 0; c != 0; ++k)
 	{
-		const uint2 x_k = x[k];
 		c += x[k].s0;
 		x[k].s0 = (uint)(c) & digit_mask;
 		c >>= digit_bit;

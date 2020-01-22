@@ -545,7 +545,7 @@ static const char * const src_proth_ocl = \
 "\n" \
 "	barrier(CLK_LOCAL_MEM_FENCE);\n" \
 "\n" \
-"	__global uint4 * const tj1_4 = (__global const uint4 *)&tj[0];\n" \
+"	__global uint4 * const tj1_4 = (__global uint4 *)&tj[0];\n" \
 "	const uint u2 = tj[4 * (16 * s) + k], u0 = T[i], u02 = _addmod(u0, u2, d);\n" \
 "	const uint4 u13 = tj1_4[k];\n" \
 "	const uint u012 = _addmod(u02, u13.s1, d), u03 = _addmod(u0, u13.s3, d);\n" \
@@ -751,12 +751,12 @@ static const char * const src_proth_ocl = \
 "\n" \
 "__kernel\n" \
 "void reduce_i(__global const uint2 * restrict const x, __global uint * restrict const y, __global uint * restrict const t,\n" \
-"	__global const uint * restrict const bp, const uint3 e_d_d_inv, const int2 s_d_shift)\n" \
+"	__global const uint * restrict const bp, const uint4 e_d_d_inv_d_shift, const int s)\n" \
 "{\n" \
 "	const size_t k = get_global_id(0);\n" \
 "\n" \
-"	const uint e = e_d_d_inv.s0, d = e_d_d_inv.s1, d_inv = e_d_d_inv.s2;\n" \
-"	const int s = s_d_shift.s0, d_shift = s_d_shift.s1;\n" \
+"	const uint e = e_d_d_inv_d_shift.s0, d = e_d_d_inv_d_shift.s1, d_inv = e_d_d_inv_d_shift.s2;\n" \
+"	const int d_shift = (int)(e_d_d_inv_d_shift.s3);\n" \
 "\n" \
 "	const uint xs = ((x[e + k + 1].s0 << (digit_bit - s)) | (x[e + k].s0 >> s)) & digit_mask;\n" \
 "	const uint u = _rem(xs * (ulong)(bp[k]), d, d_inv, d_shift);\n" \
@@ -767,12 +767,12 @@ static const char * const src_proth_ocl = \
 "\n" \
 "__kernel\n" \
 "void reduce_o(__global uint2 * restrict const x, __global const uint * restrict const y, __global const uint * restrict const t,\n" \
-"	__global const uint * restrict const ibp, const uint3 e_d_d_inv, const int2 s_d_shift)\n" \
+"	__global const uint * restrict const ibp, const uint4 e_d_d_inv_d_shift)\n" \
 "{\n" \
 "	const size_t n = get_global_size(0), k = get_global_id(0);\n" \
 "\n" \
-"	const uint e = e_d_d_inv.s0, d = e_d_d_inv.s1, d_inv = e_d_d_inv.s2;\n" \
-"	const int s = s_d_shift.s0, d_shift = s_d_shift.s1;\n" \
+"	const uint e = e_d_d_inv_d_shift.s0, d = e_d_d_inv_d_shift.s1, d_inv = e_d_d_inv_d_shift.s2;\n" \
+"	const int d_shift = (int)(e_d_d_inv_d_shift.s3);\n" \
 "\n" \
 "	const uint tk = t[k + 4];\n" \
 "	//const uint rbk_prev = (k + 1 != n) ? tk : 0;	// NVidia compiler generates a conditionnal branch instruction then the code must be written with a mask\n" \
@@ -954,7 +954,6 @@ static const char * const src_proth_ocl = \
 "	uint c = 1;\n" \
 "	for (size_t k = 0; c != 0; ++k)\n" \
 "	{\n" \
-"		const uint2 x_k = x[k];\n" \
 "		c += x[k].s0;\n" \
 "		x[k].s0 = (uint)(c) & digit_mask;\n" \
 "		c >>= digit_bit;\n" \

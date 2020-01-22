@@ -7,7 +7,7 @@ Please give feedback to the authors if improvement is realized. It is distribute
 
 #pragma once
 
-#ifdef __APPLE__
+#if defined (__APPLE__)
 	#include <OpenCL/cl.h>
 	#include <OpenCL/cl_ext.h>
 #else
@@ -31,7 +31,7 @@ namespace ocl
 // #define ocl_profile		1
 #define ocl_fast_exec		1
 
-#ifdef ocl_profile
+#if defined (ocl_profile)
 #define	_executeKernel	_executeKernelP
 #else
 #define	_executeKernel	_executeKernelN
@@ -131,7 +131,7 @@ private:
 public:
 	engine()
 	{
-#if ocl_debug
+#if defined (ocl_debug)
 		std::cerr << "Create ocl engine." << std::endl;
 #endif
 		cl_uint num_platforms;
@@ -164,7 +164,7 @@ public:
 public:
 	virtual ~engine()
 	{
-#if ocl_debug
+#if defined (ocl_debug)
 		std::cerr << "Delete ocl engine." << std::endl;
 #endif
 	}
@@ -193,7 +193,7 @@ private:
 	const size_t _d;
 	const cl_platform_id _platform;
 	const cl_device_id _device;
-#ifdef ocl_profile
+#if defined (ocl_profile)
 	bool _selfTuning = true;
 #else
 	bool _selfTuning = false;
@@ -239,7 +239,7 @@ private:
 public:
 	device(const engine & parent, const size_t d) : _engine(parent), _d(d), _platform(parent.getPlatform(d)), _device(parent.getDevice(d))
 	{
-#if ocl_debug
+#if defined (ocl_debug)
 		std::cerr << "Create ocl device " << d << "." << std::endl;
 #endif
 
@@ -279,7 +279,7 @@ public:
 public:
 	virtual ~device()
 	{
-#if ocl_debug
+#if defined (ocl_debug)
 		std::cerr << "Delete ocl device " << _d << "." << std::endl;
 #endif
 		oclFatal(clReleaseCommandQueue(_queue));
@@ -324,7 +324,7 @@ public:
 public:
 	void loadProgram(const std::string & programSrc)
 	{
-#if ocl_debug
+#if defined (ocl_debug)
 		std::cerr << "Load ocl program." << std::endl;
 #endif
 		const char * src[1]; src[0] = programSrc.c_str();
@@ -334,12 +334,12 @@ public:
 
 		char pgmOptions[1024];
 		strcpy(pgmOptions, "");
-#if ocl_debug
+#if defined (ocl_debug)
 		strcat(pgmOptions, " -cl-nv-verbose");
 #endif
 		const cl_int err = clBuildProgram(_program, 1, &_device, pgmOptions, nullptr, nullptr);
 
-#if !ocl_debug
+#if !defined (ocl_debug)
 		if (err != CL_SUCCESS)
 #endif		
 		{
@@ -350,7 +350,7 @@ public:
 				clGetProgramBuildInfo(_program, _device, CL_PROGRAM_BUILD_LOG, logSize, buildLog, nullptr);
 				buildLog[logSize] = '\0';
 				std::cerr << buildLog << std::endl;
-#if ocl_debug
+#if defined (ocl_debug)
 				std::ofstream fileOut("pgm.log"); 
 				fileOut << buildLog << std::endl;
 				fileOut.close();
@@ -361,7 +361,7 @@ public:
 
 		oclFatal(err);
 
-#if ocl_debug
+#if defined (ocl_debug)
 		size_t binSize; clGetProgramInfo(_program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binSize, nullptr);
 		char * binary = new char[binSize];
 		clGetProgramInfo(_program, CL_PROGRAM_BINARIES, sizeof(char *), &binary, nullptr);
@@ -375,7 +375,7 @@ public:
 public:
 	void clearProgram()
 	{
-#if ocl_debug
+#if defined (ocl_debug)
 		std::cerr << "Clear ocl program." << std::endl;
 #endif
 		oclFatal(clReleaseProgram(_program));
@@ -385,7 +385,7 @@ public:
 public:
 	void allocMemory(const size_t size, const size_t constant_size)
 	{
-#if ocl_debug
+#if defined (ocl_debug)
 		std::cerr << "Alloc gpu memory." << std::endl;
 #endif
 		_size = size;
@@ -416,7 +416,7 @@ public:
 public:
 	void releaseMemory()
 	{
-#if ocl_debug
+#if defined (ocl_debug)
 		std::cerr << "Free gpu memory." << std::endl;
 #endif
 		if (_size != 0)
@@ -477,10 +477,9 @@ private:
 		_setKernelArg(kernel, 1, sizeof(cl_mem), &_y);
 		_setKernelArg(kernel, 2, sizeof(cl_mem), &_t);
 		_setKernelArg(kernel, 3, sizeof(cl_mem), forward ? &_bp : &_ibp);
-		const cl_uint3 e_d_d_inv = { e, d, d_inv };
-		const cl_int2 s_d_shift = { s, d_shift };
-		_setKernelArg(kernel, 4, sizeof(cl_uint3), &e_d_d_inv);
-		_setKernelArg(kernel, 5, sizeof(cl_int2), &s_d_shift);
+		const cl_uint4 e_d_d_inv_d_shift = { e, d, d_inv, cl_uint(d_shift) };
+		_setKernelArg(kernel, 4, sizeof(cl_uint4), &e_d_d_inv_d_shift);
+		if (forward) _setKernelArg(kernel, 5, sizeof(cl_int), &s);
 		return kernel;
 	}
 
@@ -496,7 +495,7 @@ private:
 public:
 	void createKernels(const cl_uint2 norm, const cl_uint e, const cl_int s, const cl_uint d, const cl_uint d_inv, const cl_int d_shift)
 	{
-#if ocl_debug
+#if defined (ocl_debug)
 		std::cerr << "Create ocl kernels." << std::endl;
 #endif
 		const cl_uint n = cl_uint(_size / 2);
@@ -584,7 +583,7 @@ public:
 public:
 	void releaseKernels()
 	{
-#if ocl_debug
+#if defined (ocl_debug)
 		std::cerr << "Release ocl kernels." << std::endl;
 #endif
 		_releaseKernel(_sub_ntt64);
@@ -884,11 +883,11 @@ private:
 private:
 	static void _setKernelArg(cl_kernel kernel, const cl_uint arg_index, const size_t arg_size, const void * const arg_value)
 	{
-#ifndef ocl_fast_exec
+#if !defined (ocl_fast_exec) || defined (ocl_debug)
 		cl_int err =
 #endif
 		clSetKernelArg(kernel, arg_index, arg_size, arg_value);
-#ifndef ocl_fast_exec
+#if !defined (ocl_fast_exec) || defined (ocl_debug)
 		oclFatal(err);
 #endif
 	}
@@ -896,11 +895,11 @@ private:
 private:
 	void _executeKernelN(cl_kernel kernel, const size_t globalWorkSize, const size_t localWorkSize = 0)
 	{
-#ifndef ocl_fast_exec
+#if !defined (ocl_fast_exec) || defined (ocl_debug)
 		cl_int err =
 #endif
 		clEnqueueNDRangeKernel(_queue, kernel, 1, nullptr, &globalWorkSize, (localWorkSize == 0) ? nullptr : &localWorkSize, 0, nullptr, nullptr);
-#ifndef ocl_fast_exec
+#if !defined (ocl_fast_exec) || defined (ocl_debug)
 		oclFatal(err);
 #endif
 		if (_isSync)
