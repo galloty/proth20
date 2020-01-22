@@ -145,9 +145,13 @@ public:
 		// p.test_prime(device0, true);
 		// p.test_composite(device0, true);
 
-		// true test
+		// full test
 		// p.test_composite(device0);
 		// p.test_prime(device0);
+
+		// validation
+		// p.validation(device0);
+		// p.validation(device1);
 	}
 };
 

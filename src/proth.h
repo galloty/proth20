@@ -220,12 +220,6 @@ public:
 			// if (i == n - 1) X.set_bug();	// test
 			if ((i & (L - 1)) == 0)
 			{
-			// 	if (i % (L * L) == 0)
-			// 	{
-			// 		X.Gerbicz_check(L);
-			// 		checkError(X);
-			// 		std::cout << "Gerbicz_checked" << std::endl;
-			// 	}
 				X.Gerbicz_step();
 			}
 
@@ -287,6 +281,33 @@ public:
 		return true;
 	}
 
+public:
+	bool validate(const uint32_t k, const uint32_t n, ocl::device & device)
+	{
+		const uint32_t a = 3;
+		gpmp X(k, n, device);
+
+		std::cout << "Testing " << k << " * 2^" << n << " + 1, size = 2^" << ilog2(X.getSize()) << " x " << X.getDigitBit() << " bits ";
+
+		apowk(X, a, k);
+		checkError(X);
+
+		const uint32_t L = 64;
+
+		for (uint32_t i = 1; i < L * L; ++i)
+		{
+			X.square();
+			if ((i & (L - 1)) == 0) X.Gerbicz_step();
+			if (_quit) return false;
+		}
+
+		X.square();
+		X.Gerbicz_check(L);
+		checkError(X);
+		std::cout << "valid" << std::endl;
+		return true;
+	}
+
 private:
 	struct number
 	{
@@ -305,15 +326,18 @@ public:
 		primeList.push_back(number(1139, 2641));
 		primeList.push_back(number(1035, 5336));
 		primeList.push_back(number(965, 10705));
-		primeList.push_back(number(1027, 21468));	// size = 2k,   square32
-		primeList.push_back(number(1109, 42921));	// size = 4k,   square64
-		primeList.push_back(number(1085, 85959));	// size = 8k,   square128	64-bit 32-bit
-		primeList.push_back(number(1015, 171214));	// size = 16k,  square256,  0.072  0.072
-		primeList.push_back(number(1197, 343384));	// size = 32k,  square512,  0.105  0.101
-		primeList.push_back(number(1089, 685641));	// size = 64k,  square1024, 0.177  0.168
-		primeList.push_back(number(1005, 1375758));	// size = 128k, square32,   0.319  0.306
-		primeList.push_back(number(1089, 2746155));	// size = 256k, square64,   0.571  0.556
-		primeList.push_back(number(45, 5308037));	// size = 512k, square128,  1.09   1.06  ms
+		primeList.push_back(number(1027, 21468));		// size = 2^11, square32
+		primeList.push_back(number(1109, 42921));		// size = 2^12, square64
+		primeList.push_back(number(1085, 85959));		// size = 2^13, square128	64-bit 32-bit
+		primeList.push_back(number(1015, 171214));		// size = 2^14, square256,  0.073  0.072
+		primeList.push_back(number(1197, 343384));		// size = 2^15, square512,  0.107  0.101
+		primeList.push_back(number(1089, 685641));		// size = 2^16, square1024, 0.170  0.168
+		primeList.push_back(number(1005, 1375758));		// size = 2^17, square32,   0.315  0.306	square2048	0.300
+		primeList.push_back(number(1089, 2746155));		// size = 2^18, square64,   0.580  0.556	square4096	0.594
+		primeList.push_back(number(45, 5308037));		// size = 2^19, square128,  1.09   1.06
+		primeList.push_back(number(6679881, 6679881));	// size = 2^20, square256,  2.15
+		primeList.push_back(number(3, 10829346));		// size = 2^21, square512,  4.43
+		primeList.push_back(number(10223, 31172165));	// size = 2^22, square1024, 8.96
 
 		for (const auto & p : primeList) if (!check(p.k, p.n, device, bench, true)) return;
 	}
@@ -327,12 +351,12 @@ public:
 		compositeList.push_back(number(536850911,   2631, 0x3A08775B698EEB34ull));
 		compositeList.push_back(number(536870911,   5336, 0xDA3B38B4E68F0445ull));
 		compositeList.push_back(number(536770911,  10705, 0x030EECBE0A5E77A6ull));
-		compositeList.push_back(number(526870911,  21432, 0xD86853C587F1D537ull));	// size = 2k
-		compositeList.push_back(number(436870911,  42921, 0x098AD2BD01F485BCull));	// size = 4k
-		compositeList.push_back(number(535970911,  85942, 0x2D19C7E7E7553AD6ull));	// size = 8k
-		compositeList.push_back(number(536860911, 171213, 0x99EFB220EE2289A0ull));	// size = 16k
-		compositeList.push_back(number(536870911, 343386, 0x5D6A1D483910E48Full));	// size = 32k
-		compositeList.push_back(number(536870911, 685618, 0x84C7E4E7F1344902ull));	// size = 64k
+		compositeList.push_back(number(526870911,  21432, 0xD86853C587F1D537ull));
+		compositeList.push_back(number(436870911,  42921, 0x098AD2BD01F485BCull));
+		compositeList.push_back(number(535970911,  85942, 0x2D19C7E7E7553AD6ull));
+		compositeList.push_back(number(536860911, 171213, 0x99EFB220EE2289A0ull));
+		compositeList.push_back(number(536870911, 343386, 0x5D6A1D483910E48Full));
+		compositeList.push_back(number(536870911, 685618, 0x84C7E4E7F1344902ull));
 
 		// check residues
 		for (const auto & c : compositeList) if (!check(c.k, c.n, device, bench, true, c.res64)) return;
@@ -351,6 +375,11 @@ public:
 		benchList.push_back(number(10223,   31172165));		// SOB
 
 		for (const auto & b : benchList) if (!check(b.k, b.n, device, true)) return;
+	}
+
+	void validation(ocl::device & device)
+	{
+		for (uint32_t n = 15000; n < 100000000; n *= 2) if (!validate(536870911, n, device)) return;
 	}
 
 	void profile(const uint32_t k, const uint32_t n, ocl::device & device)	// ocl_profile must be defined (ocl.h)

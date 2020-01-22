@@ -15,6 +15,7 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #include <fstream>
 
 #include "proth_ocl.h"
+#include "proth_1024_ocl.h"
 
 inline constexpr int ilog2(const size_t n) { return (n > 1) ? 1 + ilog2(n >> 1) : 0; }
 
@@ -84,6 +85,7 @@ private:
 	const int _digit_bit;
 	const size_t _size;
 	const uint32_t _k, _n;
+	const bool _ext1024;
 	ocl::device & _device;
 	cl_uint2 * const _mem;
 
@@ -134,13 +136,45 @@ private:
 		static RNS prRoot(const size_t n) { return RNS(Zp<P1>(P1_PRIM_ROOT).pow((P1 - 1) / n), Zp<P2>(P2_PRIM_ROOT).pow((P2 - 1) / n)); }
 	};
 
+private:
+	static bool readOpenCL(const char * const clFileName, const char * const headerFileName, const char * const varName, std::stringstream & src)
+	{
+		std::ifstream clFile(clFileName);
+		if (!clFile.is_open()) return false;
+		
+		// if .cl file exists then generate header file
+		std::ofstream hFile(headerFileName, std::ios::binary);	// binary: don't convert line endings to `CRLF` 
+		if (!hFile.is_open()) throw std::runtime_error("cannot write openCL header file.");
+
+		hFile << "/*" << std::endl;
+		hFile << "Copyright 2020, Yves Gallot" << std::endl << std::endl;
+		hFile << "proth20 is free source code, under the MIT license (see LICENSE). You can redistribute, use and/or modify it." << std::endl;
+		hFile << "Please give feedback to the authors if improvement is realized. It is distributed in the hope that it will be useful." << std::endl;
+		hFile << "*/" << std::endl << std::endl;
+
+		hFile << "static const char * const " << varName << " = \\" << std::endl;
+
+		std::string line;
+		while (std::getline(clFile, line))
+		{
+			hFile << "\"" << line << "\\n\" \\" << std::endl;
+			src << line << std::endl;
+		}
+		hFile << ";" << std::endl;
+
+		hFile.close();
+		clFile.close();
+		return true;
+	}
+
 public:
 	gpmp(const uint32_t k, const uint32_t n, ocl::device & device) :
-		_digit_bit(digitBit(k, n)), _size(transformSize(k, n, _digit_bit)), _k(k), _n(n), _device(device), _mem(new cl_uint2[_size])
+		_digit_bit(digitBit(k, n)), _size(transformSize(k, n, _digit_bit)), _k(k), _n(n),
+		_ext1024((device.getMaxWorkGroupSize() >= 1024) && (device.getLocalMemSize() >= 32768)), _device(device), _mem(new cl_uint2[_size])
 	{
 		const size_t size = _size;
-		const size_t constant_max_m = 256;
-		const size_t constant_size = 256 + 64 + 16 + 4;	// 340 * 2 * sizeof(cl_uint4) = 10880 bytes
+		const size_t constant_max_m = 1024;
+		const size_t constant_size = 1024 + 256 + 64 + 16 + 4;	// 1364 * 2 * sizeof(cl_uint4) = 43648 bytes
 
 		const double max_digit = double((uint32_t(1) << _digit_bit) - 1);
 		if ((size / 2) * max_digit * max_digit >= P1P2 / 2)
@@ -152,33 +186,18 @@ public:
 		std::stringstream src;
 		src << "#define\tdigit_bit\t" << _digit_bit << std::endl << std::endl;
 
-		std::ifstream clFile("ocl/proth.cl"); 
-		if (clFile.is_open())	// if proth.cl file exists then generate proth_ocl.h
+		if (!readOpenCL("ocl/proth.cl", "src/proth_ocl.h", "src_proth_ocl", src))
 		{
-			std::ofstream hFile("src/proth_ocl.h", std::ios::binary);	// binary: don't convert line endings to `CRLF` 
-			if (!hFile.is_open()) throw std::runtime_error("cannot write 'proth_ocl.h' file.");
-
-			hFile << "/*" << std::endl;
-			hFile << "Copyright 2020, Yves Gallot" << std::endl << std::endl;
-			hFile << "proth20 is free source code, under the MIT license (see LICENSE). You can redistribute, use and/or modify it." << std::endl;
-			hFile << "Please give feedback to the authors if improvement is realized. It is distributed in the hope that it will be useful." << std::endl;
-			hFile << "*/" << std::endl << std::endl;
-			hFile << "static const char * const src_proth_ocl = \\" << std::endl;
-
-			std::string line;
-			while (std::getline(clFile, line))
-			{
-				hFile << "\"" << line << "\\n\" \\" << std::endl;
-				src << line << std::endl;
-			}
-			hFile << ";" << std::endl;
-
-			hFile.close();
-			clFile.close();
-		}
-		else	// otherwise program is proth_ocl.h
-		{
+			// if .cl file is not found then program is proth_ocl.h
 			src << src_proth_ocl;
+		}
+
+		if (_ext1024)
+		{
+			if (!readOpenCL("ocl/proth_1024.cl", "src/proth_1024_ocl.h", "src_proth_1024_ocl", src))
+			{
+				src << src_proth_1024_ocl;
+			}
 		}
 
 		_device.loadProgram(src.str().c_str());
@@ -186,7 +205,7 @@ public:
 		_device.allocMemory(size, constant_size);
 		const cl_uint2 norm = { cl_uint(P1 - (P1 - 1) / size), cl_uint(P2 - (P2 - 1) / size) };
 		const cl_int k_shift = cl_int(ilog2(k) - 1);
-		_device.createKernels(norm, cl_uint(n / _digit_bit), cl_int(n % _digit_bit), cl_uint(k), cl_uint((uint64_t(1) << (32 + k_shift)) / k), k_shift);
+		_device.createKernels(norm, cl_uint(n / _digit_bit), cl_int(n % _digit_bit), cl_uint(k), cl_uint((uint64_t(1) << (32 + k_shift)) / k), k_shift, _ext1024);
 
 		// (size + 2) / 3 roots
 		cl_uint4 * const r1ir1 = new cl_uint4[size];

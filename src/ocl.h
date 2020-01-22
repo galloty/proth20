@@ -211,6 +211,7 @@ private:
 	cl_mem _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr1ir1 = nullptr, _cr2ir2 = nullptr, _bp = nullptr, _ibp = nullptr;
 	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr;
 	cl_kernel _square32 = nullptr, _square64 = nullptr, _square128 = nullptr, _square256 = nullptr,_square512 = nullptr, _square1024 = nullptr;
+	cl_kernel _square2048 = nullptr, _square4096 = nullptr;
 	cl_kernel _poly2int0 = nullptr, _poly2int1 = nullptr;
 	cl_kernel _reduce_upsweep64 = nullptr, _reduce_downsweep64 = nullptr;
 	cl_kernel _reduce_topsweep32 = nullptr, _reduce_topsweep64 = nullptr, _reduce_topsweep128 = nullptr;
@@ -285,6 +286,10 @@ public:
 		oclFatal(clReleaseCommandQueue(_queue));
 		oclFatal(clReleaseContext(_context));
 	}
+
+public:
+	size_t getMaxWorkGroupSize() const { return _maxWorkGroupSize; }
+	size_t getLocalMemSize() const { return _localMemSize; }
 
 private:
 	static EVendor getVendor(const std::string & vendorString)
@@ -493,7 +498,7 @@ private:
 	}
 
 public:
-	void createKernels(const cl_uint2 norm, const cl_uint e, const cl_int s, const cl_uint d, const cl_uint d_inv, const cl_int d_shift)
+	void createKernels(const cl_uint2 norm, const cl_uint e, const cl_int s, const cl_uint d, const cl_uint d_inv, const cl_int d_shift, const bool ext1024)
 	{
 #if defined (ocl_debug)
 		std::cerr << "Create ocl kernels." << std::endl;
@@ -511,6 +516,11 @@ public:
 		_square256 = _createSquareKernel("square256");
 		_square512 = _createSquareKernel("square512");
 		_square1024 = _createSquareKernel("square1024");
+		if (ext1024)
+		{
+			_square2048 = _createSquareKernel("square2048");
+			_square4096 = _createSquareKernel("square4096");
+		}
 
 		_poly2int0 = _createKernel("poly2int0");
 		_setKernelArg(_poly2int0, 0, sizeof(cl_mem), &_x);
@@ -596,6 +606,8 @@ public:
 		_releaseKernel(_square256);
 		_releaseKernel(_square512);
 		_releaseKernel(_square1024);
+		_releaseKernel(_square2048);
+		_releaseKernel(_square4096);
 
 		_releaseKernel(_poly2int0);
 		_releaseKernel(_poly2int1);
@@ -714,6 +726,8 @@ public:
 	void square256() { _executeKernel(_square256, _size / 4, BLK256 * 256 / 4); }
 	void square512() { _executeKernel(_square512, _size / 4, 512 / 4); }
 	void square1024() { _executeKernel(_square1024, _size / 4, 1024 / 4); }
+	void square2048() { _executeKernel(_square2048, _size / 4, 2048 / 4); }
+	void square4096() { _executeKernel(_square4096, _size / 4, 4096 / 4); }
 
 public:
 	void mul2() { _executeKernel(_mul2, _size / 4); }

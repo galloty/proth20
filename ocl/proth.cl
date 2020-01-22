@@ -166,11 +166,10 @@ inline void _square2(__local uint2 * restrict const X)
 {
 	barrier(CLK_LOCAL_MEM_FENCE);
 
-	// TODO X01 & X45
-	const uint2 u0 = X[0], u1 = X[1], u2 = X[2], u3 = X[3];
-	const uint2 v0 = addmod(u0, u1), v1 = submod(u0, u1), v2 = addmod(u2, u3), v3 = submod(u2, u3);
-	const uint2 s0 = sqrmod(v0), s1 = sqrmod(v1), s2 = sqrmod(v2), s3 = sqrmod(v3);
-	X[0] = addmod(s0, s1); X[1] = submod(s0, s1); X[2] = addmod(s2, s3); X[3] = submod(s2, s3);
+	const uint2 u0 = X[0], u1 = X[1], u4 = X[4], u5 = X[5];
+	const uint2 v0 = addmod(u0, u1), v1 = submod(u0, u1), v4 = addmod(u4, u5), v5 = submod(u4, u5);
+	const uint2 s0 = sqrmod(v0), s1 = sqrmod(v1), s4 = sqrmod(v4), s5 = sqrmod(v5);
+	X[0] = addmod(s0, s1); X[1] = submod(s0, s1); X[4] = addmod(s4, s5); X[5] = submod(s4, s5);
 }
 
 inline void _square4(__local uint2 * restrict const X)
@@ -287,12 +286,12 @@ void square32(__global uint2 * restrict const x, __constmem const uint4 * restri
 
 	const size_t i = get_local_id(0);
 	const size_t i_8 = i % 8, i8 = ((4 * i) & (size_t)~(4 * 8 - 1)) | i_8, j8 = i_8 + 2;
-	const size_t i_2 = i % 2, i2 = ((4 * i) & (size_t)~(4 * 2 - 1)) | i_2, j2 = i_2;
+	const size_t i_2 = i % 2, _i2 = ((4 * i) & (size_t)~(4 * 2 - 1)), i2 = _i2 | i_2, j2 = i_2, i_0 = _i2 | (2 * i_2);
 	const size_t k8 = get_group_id(0) * 32 * BLK32 | i8;
 
 	_forward4i(8, &X[i8], 8, &x[k8], r2ir2[j8].s01, r1ir1[j8]);
 	_forward4(2, &X[i2], r2ir2[j2].s01, r1ir1[j2]);
-	_square2(&X[4 * i]);
+	_square2(&X[i_0]);
 	_backward4(2, &X[i2], r2ir2[j2].s23, r1ir1[j2]);
 	_backward4o(8, &x[k8], 8, &X[i8], r2ir2[j8].s23, r1ir1[j8]);
 }
@@ -322,13 +321,13 @@ void square128(__global uint2 * restrict const x, __constmem const uint4 * restr
 	const size_t i = get_local_id(0);
 	const size_t i_32 = i % 32, i32 = ((4 * i) & (size_t)~(4 * 32 - 1)) | i_32, j32 = i_32 + 2 + 8;
 	const size_t i_8 = i % 8, i8 = ((4 * i) & (size_t)~(4 * 8 - 1)) | i_8, j8 = i_8 + 2;
-	const size_t i_2 = i % 2, i2 = ((4 * i) & (size_t)~(4 * 2 - 1)) | i_2, j2 = i_2;
+	const size_t i_2 = i % 2, _i2 = ((4 * i) & (size_t)~(4 * 2 - 1)), i2 = _i2 | i_2, j2 = i_2, i_0 = _i2 | (2 * i_2);
 	const size_t k32 = get_group_id(0) * 128 * BLK128 | i32;
 
 	_forward4i(32, &X[i32], 32, &x[k32], r2ir2[j32].s01, r1ir1[j32]);
 	_forward4(8, &X[i8], r2ir2[j8].s01, r1ir1[j8]);
 	_forward4(2, &X[i2], r2ir2[j2].s01, r1ir1[j2]);
-	_square2(&X[4 * i]);
+	_square2(&X[i_0]);
 	_backward4(2, &X[i2], r2ir2[j2].s23, r1ir1[j2]);
 	_backward4(8, &X[i8], r2ir2[j8].s23, r1ir1[j8]);
 	_backward4o(32, &x[k32], 32, &X[i32], r2ir2[j32].s23, r1ir1[j32]);
@@ -363,14 +362,14 @@ void square512(__global uint2 * restrict const x, __constmem const uint4 * restr
 	const size_t i128 = i, j128 = i + 2 + 8 + 32;
 	const size_t i_32 = i % 32, i32 = ((4 * i) & (size_t)~(4 * 32 - 1)) | i_32, j32 = i_32 + 2 + 8;
 	const size_t i_8 = i % 8, i8 = ((4 * i) & (size_t)~(4 * 8 - 1)) | i_8, j8 = i_8 + 2;
-	const size_t i_2 = i % 2, i2 = ((4 * i) & (size_t)~(4 * 2 - 1)) | i_2, j2 = i_2;
+	const size_t i_2 = i % 2, _i2 = ((4 * i) & (size_t)~(4 * 2 - 1)), i2 = _i2 | i_2, j2 = i_2, i_0 = _i2 | (2 * i_2);
 	const size_t k128 = get_group_id(0) * 512 | i128;
 
 	_forward4i(128, &X[i128], 128, &x[k128], r2ir2[j128].s01, r1ir1[j128]);
 	_forward4(32, &X[i32], r2ir2[j32].s01, r1ir1[j32]);
 	_forward4(8, &X[i8], r2ir2[j8].s01, r1ir1[j8]);
 	_forward4(2, &X[i2], r2ir2[j2].s01, r1ir1[j2]);
-	_square2(&X[4 * i]);
+	_square2(&X[i_0]);
 	_backward4(2, &X[i2], r2ir2[j2].s23, r1ir1[j2]);
 	_backward4(8, &X[i8], r2ir2[j8].s23, r1ir1[j8]);
 	_backward4(32, &X[i32], r2ir2[j32].s23, r1ir1[j32]);
