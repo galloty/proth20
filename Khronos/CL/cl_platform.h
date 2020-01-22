@@ -51,14 +51,14 @@ extern "C" {
 #endif
 
 #ifdef __APPLE__
-    #define CL_EXTENSION_WEAK_LINK                  __attribute__((weak_import))       
+    #define CL_EXTENSION_WEAK_LINK                  __attribute__((weak_import))
     #define CL_API_SUFFIX__VERSION_1_0              AVAILABLE_MAC_OS_X_VERSION_10_6_AND_LATER
     #define CL_EXT_SUFFIX__VERSION_1_0              CL_EXTENSION_WEAK_LINK AVAILABLE_MAC_OS_X_VERSION_10_6_AND_LATER
     #define CL_API_SUFFIX__VERSION_1_1              CL_EXTENSION_WEAK_LINK
     #define CL_EXT_SUFFIX__VERSION_1_1              CL_EXTENSION_WEAK_LINK
     #define CL_EXT_SUFFIX__VERSION_1_0_DEPRECATED   CL_EXTENSION_WEAK_LINK AVAILABLE_MAC_OS_X_VERSION_10_6_AND_LATER
 #else
-    #define CL_EXTENSION_WEAK_LINK                         
+    #define CL_EXTENSION_WEAK_LINK
     #define CL_API_SUFFIX__VERSION_1_0
     #define CL_EXT_SUFFIX__VERSION_1_0
     #define CL_API_SUFFIX__VERSION_1_1
@@ -248,7 +248,7 @@ typedef double          cl_double   __attribute__((aligned(8)));
    #define CL_HUGE_VALF     ((cl_float) 1e50)
    #define CL_HUGE_VAL      ((cl_double) 1e500)
    float nanf( const char * );
-   #define CL_NAN           nanf( "" )  
+   #define CL_NAN           nanf( "" )
 #endif
 #define CL_MAXFLOAT         CL_FLT_MAX
 #define CL_INFINITY         CL_HUGE_VALF
@@ -263,17 +263,17 @@ typedef int          cl_GLint;
 typedef unsigned int cl_GLenum;
 
 /*
- * Vector types 
+ * Vector types
  *
- *  Note:   OpenCL requires that all types be naturally aligned. 
+ *  Note:   OpenCL requires that all types be naturally aligned.
  *          This means that vector types must be naturally aligned.
  *          For example, a vector of four floats must be aligned to
- *          a 16 byte boundary (calculated as 4 * the natural 4-byte 
+ *          a 16 byte boundary (calculated as 4 * the natural 4-byte
  *          alignment of the float).  The alignment qualifiers here
  *          will only function properly if your compiler supports them
  *          and if you don't actively work to defeat them.  For example,
  *          in order for a cl_float4 to be 16 byte aligned in a struct,
- *          the start of the struct must itself be 16-byte aligned. 
+ *          the start of the struct must itself be 16-byte aligned.
  *
  *          Maintaining proper alignment is the user's responsibility.
  */
@@ -387,7 +387,7 @@ typedef unsigned int cl_GLenum;
     #if defined( __MINGW64__ )
         #include <intrin.h>
     #else
-        #include <immintrin.h> 
+        #include <immintrin.h>
     #endif
     #if defined( __GNUC__ )
         typedef cl_float    __cl_float8     __attribute__((vector_size(32)));
@@ -433,7 +433,7 @@ typedef union
    __extension__ struct{ cl_char  s0, s1; };
    __extension__ struct{ cl_char  lo, hi; };
 #endif
-#if defined( __CL_CHAR2__) 
+#if defined( __CL_CHAR2__)
     __cl_char2     v2;
 #endif
 }cl_char2;
@@ -446,10 +446,10 @@ typedef union
    __extension__ struct{ cl_char  s0, s1, s2, s3; };
    __extension__ struct{ cl_char2 lo, hi; };
 #endif
-#if defined( __CL_CHAR2__) 
+#if defined( __CL_CHAR2__)
     __cl_char2     v2[2];
 #endif
-#if defined( __CL_CHAR4__) 
+#if defined( __CL_CHAR4__)
     __cl_char4     v4;
 #endif
 }cl_char4;
@@ -465,10 +465,10 @@ typedef union
    __extension__ struct{ cl_char  s0, s1, s2, s3, s4, s5, s6, s7; };
    __extension__ struct{ cl_char4 lo, hi; };
 #endif
-#if defined( __CL_CHAR2__) 
+#if defined( __CL_CHAR2__)
     __cl_char2     v2[4];
 #endif
-#if defined( __CL_CHAR4__) 
+#if defined( __CL_CHAR4__)
     __cl_char4     v4[2];
 #endif
 #if defined( __CL_CHAR8__ )
@@ -484,10 +484,10 @@ typedef union
    __extension__ struct{ cl_char  s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB, sC, sD, sE, sF; };
    __extension__ struct{ cl_char8 lo, hi; };
 #endif
-#if defined( __CL_CHAR2__) 
+#if defined( __CL_CHAR2__)
     __cl_char2     v2[8];
 #endif
-#if defined( __CL_CHAR4__) 
+#if defined( __CL_CHAR4__)
     __cl_char4     v4[4];
 #endif
 #if defined( __CL_CHAR8__ )
@@ -508,7 +508,7 @@ typedef union
    __extension__ struct{ cl_uchar  s0, s1; };
    __extension__ struct{ cl_uchar  lo, hi; };
 #endif
-#if defined( __cl_uchar2__) 
+#if defined( __cl_uchar2__)
     __cl_uchar2     v2;
 #endif
 }cl_uchar2;
@@ -521,10 +521,10 @@ typedef union
    __extension__ struct{ cl_uchar  s0, s1, s2, s3; };
    __extension__ struct{ cl_uchar2 lo, hi; };
 #endif
-#if defined( __CL_UCHAR2__) 
+#if defined( __CL_UCHAR2__)
     __cl_uchar2     v2[2];
 #endif
-#if defined( __CL_UCHAR4__) 
+#if defined( __CL_UCHAR4__)
     __cl_uchar4     v4;
 #endif
 }cl_uchar4;
@@ -540,10 +540,10 @@ typedef union
    __extension__ struct{ cl_uchar  s0, s1, s2, s3, s4, s5, s6, s7; };
    __extension__ struct{ cl_uchar4 lo, hi; };
 #endif
-#if defined( __CL_UCHAR2__) 
+#if defined( __CL_UCHAR2__)
     __cl_uchar2     v2[4];
 #endif
-#if defined( __CL_UCHAR4__) 
+#if defined( __CL_UCHAR4__)
     __cl_uchar4     v4[2];
 #endif
 #if defined( __CL_UCHAR8__ )
@@ -559,10 +559,10 @@ typedef union
    __extension__ struct{ cl_uchar  s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB, sC, sD, sE, sF; };
    __extension__ struct{ cl_uchar8 lo, hi; };
 #endif
-#if defined( __CL_UCHAR2__) 
+#if defined( __CL_UCHAR2__)
     __cl_uchar2     v2[8];
 #endif
-#if defined( __CL_UCHAR4__) 
+#if defined( __CL_UCHAR4__)
     __cl_uchar4     v4[4];
 #endif
 #if defined( __CL_UCHAR8__ )
@@ -583,7 +583,7 @@ typedef union
    __extension__ struct{ cl_short  s0, s1; };
    __extension__ struct{ cl_short  lo, hi; };
 #endif
-#if defined( __CL_SHORT2__) 
+#if defined( __CL_SHORT2__)
     __cl_short2     v2;
 #endif
 }cl_short2;
@@ -596,10 +596,10 @@ typedef union
    __extension__ struct{ cl_short  s0, s1, s2, s3; };
    __extension__ struct{ cl_short2 lo, hi; };
 #endif
-#if defined( __CL_SHORT2__) 
+#if defined( __CL_SHORT2__)
     __cl_short2     v2[2];
 #endif
-#if defined( __CL_SHORT4__) 
+#if defined( __CL_SHORT4__)
     __cl_short4     v4;
 #endif
 }cl_short4;
@@ -615,10 +615,10 @@ typedef union
    __extension__ struct{ cl_short  s0, s1, s2, s3, s4, s5, s6, s7; };
    __extension__ struct{ cl_short4 lo, hi; };
 #endif
-#if defined( __CL_SHORT2__) 
+#if defined( __CL_SHORT2__)
     __cl_short2     v2[4];
 #endif
-#if defined( __CL_SHORT4__) 
+#if defined( __CL_SHORT4__)
     __cl_short4     v4[2];
 #endif
 #if defined( __CL_SHORT8__ )
@@ -634,10 +634,10 @@ typedef union
    __extension__ struct{ cl_short  s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB, sC, sD, sE, sF; };
    __extension__ struct{ cl_short8 lo, hi; };
 #endif
-#if defined( __CL_SHORT2__) 
+#if defined( __CL_SHORT2__)
     __cl_short2     v2[8];
 #endif
-#if defined( __CL_SHORT4__) 
+#if defined( __CL_SHORT4__)
     __cl_short4     v4[4];
 #endif
 #if defined( __CL_SHORT8__ )
@@ -658,7 +658,7 @@ typedef union
    __extension__ struct{ cl_ushort  s0, s1; };
    __extension__ struct{ cl_ushort  lo, hi; };
 #endif
-#if defined( __CL_USHORT2__) 
+#if defined( __CL_USHORT2__)
     __cl_ushort2     v2;
 #endif
 }cl_ushort2;
@@ -671,10 +671,10 @@ typedef union
    __extension__ struct{ cl_ushort  s0, s1, s2, s3; };
    __extension__ struct{ cl_ushort2 lo, hi; };
 #endif
-#if defined( __CL_USHORT2__) 
+#if defined( __CL_USHORT2__)
     __cl_ushort2     v2[2];
 #endif
-#if defined( __CL_USHORT4__) 
+#if defined( __CL_USHORT4__)
     __cl_ushort4     v4;
 #endif
 }cl_ushort4;
@@ -690,10 +690,10 @@ typedef union
    __extension__ struct{ cl_ushort  s0, s1, s2, s3, s4, s5, s6, s7; };
    __extension__ struct{ cl_ushort4 lo, hi; };
 #endif
-#if defined( __CL_USHORT2__) 
+#if defined( __CL_USHORT2__)
     __cl_ushort2     v2[4];
 #endif
-#if defined( __CL_USHORT4__) 
+#if defined( __CL_USHORT4__)
     __cl_ushort4     v4[2];
 #endif
 #if defined( __CL_USHORT8__ )
@@ -709,10 +709,10 @@ typedef union
    __extension__ struct{ cl_ushort  s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB, sC, sD, sE, sF; };
    __extension__ struct{ cl_ushort8 lo, hi; };
 #endif
-#if defined( __CL_USHORT2__) 
+#if defined( __CL_USHORT2__)
     __cl_ushort2     v2[8];
 #endif
-#if defined( __CL_USHORT4__) 
+#if defined( __CL_USHORT4__)
     __cl_ushort4     v4[4];
 #endif
 #if defined( __CL_USHORT8__ )
@@ -732,7 +732,7 @@ typedef union
    __extension__ struct{ cl_int  s0, s1; };
    __extension__ struct{ cl_int  lo, hi; };
 #endif
-#if defined( __CL_INT2__) 
+#if defined( __CL_INT2__)
     __cl_int2     v2;
 #endif
 }cl_int2;
@@ -745,10 +745,10 @@ typedef union
    __extension__ struct{ cl_int  s0, s1, s2, s3; };
    __extension__ struct{ cl_int2 lo, hi; };
 #endif
-#if defined( __CL_INT2__) 
+#if defined( __CL_INT2__)
     __cl_int2     v2[2];
 #endif
-#if defined( __CL_INT4__) 
+#if defined( __CL_INT4__)
     __cl_int4     v4;
 #endif
 }cl_int4;
@@ -764,10 +764,10 @@ typedef union
    __extension__ struct{ cl_int  s0, s1, s2, s3, s4, s5, s6, s7; };
    __extension__ struct{ cl_int4 lo, hi; };
 #endif
-#if defined( __CL_INT2__) 
+#if defined( __CL_INT2__)
     __cl_int2     v2[4];
 #endif
-#if defined( __CL_INT4__) 
+#if defined( __CL_INT4__)
     __cl_int4     v4[2];
 #endif
 #if defined( __CL_INT8__ )
@@ -783,10 +783,10 @@ typedef union
    __extension__ struct{ cl_int  s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB, sC, sD, sE, sF; };
    __extension__ struct{ cl_int8 lo, hi; };
 #endif
-#if defined( __CL_INT2__) 
+#if defined( __CL_INT2__)
     __cl_int2     v2[8];
 #endif
-#if defined( __CL_INT4__) 
+#if defined( __CL_INT4__)
     __cl_int4     v4[4];
 #endif
 #if defined( __CL_INT8__ )
@@ -807,7 +807,7 @@ typedef union
    __extension__ struct{ cl_uint  s0, s1; };
    __extension__ struct{ cl_uint  lo, hi; };
 #endif
-#if defined( __CL_UINT2__) 
+#if defined( __CL_UINT2__)
     __cl_uint2     v2;
 #endif
 }cl_uint2;
@@ -820,10 +820,10 @@ typedef union
    __extension__ struct{ cl_uint  s0, s1, s2, s3; };
    __extension__ struct{ cl_uint2 lo, hi; };
 #endif
-#if defined( __CL_UINT2__) 
+#if defined( __CL_UINT2__)
     __cl_uint2     v2[2];
 #endif
-#if defined( __CL_UINT4__) 
+#if defined( __CL_UINT4__)
     __cl_uint4     v4;
 #endif
 }cl_uint4;
@@ -839,10 +839,10 @@ typedef union
    __extension__ struct{ cl_uint  s0, s1, s2, s3, s4, s5, s6, s7; };
    __extension__ struct{ cl_uint4 lo, hi; };
 #endif
-#if defined( __CL_UINT2__) 
+#if defined( __CL_UINT2__)
     __cl_uint2     v2[4];
 #endif
-#if defined( __CL_UINT4__) 
+#if defined( __CL_UINT4__)
     __cl_uint4     v4[2];
 #endif
 #if defined( __CL_UINT8__ )
@@ -858,10 +858,10 @@ typedef union
    __extension__ struct{ cl_uint  s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB, sC, sD, sE, sF; };
    __extension__ struct{ cl_uint8 lo, hi; };
 #endif
-#if defined( __CL_UINT2__) 
+#if defined( __CL_UINT2__)
     __cl_uint2     v2[8];
 #endif
-#if defined( __CL_UINT4__) 
+#if defined( __CL_UINT4__)
     __cl_uint4     v4[4];
 #endif
 #if defined( __CL_UINT8__ )
@@ -881,7 +881,7 @@ typedef union
    __extension__ struct{ cl_long  s0, s1; };
    __extension__ struct{ cl_long  lo, hi; };
 #endif
-#if defined( __CL_LONG2__) 
+#if defined( __CL_LONG2__)
     __cl_long2     v2;
 #endif
 }cl_long2;
@@ -894,10 +894,10 @@ typedef union
    __extension__ struct{ cl_long  s0, s1, s2, s3; };
    __extension__ struct{ cl_long2 lo, hi; };
 #endif
-#if defined( __CL_LONG2__) 
+#if defined( __CL_LONG2__)
     __cl_long2     v2[2];
 #endif
-#if defined( __CL_LONG4__) 
+#if defined( __CL_LONG4__)
     __cl_long4     v4;
 #endif
 }cl_long4;
@@ -913,10 +913,10 @@ typedef union
    __extension__ struct{ cl_long  s0, s1, s2, s3, s4, s5, s6, s7; };
    __extension__ struct{ cl_long4 lo, hi; };
 #endif
-#if defined( __CL_LONG2__) 
+#if defined( __CL_LONG2__)
     __cl_long2     v2[4];
 #endif
-#if defined( __CL_LONG4__) 
+#if defined( __CL_LONG4__)
     __cl_long4     v4[2];
 #endif
 #if defined( __CL_LONG8__ )
@@ -932,10 +932,10 @@ typedef union
    __extension__ struct{ cl_long  s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB, sC, sD, sE, sF; };
    __extension__ struct{ cl_long8 lo, hi; };
 #endif
-#if defined( __CL_LONG2__) 
+#if defined( __CL_LONG2__)
     __cl_long2     v2[8];
 #endif
-#if defined( __CL_LONG4__) 
+#if defined( __CL_LONG4__)
     __cl_long4     v4[4];
 #endif
 #if defined( __CL_LONG8__ )
@@ -956,7 +956,7 @@ typedef union
    __extension__ struct{ cl_ulong  s0, s1; };
    __extension__ struct{ cl_ulong  lo, hi; };
 #endif
-#if defined( __CL_ULONG2__) 
+#if defined( __CL_ULONG2__)
     __cl_ulong2     v2;
 #endif
 }cl_ulong2;
@@ -969,10 +969,10 @@ typedef union
    __extension__ struct{ cl_ulong  s0, s1, s2, s3; };
    __extension__ struct{ cl_ulong2 lo, hi; };
 #endif
-#if defined( __CL_ULONG2__) 
+#if defined( __CL_ULONG2__)
     __cl_ulong2     v2[2];
 #endif
-#if defined( __CL_ULONG4__) 
+#if defined( __CL_ULONG4__)
     __cl_ulong4     v4;
 #endif
 }cl_ulong4;
@@ -988,10 +988,10 @@ typedef union
    __extension__ struct{ cl_ulong  s0, s1, s2, s3, s4, s5, s6, s7; };
    __extension__ struct{ cl_ulong4 lo, hi; };
 #endif
-#if defined( __CL_ULONG2__) 
+#if defined( __CL_ULONG2__)
     __cl_ulong2     v2[4];
 #endif
-#if defined( __CL_ULONG4__) 
+#if defined( __CL_ULONG4__)
     __cl_ulong4     v4[2];
 #endif
 #if defined( __CL_ULONG8__ )
@@ -1007,10 +1007,10 @@ typedef union
    __extension__ struct{ cl_ulong  s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB, sC, sD, sE, sF; };
    __extension__ struct{ cl_ulong8 lo, hi; };
 #endif
-#if defined( __CL_ULONG2__) 
+#if defined( __CL_ULONG2__)
     __cl_ulong2     v2[8];
 #endif
-#if defined( __CL_ULONG4__) 
+#if defined( __CL_ULONG4__)
     __cl_ulong4     v4[4];
 #endif
 #if defined( __CL_ULONG8__ )
@@ -1032,7 +1032,7 @@ typedef union
    __extension__ struct{ cl_float  s0, s1; };
    __extension__ struct{ cl_float  lo, hi; };
 #endif
-#if defined( __CL_FLOAT2__) 
+#if defined( __CL_FLOAT2__)
     __cl_float2     v2;
 #endif
 }cl_float2;
@@ -1045,10 +1045,10 @@ typedef union
    __extension__ struct{ cl_float   s0, s1, s2, s3; };
    __extension__ struct{ cl_float2  lo, hi; };
 #endif
-#if defined( __CL_FLOAT2__) 
+#if defined( __CL_FLOAT2__)
     __cl_float2     v2[2];
 #endif
-#if defined( __CL_FLOAT4__) 
+#if defined( __CL_FLOAT4__)
     __cl_float4     v4;
 #endif
 }cl_float4;
@@ -1064,10 +1064,10 @@ typedef union
    __extension__ struct{ cl_float   s0, s1, s2, s3, s4, s5, s6, s7; };
    __extension__ struct{ cl_float4  lo, hi; };
 #endif
-#if defined( __CL_FLOAT2__) 
+#if defined( __CL_FLOAT2__)
     __cl_float2     v2[4];
 #endif
-#if defined( __CL_FLOAT4__) 
+#if defined( __CL_FLOAT4__)
     __cl_float4     v4[2];
 #endif
 #if defined( __CL_FLOAT8__ )
@@ -1083,10 +1083,10 @@ typedef union
    __extension__ struct{ cl_float  s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB, sC, sD, sE, sF; };
    __extension__ struct{ cl_float8 lo, hi; };
 #endif
-#if defined( __CL_FLOAT2__) 
+#if defined( __CL_FLOAT2__)
     __cl_float2     v2[8];
 #endif
-#if defined( __CL_FLOAT4__) 
+#if defined( __CL_FLOAT4__)
     __cl_float4     v4[4];
 #endif
 #if defined( __CL_FLOAT8__ )
@@ -1107,7 +1107,7 @@ typedef union
    __extension__ struct{ cl_double s0, s1; };
    __extension__ struct{ cl_double lo, hi; };
 #endif
-#if defined( __CL_DOUBLE2__) 
+#if defined( __CL_DOUBLE2__)
     __cl_double2     v2;
 #endif
 }cl_double2;
@@ -1120,10 +1120,10 @@ typedef union
    __extension__ struct{ cl_double  s0, s1, s2, s3; };
    __extension__ struct{ cl_double2 lo, hi; };
 #endif
-#if defined( __CL_DOUBLE2__) 
+#if defined( __CL_DOUBLE2__)
     __cl_double2     v2[2];
 #endif
-#if defined( __CL_DOUBLE4__) 
+#if defined( __CL_DOUBLE4__)
     __cl_double4     v4;
 #endif
 }cl_double4;
@@ -1139,10 +1139,10 @@ typedef union
    __extension__ struct{ cl_double  s0, s1, s2, s3, s4, s5, s6, s7; };
    __extension__ struct{ cl_double4 lo, hi; };
 #endif
-#if defined( __CL_DOUBLE2__) 
+#if defined( __CL_DOUBLE2__)
     __cl_double2     v2[4];
 #endif
-#if defined( __CL_DOUBLE4__) 
+#if defined( __CL_DOUBLE4__)
     __cl_double4     v4[2];
 #endif
 #if defined( __CL_DOUBLE8__ )
@@ -1158,10 +1158,10 @@ typedef union
    __extension__ struct{ cl_double  s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, sA, sB, sC, sD, sE, sF; };
    __extension__ struct{ cl_double8 lo, hi; };
 #endif
-#if defined( __CL_DOUBLE2__) 
+#if defined( __CL_DOUBLE2__)
     __cl_double2     v2[8];
 #endif
-#if defined( __CL_DOUBLE4__) 
+#if defined( __CL_DOUBLE4__)
     __cl_double4     v4[4];
 #endif
 #if defined( __CL_DOUBLE8__ )
@@ -1172,9 +1172,9 @@ typedef union
 #endif
 }cl_double16;
 
-/* Macro to facilitate debugging 
+/* Macro to facilitate debugging
  * Usage:
- *   Place CL_PROGRAM_STRING_DEBUG_INFO on the line before the first line of your source. 
+ *   Place CL_PROGRAM_STRING_DEBUG_INFO on the line before the first line of your source.
  *   The first line ends with:   CL_PROGRAM_STRING_BEGIN \"
  *   Each line thereafter of OpenCL C source must end with: \n\
  *   The last line ends in ";
@@ -1189,13 +1189,13 @@ typedef union
  *   }                                               \n\
  *   ";
  *
- * This should correctly set up the line, (column) and file information for your source 
+ * This should correctly set up the line, (column) and file information for your source
  * string so you can do source level debugging.
  */
 #define  __CL_STRINGIFY( _x )               # _x
 #define  _CL_STRINGIFY( _x )                __CL_STRINGIFY( _x )
-#define  CL_PROGRAM_STRING_DEBUG_INFO       "#line "  _CL_STRINGIFY(__LINE__) " \"" __FILE__ "\" \n\n" 
-  
+#define  CL_PROGRAM_STRING_DEBUG_INFO       "#line "  _CL_STRINGIFY(__LINE__) " \"" __FILE__ "\" \n\n"
+
 #ifdef __cplusplus
 }
 #endif
