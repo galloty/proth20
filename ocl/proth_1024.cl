@@ -5,6 +5,117 @@ proth20 is free source code, under the MIT license (see LICENSE). You can redist
 Please give feedback to the authors if improvement is realized. It is distributed in the hope that it will be useful.
 */
 
+#define CHUNK256	8
+
+__kernel __attribute__((reqd_work_group_size(256 / 4 * CHUNK256, 1, 1)))
+void sub_ntt256(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2)
+{
+	__local uint2 X[256 * CHUNK256];
+
+	const size_t m = get_global_size(0) / 64;
+
+	const size_t local_id = get_local_id(0), chunk_idx = local_id % CHUNK256, threadIdx = local_id / CHUNK256, block_idx = get_group_id(0) * CHUNK256;
+
+	const size_t bl_i = block_idx | chunk_idx;
+
+	const size_t _i_64m = threadIdx;
+	const size_t _i_16m = ((4 * threadIdx) & ~(16 * 4 - 1)) | (threadIdx % 16);
+	const size_t _i_4m = ((4 * threadIdx) & ~(4 * 4 - 1)) | (threadIdx % 4);
+	const size_t _i_m = 4 * threadIdx;
+
+	const size_t i_64m = _i_64m * CHUNK256 | chunk_idx;
+	const size_t i_16m = _i_16m * CHUNK256 | chunk_idx;
+	const size_t i_4m = _i_4m * CHUNK256 | chunk_idx;
+	const size_t i_m = _i_m * CHUNK256 | chunk_idx;
+
+	const size_t k_64m = _i_64m * m | bl_i;
+	const size_t k_16m = _i_16m * m | bl_i;
+	const size_t k_4m = _i_4m * m | bl_i;
+	const size_t k_m = _i_m * m | bl_i;
+
+	const size_t j_64m = k_64m;	// & (64 * m - 1);
+	const size_t j_16m = k_16m & (16 * m - 1);
+	const size_t j_4m = k_4m & (4 * m - 1);
+	const size_t j_m = bl_i;	// k_m & (m - 1);
+
+	_sub_forward4i(64 * CHUNK256, &X[i_64m], 64 * m, &x[k_64m], r2[j_64m], r1ir1[j_64m]);
+	_forward4(16 * CHUNK256, &X[i_16m], r2[64 * m + j_16m], r1ir1[64 * m + j_16m]);
+	_forward4(4 * CHUNK256, &X[i_4m], r2[64 * m + 16 * m + j_4m], r1ir1[64 * m + 16 * m + j_4m]);
+	_forward4o(m, &x[k_m], CHUNK256, &X[i_m], r2[64 * m + 16 * m + 4 * m + j_m], r1ir1[64 * m + 16 * m + 4 * m + j_m]);
+}
+
+__kernel __attribute__((reqd_work_group_size(256 / 4 * CHUNK256, 1, 1)))
+void ntt256(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
+{
+	__local uint2 X[256 * CHUNK256];
+
+	const size_t local_id = get_local_id(0), chunk_idx = local_id % CHUNK256, threadIdx = local_id / CHUNK256, block_idx = get_group_id(0) * CHUNK256;
+
+	__global uint2 * const xo = &x[256 * (block_idx & ~(m - 1))];		// m-block offset
+	const size_t bl_i = (block_idx & (m - 1)) | chunk_idx;
+
+	const size_t _i_64m = threadIdx;
+	const size_t _i_16m = ((4 * threadIdx) & ~(16 * 4 - 1)) | (threadIdx % 16);
+	const size_t _i_4m = ((4 * threadIdx) & ~(4 * 4 - 1)) | (threadIdx % 4);
+	const size_t _i_m = 4 * threadIdx;
+
+	const size_t i_64m = _i_64m * CHUNK256 | chunk_idx;
+	const size_t i_16m = _i_16m * CHUNK256 | chunk_idx;
+	const size_t i_4m = _i_4m * CHUNK256 | chunk_idx;
+	const size_t i_m = _i_m * CHUNK256 | chunk_idx;
+
+	const size_t k_64m = _i_64m * m | bl_i;
+	const size_t k_16m = _i_16m * m | bl_i;
+	const size_t k_4m = _i_4m * m | bl_i;
+	const size_t k_m = _i_m * m | bl_i;
+
+	const size_t j_64m = k_64m;	// & (64 * m - 1);
+	const size_t j_16m = k_16m & (16 * m - 1);
+	const size_t j_4m = k_4m & (4 * m - 1);
+	const size_t j_m = bl_i;	// k_m & (m - 1); We have bl_i < m
+
+	_forward4i(64 * CHUNK256, &X[i_64m], 64 * m, &xo[k_64m], r2[rindex + j_64m], r1ir1[rindex + j_64m]);
+	_forward4(16 * CHUNK256, &X[i_16m], r2[rindex + 64 * m + j_16m], r1ir1[rindex + 64 * m + j_16m]);
+	_forward4(4 * CHUNK256, &X[i_4m], r2[rindex + 64 * m + 16 * m + j_4m], r1ir1[rindex + 64 * m + 16 * m + j_4m]);
+	_forward4o(m, &xo[k_m], CHUNK256, &X[i_m], r2[rindex + 64 * m + 16 * m + 4 * m + j_m], r1ir1[rindex + 64 * m + 16 * m + 4 * m + j_m]);
+}
+
+__kernel __attribute__((reqd_work_group_size(256 / 4 * CHUNK256, 1, 1)))
+void intt256(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2, const uint m, const uint rindex)
+{
+	__local uint2 X[256 * CHUNK256];
+
+	const size_t local_id = get_local_id(0), chunk_idx = local_id % CHUNK256, threadIdx = local_id / CHUNK256, block_idx = get_group_id(0) * CHUNK256;
+
+	__global uint2 * const xo = &x[256 * (block_idx & ~(m - 1))];		// m-block offset
+	const size_t bl_i = (block_idx & (m - 1)) | chunk_idx;
+
+	const size_t _i_64m = threadIdx;
+	const size_t _i_16m = ((4 * threadIdx) & ~(16 * 4 - 1)) | (threadIdx % 16);
+	const size_t _i_4m = ((4 * threadIdx) & ~(4 * 4 - 1)) | (threadIdx % 4);
+	const size_t _i_m = 4 * threadIdx;
+
+	const size_t i_64m = _i_64m * CHUNK256 | chunk_idx;
+	const size_t i_16m = _i_16m * CHUNK256 | chunk_idx;
+	const size_t i_4m = _i_4m * CHUNK256 | chunk_idx;
+	const size_t i_m = _i_m * CHUNK256 | chunk_idx;
+
+	const size_t k_64m = _i_64m * m | bl_i;
+	const size_t k_16m = _i_16m * m | bl_i;
+	const size_t k_4m = _i_4m * m | bl_i;
+	const size_t k_m = _i_m * m | bl_i;
+
+	const size_t j_64m = k_64m;	// & (64 * m - 1);
+	const size_t j_16m = k_16m & (16 * m - 1);
+	const size_t j_4m = k_4m & (4 * m - 1);
+	const size_t j_m = bl_i;	// k_m & (m - 1); We have bl_i < m
+
+	_backward4i(CHUNK256, &X[i_m], m, &xo[k_m], ir2[rindex + 64 * m + 16 * m + 4 * m + j_m], r1ir1[rindex + 64 * m + 16 * m + 4 * m + j_m]);
+	_backward4(4 * CHUNK256, &X[i_4m], ir2[rindex + 64 * m + 16 * m + j_4m], r1ir1[rindex + 64 * m + 16 * m + j_4m]);
+	_backward4(16 * CHUNK256, &X[i_16m], ir2[rindex + 64 * m + j_16m], r1ir1[rindex + 64 * m + j_16m]);
+	_backward4o(64 * m, &xo[k_64m], 64 * CHUNK256, &X[i_64m], ir2[rindex + j_64m], r1ir1[rindex + j_64m]);
+}
+
 __kernel __attribute__((reqd_work_group_size(2048 / 4, 1, 1)))
 void square2048(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)
 {
