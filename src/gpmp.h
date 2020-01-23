@@ -497,13 +497,13 @@ public:
 		_device.sub_ntt64();
 
 		cl_uint m = cl_uint(size / 4);
-		cl_uint rindex = m + m / 4 + m / 16;
+		cl_uint rindex = (16 + 4 + 1) * (m / 16);
 		m /= 64;
 
 		for (; m > 256; m /= 64)
 		{
 			_device.ntt64(m / 16, rindex);
-			rindex += m + m / 4 + m / 16;
+			rindex += (16 + 4 + 1) * (m / 16);
 		}
 
 		if (m == 256)        _device.square1024();
@@ -511,12 +511,14 @@ public:
 		else if (m == 64)    _device.square256();
 		else if (m == 32)    _device.square128();
 		else if (m == 16)    _device.square64();
-		else /*if (m == 8)*/ _device.square32();
+		else if (m == 8)     _device.square32();
+		else if (m == 4)     _device.square16();
+		else /*if (m == 2)*/ _device.square8();
 
-		while (m < cl_uint(size / 4))
+		while (m <= cl_uint(size / 4) / 64)
 		{
 			m *= 64;
-			rindex -= m + m / 4 + m / 16;
+			rindex -= (16 + 4 + 1) * (m / 16);
 			_device.intt64(m / 16, rindex);
 		}
 
@@ -539,13 +541,13 @@ public:
 		_device.sub_ntt64_u();
 
 		cl_uint m = cl_uint(_size / 4);
-		cl_uint rindex = m + m / 4 + m / 16;
+		cl_uint rindex = (16 + 4 + 1) * (m / 16);
 		m /= 64;
 
 		for (; m > 256; m /= 64)
 		{
 			_device.ntt64_u(m / 16, rindex);
-			rindex += m + m / 4 + m / 16;
+			rindex += (16 + 4 + 1) * (m / 16);
 		}
 
 		for (; m > 1; m /= 4)
@@ -567,13 +569,13 @@ public:
 		_device.sub_ntt64();
 
 		cl_uint m = cl_uint(size / 4);
-		cl_uint rindex = m + m / 4 + m / 16;
+		cl_uint rindex = (16 + 4 + 1) * (m / 16);
 		m /= 64;
 
 		for (; m > 256; m /= 64)
 		{
 			_device.ntt64(m / 16, rindex);
-			rindex += m + m / 4 + m / 16;
+			rindex += (16 + 4 + 1) * (m / 16);
 		}
 
 		size_t n4 = 0;
@@ -598,7 +600,7 @@ public:
 		while (m < cl_uint(size / 4))
 		{
 			m *= 64;
-			rindex -= m + m / 4 + m / 16;
+			rindex -= (16 + 4 + 1) * (m / 16);
 			_device.intt64(m / 16, rindex);
 		}
 
@@ -701,7 +703,7 @@ private:
 		for (; s > 256; s /= 64)
 		{
 			_device.reduce_upsweep64(s / 16, j);
-			j += 5 * (s + s / 4 + s / 16);
+			j += 5 * (16 + 4 + 1) * (s / 16);
 		}
 
 		if (s == 256)        _device.reduce_topsweep1024(j);
@@ -714,7 +716,7 @@ private:
 		while (s < n / 4)
 		{
 			s *= 64;
-			j -= 5 * (s + s / 4 + s / 16);
+			j -= 5 * (16 + 4 + 1) * (s / 16);
 			_device.reduce_downsweep64(s / 16, j);
 		}
 

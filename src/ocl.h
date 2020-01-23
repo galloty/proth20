@@ -209,9 +209,10 @@ private:
 	size_t _size = 0, _constant_size = 0;
 	cl_mem _x = nullptr, _y = nullptr, _t = nullptr, _cr = nullptr, _u = nullptr, _tu = nullptr, _v = nullptr, _m1 = nullptr, _m2 = nullptr, _err = nullptr;
 	cl_mem _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr1ir1 = nullptr, _cr2ir2 = nullptr, _bp = nullptr, _ibp = nullptr;
-	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr;
-	cl_kernel _square32 = nullptr, _square64 = nullptr, _square128 = nullptr, _square256 = nullptr,_square512 = nullptr, _square1024 = nullptr;
-	cl_kernel _square2048 = nullptr, _square4096 = nullptr;
+	cl_kernel _sub_ntt64 = nullptr, _ntt64 = nullptr, _intt64 = nullptr, _sub_ntt256 = nullptr, _ntt256 = nullptr, _intt256 = nullptr;
+	cl_kernel _sub_ntt1024 = nullptr, _ntt1024 = nullptr, _intt1024 = nullptr;
+	cl_kernel _square8 = nullptr, _square16 = nullptr, _square32 = nullptr, _square64 = nullptr, _square128 = nullptr, _square256 = nullptr;
+	cl_kernel _square512 = nullptr, _square1024 = nullptr, _square2048 = nullptr, _square4096 = nullptr;
 	cl_kernel _poly2int0 = nullptr, _poly2int1 = nullptr;
 	cl_kernel _reduce_upsweep64 = nullptr, _reduce_downsweep64 = nullptr;
 	cl_kernel _reduce_topsweep32 = nullptr, _reduce_topsweep64 = nullptr, _reduce_topsweep128 = nullptr;
@@ -235,7 +236,9 @@ private:
 	std::map<cl_kernel, profile> _profileMap;
 
 	// Must be identical to ocl defines
-	static const size_t CHUNK64 = 16, BLK32 = 8, BLK64 = 4, BLK128 = 2, BLK256 = 1, P2I_WGS = 16, P2I_BLK = 16, RED_BLK = 4;
+	static const size_t CHUNK64 = 16, CHUNK256 = 8, CHUNK1024 = 4;
+	static const size_t BLK8 = 32, BLK16 = 16, BLK32 = 8, BLK64 = 4, BLK128 = 2, BLK256 = 1;
+	static const size_t P2I_WGS = 16, P2I_BLK = 16, RED_BLK = 4;
 
 public:
 	device(const engine & parent, const size_t d) : _engine(parent), _d(d), _platform(parent.getPlatform(d)), _device(parent.getDevice(d))
@@ -509,7 +512,18 @@ public:
 		_sub_ntt64 = _createNttKernel("sub_ntt64", true);
 		_ntt64 = _createNttKernel("ntt64", true);
 		_intt64 = _createNttKernel("intt64", false);
+		if (ext1024)
+		{
+			_sub_ntt256 = _createNttKernel("sub_ntt256", true);
+			_ntt256 = _createNttKernel("ntt256", true);
+			_intt256 = _createNttKernel("intt256", false);
+			_sub_ntt1024 = _createNttKernel("sub_ntt1024", true);
+			_ntt1024 = _createNttKernel("ntt1024", true);
+			_intt1024 = _createNttKernel("intt1024", false);
+		}
 
+		_square8 = _createSquareKernel("square8");
+		_square16 = _createSquareKernel("square16");
 		_square32 = _createSquareKernel("square32");
 		_square64 = _createSquareKernel("square64");
 		_square128 = _createSquareKernel("square128");
@@ -599,7 +613,15 @@ public:
 		_releaseKernel(_sub_ntt64);
 		_releaseKernel(_ntt64);
 		_releaseKernel(_intt64);
+		_releaseKernel(_sub_ntt256);
+		_releaseKernel(_ntt256);
+		_releaseKernel(_intt256);
+		_releaseKernel(_sub_ntt1024);
+		_releaseKernel(_ntt1024);
+		_releaseKernel(_intt1024);
 
+		_releaseKernel(_square8);
+		_releaseKernel(_square16);
 		_releaseKernel(_square32);
 		_releaseKernel(_square64);
 		_releaseKernel(_square128);
@@ -680,20 +702,26 @@ public:
 
 public:
 	void sub_ntt64() { _executeKernel(_sub_ntt64, _size / 4, CHUNK64 * (64 / 4)); }
+	void sub_ntt256() { _executeKernel(_sub_ntt256, _size / 4, CHUNK256 * (256 / 4)); }
+	void sub_ntt1024() { _executeKernel(_sub_ntt1024, _size / 4, CHUNK1024 * (1024 / 4)); }
 
 private:
-	inline void _executeNttKernel(cl_kernel kernel, const cl_uint m, const cl_uint rindex)
+	inline void _executeNttKernel(cl_kernel kernel, const cl_uint m, const cl_uint rindex, const size_t size)
 	{
 		_setKernelArg(kernel, 3, sizeof(cl_uint), &m);
 		_setKernelArg(kernel, 4, sizeof(cl_uint), &rindex);
-		_executeKernel(kernel, _size / 4, CHUNK64 * (64 / 4));
+		_executeKernel(kernel, _size / 4, size);
 	}
 
 public:
-	void ntt64(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_ntt64, m, rindex); }
-	void intt64(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_intt64, m, rindex); }
-	void ntt4(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_ntt4, m, rindex); }
-	void intt4(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_intt4, m, rindex); }
+	void ntt64(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_ntt64, m, rindex, CHUNK64 * (64 / 4)); }
+	void intt64(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_intt64, m, rindex, CHUNK64 * (64 / 4)); }
+	void ntt256(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_ntt256, m, rindex, CHUNK256 * (256 / 4)); }
+	void intt256(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_intt256, m, rindex, CHUNK256 * (256 / 4)); }
+	void ntt1024(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_ntt1024, m, rindex, CHUNK1024 * (1024 / 4)); }
+	void intt1024(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_intt1024, m, rindex, CHUNK1024 * (1024 / 4)); }
+	void ntt4(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_ntt4, m, rindex, 0); }
+	void intt4(const cl_uint m, const cl_uint rindex) { _executeNttKernel(_intt4, m, rindex, 0); }
 
 public:
 	void sub_ntt64_u()
@@ -707,7 +735,7 @@ public:
 	void ntt64_u(const cl_uint m, const cl_uint rindex)
 	{
 		_setKernelArg(_ntt64, 0, sizeof(cl_mem), &_tu);
-		_executeNttKernel(_ntt64, m, rindex);
+		_executeNttKernel(_ntt64, m, rindex, CHUNK64 * (64 / 4));
 		_setKernelArg(_ntt64, 0, sizeof(cl_mem), &_x);
 	}
 
@@ -715,11 +743,13 @@ public:
 	void ntt4_u(const cl_uint m, const cl_uint rindex)
 	{
 		_setKernelArg(_ntt4, 0, sizeof(cl_mem), &_tu);
-		_executeNttKernel(_ntt4, m, rindex);
+		_executeNttKernel(_ntt4, m, rindex, CHUNK64 * (64 / 4));
 		_setKernelArg(_ntt4, 0, sizeof(cl_mem), &_x);
 	}
 
 public:
+	void square8() { _executeKernel(_square8, _size / 4, BLK8 * 8 / 4); }
+	void square16() { _executeKernel(_square16, _size / 4, BLK16 * 16 / 4); }
 	void square32() { _executeKernel(_square32, _size / 4, BLK32 * 32 / 4); }
 	void square64() { _executeKernel(_square64, _size / 4, BLK64 * 64 / 4); }
 	void square128() { _executeKernel(_square128, _size / 4, BLK128 * 128 / 4); }

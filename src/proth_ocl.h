@@ -29,6 +29,8 @@ static const char * const src_proth_ocl = \
 "#define	P1P2		(P1 * (ulong)(P2))\n" \
 "\n" \
 "#define CHUNK64		16\n" \
+"#define BLK8		32\n" \
+"#define BLK16		16\n" \
 "#define BLK32		8\n" \
 "#define BLK64		4\n" \
 "#define BLK128		2\n" \
@@ -191,7 +193,7 @@ static const char * const src_proth_ocl = \
 "	X[0] = addmod(t0, t2); X[2] = submod(t0, t2); X[1] = addmod(t1, t3); X[3] = submod(t1, t3);\n" \
 "}\n" \
 "\n" \
-"__kernel  __attribute__((reqd_work_group_size(64 / 4 * CHUNK64, 1, 1)))\n" \
+"__kernel __attribute__((reqd_work_group_size(64 / 4 * CHUNK64, 1, 1)))\n" \
 "void sub_ntt64(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2)\n" \
 "{\n" \
 "	__local uint2 X[64 * CHUNK64];\n" \
@@ -223,7 +225,7 @@ static const char * const src_proth_ocl = \
 "	_forward4o(m, &x[k_m], CHUNK64, &X[i_m], r2[16 * m + 4 * m + j_m], r1ir1[16 * m + 4 * m + j_m]);\n" \
 "}\n" \
 "\n" \
-"__kernel  __attribute__((reqd_work_group_size(64 / 4 * CHUNK64, 1, 1)))\n" \
+"__kernel __attribute__((reqd_work_group_size(64 / 4 * CHUNK64, 1, 1)))\n" \
 "void ntt64(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)\n" \
 "{\n" \
 "	__local uint2 X[64 * CHUNK64];\n" \
@@ -254,7 +256,7 @@ static const char * const src_proth_ocl = \
 "	_forward4o(m, &xo[k_m], CHUNK64, &X[i_m], r2[rindex + 16 * m + 4 * m + j_m], r1ir1[rindex + 16 * m + 4 * m + j_m]);\n" \
 "}\n" \
 "\n" \
-"__kernel  __attribute__((reqd_work_group_size(64 / 4 * CHUNK64, 1, 1)))\n" \
+"__kernel __attribute__((reqd_work_group_size(64 / 4 * CHUNK64, 1, 1)))\n" \
 "void intt64(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2, const uint m, const uint rindex)\n" \
 "{\n" \
 "	__local uint2 X[64 * CHUNK64];\n" \
@@ -283,6 +285,34 @@ static const char * const src_proth_ocl = \
 "	_backward4i(CHUNK64, &X[i_m], m, &xo[k_m], ir2[rindex + 16 * m + 4 * m + j_m], r1ir1[rindex + 16 * m + 4 * m + j_m]);\n" \
 "	_backward4(4 * CHUNK64, &X[i_4m], ir2[rindex + 16 * m + j_4m], r1ir1[rindex + 16 * m + j_4m]);\n" \
 "	_backward4o(16 * m, &xo[k_16m], 16 * CHUNK64, &X[i_16m], ir2[rindex + j_16m], r1ir1[rindex + j_16m]);\n" \
+"}\n" \
+"\n" \
+"__kernel __attribute__((reqd_work_group_size(8 / 4 * BLK8, 1, 1)))\n" \
+"void square8(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)\n" \
+"{\n" \
+"	__local uint2 X[8 * BLK8];\n" \
+"\n" \
+"	const size_t i = get_local_id(0);\n" \
+"	const size_t i_2 = i % 2, _i2 = ((4 * i) & (size_t)~(4 * 2 - 1)), i2 = _i2 | i_2, j2 = i_2, i_0 = _i2 | (2 * i_2);\n" \
+"	const size_t k2 = get_group_id(0) * 8 * BLK8 | i2;\n" \
+"\n" \
+"	_forward4i(2, &X[i2], 2, &x[k2], r2ir2[j2].s01, r1ir1[j2]);\n" \
+"	_square2(&X[i_0]);\n" \
+"	_backward4o(2, &x[k2], 2, &X[i2], r2ir2[j2].s23, r1ir1[j2]);\n" \
+"}\n" \
+"\n" \
+"__kernel __attribute__((reqd_work_group_size(16 / 4 * BLK16, 1, 1)))\n" \
+"void square16(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)\n" \
+"{\n" \
+"	__local uint2 X[16 * BLK16];\n" \
+"\n" \
+"	const size_t i = get_local_id(0);\n" \
+"	const size_t i_4 = i % 4, i4 = ((4 * i) & (size_t)~(4 * 4 - 1)) | i_4, j4 = i_4;\n" \
+"	const size_t k4 = get_group_id(0) * 16 * BLK16 | i4;\n" \
+"\n" \
+"	_forward4i(4, &X[i4], 4, &x[k4], r2ir2[j4].s01, r1ir1[j4]);\n" \
+"	_square4(&X[4 * i]);\n" \
+"	_backward4o(4, &x[k4], 4, &X[i4], r2ir2[j4].s23, r1ir1[j4]);\n" \
 "}\n" \
 "\n" \
 "__kernel __attribute__((reqd_work_group_size(32 / 4 * BLK32, 1, 1)))\n" \
