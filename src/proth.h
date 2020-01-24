@@ -253,18 +253,18 @@ public:
 		primeList.push_back(number(1139, 2641));
 		primeList.push_back(number(1035, 5336));
 		primeList.push_back(number(965, 10705));
-		primeList.push_back(number(1027, 21468));		// size = 2^11, square32
-		primeList.push_back(number(1109, 42921));		// size = 2^12, square64
-		primeList.push_back(number(1085, 85959));		// size = 2^13, square128	64-bit 32-bit
-		primeList.push_back(number(1015, 171214));		// size = 2^14, square256,  0.073  0.072
-		primeList.push_back(number(1197, 343384));		// size = 2^15, square512,  0.107  0.101
-		primeList.push_back(number(1089, 685641));		// size = 2^16, square1024, 0.170  0.168
-		primeList.push_back(number(1005, 1375758));		// size = 2^17, square32,   0.315  0.306	square2048	0.300
-		primeList.push_back(number(1089, 2746155));		// size = 2^18, square64,   0.580  0.556	square4096	0.594
-		primeList.push_back(number(45, 5308037));		// size = 2^19, square128,  1.09   1.06
-		primeList.push_back(number(6679881, 6679881));	// size = 2^20, square256,  2.15
-		primeList.push_back(number(3, 10829346));		// size = 2^21, square512,  4.43
-		primeList.push_back(number(10223, 31172165));	// size = 2^22, square1024, 8.96
+		primeList.push_back(number(1027, 21468));		// size = 2^11, 64      sq32
+		primeList.push_back(number(1109, 42921));		// size = 2^12, 64      sq64
+		primeList.push_back(number(1085, 85959));		// size = 2^13, 64     sq128 64-bit 32-bit
+		primeList.push_back(number(1015, 171214));		// size = 2^14, 64     sq256, 0.073  0.071
+		primeList.push_back(number(1197, 343384));		// size = 2^15, 64     sq512, 0.107  0.095
+		primeList.push_back(number(1089, 685641));		// size = 2^16, 64    sq1024, 0.170  0.163
+		primeList.push_back(number(1005, 1375758));		// size = 2^17, 256    sq512, 0.291  0.284
+		primeList.push_back(number(1089, 2746155));		// size = 2^18, 256   sq1024, 0.542  0.527
+		primeList.push_back(number(45, 5308037));		// size = 2^19, 256   sq2048, 1.04   1.02
+		primeList.push_back(number(6679881, 6679881));	// size = 2^20, 256 256 sq16, 2.05   1.97
+		primeList.push_back(number(3, 10829346));		// size = 2^21, 256 256 sq32, 4.14   4.01
+		primeList.push_back(number(10223, 31172165));	// size = 2^22, 256 256 sq64, 8.43   8.13
 
 		for (const auto & p : primeList) if (!check(p.k, p.n, engine, bench, true)) return;
 	}

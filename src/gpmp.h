@@ -66,7 +66,16 @@ private:
 	const bool _ext1024;
 	engine & _engine;
 	cl_uint2 * const _mem;
-	std::vector<uint32_t> _squarePattern;
+
+	struct squareSeq
+	{
+		size_t ns;
+		cl_uint s[8];
+
+		squareSeq() : ns(0) {}
+		squareSeq(const std::vector<uint32_t> & seq) { ns = seq.size(); for (size_t i = 0; i < ns; ++i) s[i] = seq[i]; }
+	};
+	squareSeq _squareSeq;
 
 private:
 	template <uint32_t p> class Zp
@@ -256,23 +265,27 @@ public:
 
 		engine.setProfiling(true);
 		_initEngine();
-		const size_t patternCount = engine.configure(_ext1024);
-		init(5);
-		for (size_t i = 0; i < patternCount; ++i)
-		{
-			_squarePattern = engine.getPattern(i);
-			// uint32_t m = uint32_t(_size / 4);
-			// for (const uint32_t mi : _squarePattern) { std::cout << mi << " "; m /= mi; }
-			// std::cout << "+ " << m << std::endl;
 
-			square();
+		const size_t cnt = engine.configure(_ext1024);
+		cl_ulong bestTime = cl_ulong(-1);
+		size_t best_i = 0;
+		for (size_t i = 0; i < cnt; ++i)
+		{
+			initProfiling();
+			_squareSeq = squareSeq(engine.getSquareSeq(i));
+			for (size_t j = 0; j < 16; ++j) square();
+			const cl_ulong time = engine.getProfileTime();
+			if (time < bestTime)
+			{
+				bestTime = time;
+				best_i = i;
+			}
+			engine.resetProfiles();
 		}
-		// uint32_t m = uint32_t(_size / 4);
-		// for (const uint32_t mi : _squarePattern) { std::cout << mi << " "; m /= mi; }
-		// std::cout << "+ " << m << std::endl;
+
+		_squareSeq = squareSeq(engine.getSquareSeq(best_i));
 
 		_clearEngine();
-		engine.resetProfiles();
 		engine.setProfiling(profile);
 		_initEngine();
 	}
@@ -341,22 +354,6 @@ public:
 		_engine.readMemory_err(&err);
 		return int(err);
 	}
-
-public:
-	// void test()
-	// {
-	// 	const size_t size = _size;
-	// 	cl_uint2 * const x = _mem;
-
-	// 	for (size_t i = 0; i < size / 2; ++i) x[i] =  { (uint32_t(1) << _digit_bit) - 1, 0 };
-	// 	for (size_t i = size / 2; i < size; ++i) x[i] = { 0, 0 };
-	// 	square();
-
-	// 	for (size_t i = 0 * size / 4; i < 1 * size / 4; ++i) x[i] = { (uint32_t(1) << _digit_bit) - 1, 0 };
-	// 	for (size_t i = 1 * size / 4; i < 2 * size / 4; ++i) x[i] = { 0, (uint32_t(1) << _digit_bit) - 1 };
-	// 	for (size_t i = size / 2; i < size; ++i) x[i] = { 0, 0 };
-	// 	square();
-	// }
 
 private:
 	static bool _writeContext(std::ofstream & cFile, const char * const ptr, const size_t size)
@@ -468,6 +465,23 @@ public:
 	}
 
 public:
+	void initProfiling()
+	{
+		const size_t size = _size;
+
+		cl_uint2 * const x = _mem;
+		for (size_t i = 0; i < size / 2; ++i) x[i] =  { (uint32_t(1) << _digit_bit) - 1, 0 };
+		for (size_t i = size / 2; i < size; ++i) x[i] = { 0, 0 };
+		_engine.writeMemory_x(x);
+
+		cl_uint2 * const u = _mem;
+		for (size_t i = 0 * size / 4; i < 1 * size / 4; ++i) u[i] = { (uint32_t(1) << _digit_bit) - 1, 0 };
+		for (size_t i = 1 * size / 4; i < 2 * size / 4; ++i) u[i] = { 0, (uint32_t(1) << _digit_bit) - 1 };
+		for (size_t i = size / 2; i < size; ++i) u[i] = { 0, 0 };
+		_engine.writeMemory_u(u);
+}
+
+public:
 	void set_bug()
 	{
 		cl_uint2 * const x = _mem;
@@ -497,59 +511,53 @@ public:
 	{
 		const size_t size = _size;
 
-		const std::vector<uint32_t> & pattern = _squarePattern;
+		const squareSeq & seq = _squareSeq;
 
 		// x size is size / 2; _x[0] = R, _x[1] = Y; compute (R - Y)^2
 
 		cl_uint m = cl_uint(size / 4);
 		cl_uint rindex = 0;
 
-		if (pattern[0] == 1024)
+		if (seq.s[0] == 1024)
 		{
 			_engine.sub_ntt1024();
 			rindex += (256 + 64 + 16 + 4 + 1) * (m / 256);
 			m /= 1024;
 		} 
-		else if (pattern[0] == 256)
+		else if (seq.s[0] == 256)
 		{
 			_engine.sub_ntt256();
 			rindex += (64 + 16 + 4 + 1) * (m / 64);
 			m /= 256;
 		}
-		else /*if (pattern[0] == 64)*/
+		else /*if (seq.s[0] == 64)*/
 		{
 			_engine.sub_ntt64();
 			rindex += (16 + 4 + 1) * (m / 16);
 			m /= 64;
 		}
 
-		for (size_t i = 1; i < pattern.size(); ++i)
+		for (size_t i = 1; i < seq.ns; ++i)
 		{
-			if (pattern[i] == 1024)
+			if (seq.s[i] == 1024)
 			{
 				_engine.ntt1024(m / 256, rindex);
 				rindex += (256 + 64 + 16 + 4 + 1) * (m / 256);
 				m /= 1024;
 			} 
-			else if (pattern[i] == 256)
+			else if (seq.s[i] == 256)
 			{
 				_engine.ntt256(m / 64, rindex);
 				rindex += (64 + 16 + 4 + 1) * (m / 64);
 				m /= 256;
 			}
-			else /*if (pattern[i] == 64)*/
+			else /*if (seq.s[i] == 64)*/
 			{
 				_engine.ntt64(m / 16, rindex);
 				rindex += (16 + 4 + 1) * (m / 16);
 				m /= 64;
 			}
 		}
-
-		// for (; m > 256; m /= 64)
-		// {
-		// 	_engine.ntt64(m / 16, rindex);
-		// 	rindex += (16 + 4 + 1) * (m / 16);
-		// }
 
 		if (m == 1024)       _engine.square4096();
 		else if (m == 512)   _engine.square2048();
@@ -562,36 +570,29 @@ public:
 		else if (m == 4)     _engine.square16();
 		else /*if (m == 2)*/ _engine.square8();
 
-		for (size_t i = 0; i < pattern.size(); ++i)
+		for (size_t i = 0; i < seq.ns; ++i)
 		{
-			const size_t ri = pattern.size() - 1 - i;
+			const size_t ri = seq.ns - 1 - i;
 
-			if (pattern[ri] == 1024)
+			if (seq.s[ri] == 1024)
 			{
 				m *= 1024;
 				rindex -= (256 + 64 + 16 + 4 + 1) * (m / 256);
 				_engine.intt1024(m / 256, rindex);
 			} 
-			else if (pattern[ri] == 256)
+			else if (seq.s[ri] == 256)
 			{
 				m *= 256;
 				rindex -= (64 + 16 + 4 + 1) * (m / 64);
 				_engine.intt256(m / 64, rindex);
 			}
-			else /*if (pattern[ri] == 64)*/
+			else /*if (seq.s == 64)*/
 			{
 				m *= 64;
 				rindex -= (16 + 4 + 1) * (m / 16);
 				_engine.intt64(m / 16, rindex);
 			}
 		}
-
-		// while (m <= cl_uint(size / 4) / 64)
-		// {
-		// 	m *= 64;
-		// 	rindex -= (16 + 4 + 1) * (m / 16);
-		// 	_engine.intt64(m / 16, rindex);
-		// }
 
 		_engine.poly2int0();
 		_engine.poly2int1();

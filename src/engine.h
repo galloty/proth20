@@ -14,15 +14,12 @@ class engine : public ocl::device
 private:
 	class splitter
 	{
-	public:
-		typedef std::vector<uint32_t> pattern;
-
 	private:
 		bool _b1024 = false;
-		std::vector<pattern> _group;
+		std::vector<std::vector<uint32_t> > _squareSet;
 
 	private:
-		void split(const uint32_t m, const size_t i, pattern & p)
+		void split(const uint32_t m, const size_t i, std::vector<uint32_t> & p)
 		{
 			if (_b1024 && (m >= 1024 / 4 * CHUNK1024))
 			{
@@ -45,7 +42,7 @@ private:
 
 			if ((i != 0) && (m >= 2) && ((m <= 256) || (_b1024 && (m <= 1024))))
 			{
-				_group.push_back(p);
+				_squareSet.push_back(p);
 			}
 		}
 
@@ -57,11 +54,12 @@ private:
 		void init(const uint32_t n, const bool b1024)
 		{
 			_b1024 = b1024;
-			_group.clear();
-			pattern p; split(n, 0, p);
+			_squareSet.clear();
+			std::vector<uint32_t> p; split(n, 0, p);
 		}
 
-		const std::vector<pattern> & getGroup() const { return _group; }
+		size_t getSquareSize() const { return _squareSet.size(); }
+		const std::vector<uint32_t> & getSquareSeq(const size_t i) const { return _squareSet.at(i); }
 	};
 
 private:
@@ -95,11 +93,11 @@ public:
 	{
 		if (_size == 0) return 0;
 		_splitter.init(_size / 4, b1024);
-		return _splitter.getGroup().size();
+		return _splitter.getSquareSize();
 	}
 
 public:
-	const std::vector<uint32_t> & getPattern(const size_t i) const { return _splitter.getGroup().at(i); }
+	const std::vector<uint32_t> & getSquareSeq(const size_t i) const { return _splitter.getSquareSeq(i); }
 
 public:
 	void allocMemory(const size_t size, const size_t constant_size)

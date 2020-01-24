@@ -207,7 +207,7 @@ private:
 		cl_ulong time;
 
 		profile() {}
-		profile(const std::string & name) : name(name), count(0), time(0.0) {}
+		profile(const std::string & name) : name(name), count(0), time(0) {}
 	};
 	std::map<cl_kernel, profile> _profileMap;
 
@@ -283,7 +283,23 @@ private:
 	}
 
 public:
-	void resetProfiles() { _profileMap.clear(); }
+	void resetProfiles()
+	{
+		for (auto it : _profileMap)
+		{
+			profile & prof = _profileMap[it.first];	// it.first is not a reference!
+			prof.count = 0;
+			prof.time = 0;
+		}
+	}
+
+public:
+	cl_ulong getProfileTime() const
+	{
+		cl_ulong time = 0;
+		for (auto it : _profileMap) time += it.second.time;
+		return time;
+	}
 
 public:
 	void displayProfiles(const size_t count) const
@@ -372,6 +388,7 @@ public:
 #endif
 		oclFatal(clReleaseProgram(_program));
 		_program = nullptr;
+		_profileMap.clear();
 	}
 
 private:
