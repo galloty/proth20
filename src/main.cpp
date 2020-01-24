@@ -81,8 +81,8 @@ public:
 			std::cout << std::endl;
 		}
 
-		ocl::engine engine;
-		engine.displayDevices();
+		ocl::platform platform;
+		platform.displayDevices();
 		std::cout << std::endl;
 
 		bool bBench = false, bPrime = false;
@@ -112,46 +112,46 @@ public:
 			{
 				const std::string dev = ((arg == "-d") && (i + 1 < size)) ? args[++i] : arg.substr(2);
 				d = std::atoi(dev.c_str());
-				if (d >= engine.getDeviceCount()) throw std::runtime_error("invalid device number");
+				if (d >= platform.getDeviceCount()) throw std::runtime_error("invalid device number");
 			}
 		}
 
 		if (bBench)
 		{
-			ocl::device device(engine, d);
-			proth::getInstance().bench(device);
+			engine engine(platform, d);
+			proth::getInstance().bench(engine);
 		}
 
 		if (bPrime)
 		{
-			ocl::device device(engine, d);
-			proth::getInstance().check(k, n, device);
+			engine engine(platform, d);
+			proth::getInstance().check(k, n, engine);
 		}
 
 		// gpmp::printRanges(10000);
 
-		// ocl::device device0(engine, 0);
+		// engine engine0(platform, 0);
 		// test Intel GPU
-		// ocl::device device1(engine, 1);
+		// engine engine1(platform, 1);
 
 		// proth & p = proth::getInstance();
 
 		// profile: ocl_profile must be defined (ocl.h)
-		// p.profile(45, 5308037, device0);
-		// p.profile(99739, 14019102, device0);
+		// p.profile(45, 5308037, engine0);
+		// p.profile(99739, 14019102, engine0);
 
 		// bench
-		// p.bench(device0);
-		// p.test_prime(device0, true);
-		// p.test_composite(device0, true);
+		// p.bench(engine0);
+		// p.test_prime(engine0, true);
+		// p.test_composite(engine0, true);
 
 		// full test
-		// p.test_composite(device0);
-		// p.test_prime(device0);
+		// p.test_composite(engine0);
+		// p.test_prime(engine0);
 
 		// validation
-		// p.validation(device0);
-		// p.validation(device1);
+		// p.validation(engine0);
+		// p.validation(engine1);
 	}
 };
 

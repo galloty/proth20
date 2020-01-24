@@ -55,3 +55,19 @@ struct timer
 		return ss.str();
 	}
 };
+
+struct chronometer
+{
+	double previousTime;
+	timer::time startTime;
+	timer::time startBenchTime;
+	timer::time startRecordTime;
+
+	double getElapsedTime() const { return previousTime + timer::diffTime(timer::currentTime(), startTime); }
+	double getBenchTime() const { return timer::diffTime(timer::currentTime(), startBenchTime); }
+	double getRecordTime() const { return timer::diffTime(timer::currentTime(), startRecordTime); }
+
+	void resetTime() { startTime = timer::currentTime(); }
+	void resetBenchTime() { startBenchTime = timer::currentTime(); }
+	void resetRecordTime() { startRecordTime = timer::currentTime(); }
+};

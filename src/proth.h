@@ -8,6 +8,7 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #pragma once
 
 #include "ocl.h"
+#include "arith.h"
 #include "gpmp.h"
 #include "timer.h"
 
@@ -30,80 +31,6 @@ public:
 
 private:
 	volatile bool _quit = false;
-
-	struct pendulum
-	{
-		double previousTime;
-		timer::time startTime;
-		timer::time startBenchTime;
-		timer::time startRecordTime;
-
-		double getElapsedTime() const { return previousTime + timer::diffTime(timer::currentTime(), startTime); }
-		double getBenchTime() const { return timer::diffTime(timer::currentTime(), startBenchTime); }
-		double getRecordTime() const { return timer::diffTime(timer::currentTime(), startRecordTime); }
-
-		void resetTime() { startTime = timer::currentTime(); }
-		void resetBenchTime() { startBenchTime = timer::currentTime(); }
-		void resetRecordTime() { startRecordTime = timer::currentTime(); }
-	};
-
-private:
-	static int jacobi(const uint64_t x, const uint64_t y)
-	{
-		uint64_t m = x, n = y;
-
-		int k = 1;
-		while (m != 0)
-		{
-			// (2/n) = (-1)^((n^2-1)/8)
-			bool odd = false;
-			while (m % 2 == 0) { m /= 2; odd = !odd; }
-			if (odd && (n % 8 != 1) && (n % 8 != 7)) k = -k;
-
-			if (m == 1) return k;	// (1/n) = 1
-
-			// (m/n)(n/m) = -1 iif m == n == 3 (mod 4)
-			if ((m % 4 == 3) && (n % 4 == 3)) k = -k;
-			const uint64_t t = n; n = m; m = t;
-
-			m %= n;	// (m/n) = (m mod n / n)
-		}
-
-		return n;	// x and y are not coprime, return their gcd
-	}
-
-private:
-	static bool find_a(const uint32_t k, const uint32_t n, uint32_t & ra)
-	{
-		// Proth's theorem: a such that (a/P) = -1
-		// Note that P = k*2^n + 1 and a is odd => (a/P) * (P/a) = 1 if P = 1 (mod 4)
-		// Then (P/a) = (P mod a / a)
-
-		uint32_t a = 3;
-		for (; a < (1u << 31); a += 2)
-		{
-			bool isPrime = true;
-			for (uint32_t d = 3; d < a; d += 2) if (a % d == 0) isPrime = false;
-			if (!isPrime) continue;
-
-			uint32_t pmoda = k % a;
-			if (pmoda == 0) continue;
-			for (uint32_t i = 0; i < n; ++i) { pmoda += pmoda; if (pmoda >= a) pmoda -= a; }
-			pmoda += 1; if (pmoda >= a) pmoda -= a;
-
-			if (pmoda == 0) { ra = a; return false; }
-			if (pmoda == 1) continue;
-
-			const int jac = jacobi(pmoda, a);
-			if (jac > 1) { ra = jac; return false; }
-
-			if (jac == -1) break;
-		}
-
-		if (a >= (1u << 31)) { ra = 0; return false; }
-		ra = a;
-		return true;
-	}
 
 private:
 	static std::string res64String(const uint64_t res64)
@@ -158,23 +85,23 @@ public:
 	}
 
 public:
-	bool check(const uint32_t k, const uint32_t n, ocl::device & device, const bool bench = false, const bool checkRes = false, const uint64_t r64 = 0)
+	bool check(const uint32_t k, const uint32_t n, engine & engine, const bool bench = false, const bool checkRes = false, const uint64_t r64 = 0)
 	{
 		uint32_t a = 0;
-		if (!find_a(k, n, a))
+		if (!arith::proth_prime_quad_nonres(k, n, 3, a))
 		{
 			std::cout << k << " * 2^" << n << " + 1 is divisible by " << a << std::endl;
 			return true;
 		}
 
-		gpmp X(k, n, device);
-		pendulum chrono;
+		gpmp X(k, n, engine);
 
+		chronometer chrono;
 		uint32_t i0;
 		const bool found = X.restoreContext(i0, chrono.previousTime);
 
 		std::cout << (found ? "Resuming from a checkpoint " : "Testing ");
-		std::cout << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^" << ilog2(X.getSize()) << " x " << X.getDigitBit() << " bits" << std::endl;
+		std::cout << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^" << arith::log2(X.getSize()) << " x " << X.getDigitBit() << " bits" << std::endl;
 
 		chrono.resetTime();
 
@@ -186,7 +113,7 @@ public:
 			checkError(X);	// Sync GPU before benchmark
 		}
 
-		const uint32_t L = 1 << (ilog2(n) / 2);
+		const uint32_t L = 1 << (arith::log2(n) / 2);
 
 		const uint32_t benchCount = (n < 100000) ? 50000 : 50000000 / (n / 1000);
 		uint32_t benchIter = benchCount;
@@ -282,12 +209,12 @@ public:
 	}
 
 public:
-	bool validate(const uint32_t k, const uint32_t n, ocl::device & device)
+	bool validate(const uint32_t k, const uint32_t n, engine & engine)
 	{
 		const uint32_t a = 3;
-		gpmp X(k, n, device);
+		gpmp X(k, n, engine);
 
-		std::cout << "Testing " << k << " * 2^" << n << " + 1, size = 2^" << ilog2(X.getSize()) << " x " << X.getDigitBit() << " bits ";
+		std::cout << "Testing " << k << " * 2^" << n << " + 1, size = 2^" << arith::log2(X.getSize()) << " x " << X.getDigitBit() << " bits ";
 
 		apowk(X, a, k);
 		checkError(X);
@@ -317,7 +244,7 @@ private:
 	};
 
 public:
-	void test_prime(ocl::device & device, const bool bench = false)
+	void test_prime(engine & engine, const bool bench = false)
 	{
 		std::vector<number>	primeList;
 		primeList.push_back(number(1035, 301));
@@ -339,10 +266,10 @@ public:
 		primeList.push_back(number(3, 10829346));		// size = 2^21, square512,  4.43
 		primeList.push_back(number(10223, 31172165));	// size = 2^22, square1024, 8.96
 
-		for (const auto & p : primeList) if (!check(p.k, p.n, device, bench, true)) return;
+		for (const auto & p : primeList) if (!check(p.k, p.n, engine, bench, true)) return;
 	}
 
-	void test_composite(ocl::device & device, const bool bench = false)
+	void test_composite(engine & engine, const bool bench = false)
 	{
 		std::vector<number>	compositeList;
 		compositeList.push_back(number(536870911,    298, 0x35461D17F60DA78Aull));
@@ -359,36 +286,36 @@ public:
 		compositeList.push_back(number(536870911, 685618, 0x84C7E4E7F1344902ull));
 
 		// check residues
-		for (const auto & c : compositeList) if (!check(c.k, c.n, device, bench, true, c.res64)) return;
+		for (const auto & c : compositeList) if (!check(c.k, c.n, engine, bench, true, c.res64)) return;
 	}
 
-	void bench(ocl::device & device)
+	void bench(engine & engine)
 	{
 		std::vector<number>	benchList;
 		benchList.push_back(number(7649,     1553995));		// PPSE
 		benchList.push_back(number(595,      2833406));		// PPS
-		benchList.push_back(number(45,       5308037));		// DIV
+		benchList.push_back(number(13,       5523860));		// DIV
 		benchList.push_back(number(6679881,  6679881));		// Cullen
 		benchList.push_back(number(3,       10829346));		// 321
 		benchList.push_back(number(99739,   14019102));		// ESP
 		benchList.push_back(number(168451,  19375200));		// PSP
 		benchList.push_back(number(10223,   31172165));		// SOB
 
-		for (const auto & b : benchList) if (!check(b.k, b.n, device, true)) return;
+		for (const auto & b : benchList) if (!check(b.k, b.n, engine, true)) return;
 	}
 
-	void validation(ocl::device & device)
+	void validation(engine & engine)
 	{
-		for (uint32_t n = 15000; n < 100000000; n *= 2) if (!validate(536870911, n, device)) return;
+		for (uint32_t n = 15000; n < 100000000; n *= 2) if (!validate(536870911, n, engine)) return;
 	}
 
-	void profile(const uint32_t k, const uint32_t n, ocl::device & device)	// ocl_profile must be defined (ocl.h)
+	void profile(const uint32_t k, const uint32_t n, engine & engine)	// ocl_profile must be defined (ocl.h)
 	{
-		gpmp X(k, n, device);
+		gpmp X(k, n, engine);
 		const size_t pCount = 1000;
 		for (size_t i = 0; i < pCount; ++i) X.square();
 		std::cout << "Size = " << X.getSize() << std::endl;
-		device.displayProfiles(pCount);
+		engine.displayProfiles(pCount);
 
 		// Size = 524288
 		// - sub_ntt64: 1, 11.6 %, 124732 (124732)

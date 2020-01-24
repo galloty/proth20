@@ -7,7 +7,8 @@ Please give feedback to the authors if improvement is realized. It is distribute
 
 #pragma once
 
-#include "ocl.h"
+#include "arith.h"
+#include "engine.h"
 
 #include <cstdint>
 #include <cmath>
@@ -16,8 +17,6 @@ Please give feedback to the authors if improvement is realized. It is distribute
 
 #include "proth_ocl.h"
 #include "proth_1024_ocl.h"
-
-inline constexpr int ilog2(const size_t n) { return (n > 1) ? 1 + ilog2(n >> 1) : 0; }
 
 class gpmp
 {
@@ -31,27 +30,6 @@ private:
 	// 2^20 / 2 * (2^21 - 1)^2 > P1P2 / 2 > 2^19 / 2 * (2^21 - 1)^2 => max size = 2^19
 
 private:
-	static constexpr uint32_t invert(const uint32_t n, const uint32_t m)
-	{
-		int64_t s0 = 1, s1 = 0, d0 = n % m, d1 = m;
-		
-		while (d1 != 0)
-		{
-			const int64_t q = d0 / d1;
-			d0 -= q * d1;
-			const int64_t t1 = d0; d0 = d1; d1 = t1;
-			s0 -= q * s1;
-			const int64_t t2 = s0; s0 = s1; s1 = t2;
-		}
-		
-		if (d0 != 1) return 0;
-
-		if (s0 < 0) s0 += m;
-
-		return uint32_t(s0);
-	}
-
-private:
 	static constexpr size_t transformSize(const uint32_t k, const uint32_t n, const int digit_bit)
 	{
 		// P = k.2^n + 1 = k.2^s * (2^digit_bit)^e + 1
@@ -61,7 +39,7 @@ private:
 		// a < P => X = a^2 <= (P - 1)^2 = (k.2^s)^2 * (2^digit_bit)^{2e}
 		// X_hi = [X / (2^digit_bit)^e] <= (k.2^s)^2 * (2^digit_bit)^e
 		// bit size of X_hi < 2 * (log2(k) + 1 + s) + digit_bit * e
-		const size_t x_hi_size = e + (2 * (ilog2(k) + 1 + s) + digit_bit - 1) / digit_bit;
+		const size_t x_hi_size = e + (2 * (arith::log2(k) + 1 + s) + digit_bit - 1) / digit_bit;
 
 		// Power of 2 such that size >= 2 * X_hi_size (we have to compute X^2 such that X < P)
 		size_t size = 2048;
@@ -86,7 +64,7 @@ private:
 	const size_t _size;
 	const uint32_t _k, _n;
 	const bool _ext1024;
-	ocl::device & _device;
+	engine & _engine;
 	cl_uint2 * const _mem;
 
 private:
@@ -114,7 +92,7 @@ private:
 			return r * y;
 		}
 
-		Zp invert() const { return Zp(gpmp::invert(n, p)); }
+		Zp invert() const { return Zp(arith::invert(n, p)); }
 	};
 
 	class RNS
@@ -168,9 +146,9 @@ private:
 	}
 
 public:
-	gpmp(const uint32_t k, const uint32_t n, ocl::device & device) :
+	gpmp(const uint32_t k, const uint32_t n, engine & engine) :
 		_digit_bit(digitBit(k, n)), _size(transformSize(k, n, _digit_bit)), _k(k), _n(n),
-		_ext1024((device.getMaxWorkGroupSize() >= 1024) && (device.getLocalMemSize() >= 32768)), _device(device), _mem(new cl_uint2[_size])
+		_ext1024((engine.getMaxWorkGroupSize() >= 1024) && (engine.getLocalMemSize() >= 32768)), _engine(engine), _mem(new cl_uint2[_size])
 	{
 		const size_t size = _size;
 		const size_t constant_max_m = 1024;
@@ -200,12 +178,12 @@ public:
 			}
 		}
 
-		_device.loadProgram(src.str().c_str());
+		_engine.loadProgram(src.str().c_str());
 
-		_device.allocMemory(size, constant_size);
+		_engine.allocMemory(size, constant_size);
 		const cl_uint2 norm = { cl_uint(P1 - (P1 - 1) / size), cl_uint(P2 - (P2 - 1) / size) };
-		const cl_int k_shift = cl_int(ilog2(k) - 1);
-		_device.createKernels(norm, cl_uint(n / _digit_bit), cl_int(n % _digit_bit), cl_uint(k), cl_uint((uint64_t(1) << (32 + k_shift)) / k), k_shift, _ext1024);
+		const cl_int k_shift = cl_int(arith::log2(k) - 1);
+		_engine.createKernels(norm, cl_uint(n / _digit_bit), cl_int(n % _digit_bit), cl_uint(k), cl_uint((uint64_t(1) << (32 + k_shift)) / k), k_shift, _ext1024);
 
 		// (size + 2) / 3 roots
 		cl_uint4 * const r1ir1 = new cl_uint4[size];
@@ -237,8 +215,8 @@ public:
 			}
 			ps *= ps; ps *= ps; ips *= ips; ips *= ips;
 		}
-		_device.writeMemory_r(r1ir1, r2, ir2);
-		_device.writeMemory_cr(cr1ir1, cr2ir2);
+		_engine.writeMemory_r(r1ir1, r2, ir2);
+		_engine.writeMemory_cr(cr1ir1, cr2ir2);
 		delete[] r1ir1;
 		delete[] r2;
 		delete[] ir2;
@@ -247,7 +225,7 @@ public:
 
 		cl_uint * const bp = new cl_uint[size / 2];
 		cl_uint * const ibp = new uint32_t[size / 2];
-		const uint32_t ib = invert(uint32_t(1) << _digit_bit, k);
+		const uint32_t ib = arith::invert(uint32_t(1) << _digit_bit, k);
 		uint32_t bp_i = 1, ibp_i = ib;
 		for (size_t i = 0; i < size / 2; ++i)
 		{
@@ -256,20 +234,20 @@ public:
 			bp_i = uint32_t((uint64_t(bp_i) << _digit_bit) % k);
 			ibp_i = uint32_t((uint64_t(ibp_i) * ib) % k);
 		}
-		_device.writeMemory_bp(bp, ibp);
+		_engine.writeMemory_bp(bp, ibp);
 		delete[] bp;
 		delete[] ibp;
 
 		cl_int err = 0;
-		_device.writeMemory_err(&err);
+		_engine.writeMemory_err(&err);
 	}
 
 public:
 	virtual ~gpmp()
 	{
-		_device.releaseKernels();
-		_device.releaseMemory();
-		_device.clearProgram();
+		_engine.releaseKernels();
+		_engine.releaseMemory();
+		_engine.clearProgram();
 
 		delete[] _mem;
 	}
@@ -284,7 +262,7 @@ public:
 	{
 		const size_t size = _size / 2;
 		cl_uint2 * const x = _mem;
-		_device.readMemory_x(x);
+		_engine.readMemory_x(x);
 		std::cout << std::endl;
 		for (size_t i = 0; i < size; ++i)
 		{
@@ -311,8 +289,8 @@ public:
 				if (s == s_min) n_min = m;
 				if (s == s_max) n_max = m;
 			}
-			const size_t ls_min = ilog2(transformSize(k, n_min, digitBit(k, n_min)));
-			const size_t ls_max = ilog2(transformSize(k, n_max, digitBit(k, n_max)));
+			const size_t ls_min = arith::log2(transformSize(k, n_min, digitBit(k, n_min)));
+			const size_t ls_max = arith::log2(transformSize(k, n_max, digitBit(k, n_max)));
 			range[ls_min].second = n_min;
 			range[ls_max].first = n_max;
 			n_min = n_max; n_max = 2 * n_min + 1000;
@@ -327,7 +305,7 @@ public:
 	int getError() const
 	{
 		cl_int err = 0;
-		_device.readMemory_err(&err);
+		_engine.readMemory_err(&err);
 		return int(err);
 	}
 
@@ -351,23 +329,17 @@ private:
 	static bool _writeContext(std::ofstream & cFile, const char * const ptr, const size_t size)
 	{
 		cFile.write(ptr, size);
-		if (!cFile.good())
-		{
-			cFile.close();
-			return false;
-		}
-		return true;
+		if (cFile.good()) return true;
+		cFile.close();
+		return false;
 	}
 
 	static bool _readContext(std::ifstream & cFile, char * const ptr, const size_t size)
 	{
 		cFile.read(ptr, size);
-		if (!cFile.good())
-		{
-			cFile.close();
-			return false;
-		}
-		return true;
+		if (cFile.good()) return true;
+		cFile.close();
+		return false;
 	}
 
 public:
@@ -395,11 +367,11 @@ public:
 
 		if (!_writeContext(cFile, reinterpret_cast<const char *>(&i), sizeof(i))) return false;
 
-		_device.readMemory_x(mem);
+		_engine.readMemory_x(mem);
 		if (!_writeContext(cFile, reinterpret_cast<const char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
-		_device.readMemory_u(mem);
+		_engine.readMemory_u(mem);
 		if (!_writeContext(cFile, reinterpret_cast<const char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
-		_device.readMemory_v(mem);
+		_engine.readMemory_v(mem);
 		if (!_writeContext(cFile, reinterpret_cast<const char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
 
 		cFile.close();
@@ -436,11 +408,11 @@ public:
 		if (!_readContext(cFile, reinterpret_cast<char *>(&i), sizeof(i))) return false;
 
 		if (!_readContext(cFile, reinterpret_cast<char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
-		_device.writeMemory_x(mem);
+		_engine.writeMemory_x(mem);
 		if (!_readContext(cFile, reinterpret_cast<char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
-		_device.writeMemory_u(mem);
+		_engine.writeMemory_u(mem);
 		if (!_readContext(cFile, reinterpret_cast<char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
-		_device.writeMemory_v(mem);
+		_engine.writeMemory_v(mem);
 
 		cFile.close();
 		return true;
@@ -454,38 +426,38 @@ public:
 		cl_uint2 * const x = _mem;
 		x[0] = { 1, 0 };
 		for (size_t i = 1; i < size; ++i) x[i] = { 0, 0 };
-		_device.writeMemory_x(x);
+		_engine.writeMemory_x(x);
 
 		cl_uint2 * const u = _mem;
 		u[0] = { a, 0 };
 		for (size_t i = 1; i < size; ++i) u[i] = { 0, 0 };
-		_device.writeMemory_u(u);
+		_engine.writeMemory_u(u);
 	}
 
 public:
 	void set_bug()
 	{
 		cl_uint2 * const x = _mem;
-		_device.readMemory_x(x);
+		_engine.readMemory_x(x);
 		x[_size / 3].s[0] += 1;
-		_device.writeMemory_x(x);
+		_engine.writeMemory_x(x);
 	}
 
 public:
 	void norm()
 	{
 		// if R < Y then add k.2^n + 1 to R. We have 0 <= R - Y + k.2^n + 1 <= k.2^n
-		_device.set_positive();
+		_engine.set_positive();
 
 		// _x[0] = R, _x[1] = Y; compute R - Y
-		_device.reduce_x();
+		_engine.reduce_x();
 	}
 
 public:
-	void swap_x_u() { _device.swap_x_u(); }
-	void copy_x_u() { _device.copy_x_u(); }
-	void copy_x_v() { _device.copy_x_v(); }
-	void compare_u_v() { _device.compare_u_v(); }
+	void swap_x_u() { _engine.swap_x_u(); }
+	void copy_x_u() { _engine.copy_x_u(); }
+	void copy_x_v() { _engine.copy_x_v(); }
+	void compare_u_v() { _engine.compare_u_v(); }
 
 public:
 	void square()
@@ -494,7 +466,7 @@ public:
 
 		// x size is size / 2; _x[0] = R, _x[1] = Y; compute (R - Y)^2
 
-		_device.sub_ntt64();
+		_engine.sub_ntt64();
 
 		cl_uint m = cl_uint(size / 4);
 		cl_uint rindex = (16 + 4 + 1) * (m / 16);
@@ -502,28 +474,28 @@ public:
 
 		for (; m > 256; m /= 64)
 		{
-			_device.ntt64(m / 16, rindex);
+			_engine.ntt64(m / 16, rindex);
 			rindex += (16 + 4 + 1) * (m / 16);
 		}
 
-		if (m == 256)        _device.square1024();
-		else if (m == 128)   _device.square512();
-		else if (m == 64)    _device.square256();
-		else if (m == 32)    _device.square128();
-		else if (m == 16)    _device.square64();
-		else if (m == 8)     _device.square32();
-		else if (m == 4)     _device.square16();
-		else /*if (m == 2)*/ _device.square8();
+		if (m == 256)        _engine.square1024();
+		else if (m == 128)   _engine.square512();
+		else if (m == 64)    _engine.square256();
+		else if (m == 32)    _engine.square128();
+		else if (m == 16)    _engine.square64();
+		else if (m == 8)     _engine.square32();
+		else if (m == 4)     _engine.square16();
+		else /*if (m == 2)*/ _engine.square8();
 
 		while (m <= cl_uint(size / 4) / 64)
 		{
 			m *= 64;
 			rindex -= (16 + 4 + 1) * (m / 16);
-			_device.intt64(m / 16, rindex);
+			_engine.intt64(m / 16, rindex);
 		}
 
-		_device.poly2int0();
-		_device.poly2int1();
+		_engine.poly2int0();
+		_engine.poly2int1();
 
 		// x size is size
 
@@ -535,10 +507,10 @@ public:
 public:
 	void setMultiplicand()
 	{
-		_device.copy_u_tu();
-		_device.set_positive_tu();
+		_engine.copy_u_tu();
+		_engine.set_positive_tu();
 
-		_device.sub_ntt64_u();
+		_engine.sub_ntt64_u();
 
 		cl_uint m = cl_uint(_size / 4);
 		cl_uint rindex = (16 + 4 + 1) * (m / 16);
@@ -546,13 +518,13 @@ public:
 
 		for (; m > 256; m /= 64)
 		{
-			_device.ntt64_u(m / 16, rindex);
+			_engine.ntt64_u(m / 16, rindex);
 			rindex += (16 + 4 + 1) * (m / 16);
 		}
 
 		for (; m > 1; m /= 4)
 		{
-			_device.ntt4_u(m, rindex);
+			_engine.ntt4_u(m, rindex);
 			rindex += m;
 		}
 	}
@@ -564,9 +536,9 @@ public:
 
 		// if R - Y < 0 then the result a * (R - Y) < 0 => error
 		// if R < Y then add k.2^n + 1 to R. We have 0 < R - Y + k.2^n + 1 <= k.2^n
-		_device.set_positive();
+		_engine.set_positive();
 
-		_device.sub_ntt64();
+		_engine.sub_ntt64();
 
 		cl_uint m = cl_uint(size / 4);
 		cl_uint rindex = (16 + 4 + 1) * (m / 16);
@@ -574,38 +546,38 @@ public:
 
 		for (; m > 256; m /= 64)
 		{
-			_device.ntt64(m / 16, rindex);
+			_engine.ntt64(m / 16, rindex);
 			rindex += (16 + 4 + 1) * (m / 16);
 		}
 
 		size_t n4 = 0;
 		for (; m > 4; m /= 4)
 		{
-			_device.ntt4(m, rindex);
+			_engine.ntt4(m, rindex);
 			rindex += m;
 			++n4;
 		}
 
-		_device.ntt4(m, rindex);
-		if (m == 4) _device.mul4(); else _device.mul2();
-		_device.intt4(m, rindex);
+		_engine.ntt4(m, rindex);
+		if (m == 4) _engine.mul4(); else _engine.mul2();
+		_engine.intt4(m, rindex);
 
 		for (; n4 != 0; --n4)
 		{
 			m *= 4;
 			rindex -= m;
-			_device.intt4(m, rindex);
+			_engine.intt4(m, rindex);
 		}
 
 		while (m < cl_uint(size / 4))
 		{
 			m *= 64;
 			rindex -= (16 + 4 + 1) * (m / 16);
-			_device.intt64(m / 16, rindex);
+			_engine.intt64(m / 16, rindex);
 		}
 
-		_device.poly2int0();
-		_device.poly2int1();
+		_engine.poly2int0();
+		_engine.poly2int1();
 
 		split();
 	}
@@ -616,13 +588,13 @@ public:
 		norm();
 
 		// res is x + 1 such that 0 <= res < k*2^n + 1
-		_device.copy_x_m1();
-		_device.add1_m1();
-		_device.reduce_z_m1();
+		_engine.copy_x_m1();
+		_engine.add1_m1();
+		_engine.reduce_z_m1();
 
 		cl_uint2 * const res = _mem;
 
-		_device.readMemory_m1(res);
+		_engine.readMemory_m1(res);
 
 		bool isPrime = true;
 		for (size_t i = 0, n = _size / 2; i < n; ++i)
@@ -655,25 +627,25 @@ public:
 	void Gerbicz_check(const size_t L)
 	{
 		// v * u^(2^L)
-		_device.copy_u_m1();		// m1 = u
-		_device.copy_x_m2();		// m1 = u, m2 = x
-		_device.copy_u_x();
+		_engine.copy_u_m1();		// m1 = u
+		_engine.copy_x_m2();		// m1 = u, m2 = x
+		_engine.copy_u_x();
 		for (size_t i = 0; i < L; ++i) square();	// x = u^(2^L)
-		_device.copy_v_u();
+		_engine.copy_v_u();
 		setMultiplicand();
 		mul();			// x = v * u^(2^L)
 		norm();
-		_device.swap_x_m2();		// m1 = u, m2 = v * u^(2^L)
-		_device.copy_m1_u();		// m2 = v * u^(2^L)
+		_engine.swap_x_m2();		// m1 = u, m2 = v * u^(2^L)
+		_engine.copy_m1_u();		// m2 = v * u^(2^L)
 
 		// u * x;
-		_device.copy_x_m1();		// m1 = x
+		_engine.copy_x_m1();		// m1 = x
 		setMultiplicand();
 		mul();
 		norm();
-		_device.swap_x_m1();		// m1 = u * x, m2 = v * u^(2^L)
+		_engine.swap_x_m1();		// m1 = u * x, m2 = v * u^(2^L)
 
-		_device.compare_m1_m2();
+		_engine.compare_m1_m2();
 	}
 
 private:
@@ -693,7 +665,7 @@ private:
 
 		// Daisuke Takahashi, A parallel algorithm for multiple-precision division by a single-precision integer.
 
-		_device.reduce_i();
+		_engine.reduce_i();
 
 		// x size is size / 2, x = X mod B^(size / 2), y = X / (B^e * 2^s)
 
@@ -702,31 +674,31 @@ private:
 		cl_uint s = n / 4;
 		for (; s > 256; s /= 64)
 		{
-			_device.reduce_upsweep64(s / 16, j);
+			_engine.reduce_upsweep64(s / 16, j);
 			j += 5 * (16 + 4 + 1) * (s / 16);
 		}
 
-		if (s == 256)        _device.reduce_topsweep1024(j);
-		else if (s == 128)   _device.reduce_topsweep512(j);
-		else if (s == 64)    _device.reduce_topsweep256(j);
-		else if (s == 32)    _device.reduce_topsweep128(j);
-		else if (s == 16)    _device.reduce_topsweep64(j);
-		else /*if (s == 8)*/ _device.reduce_topsweep32(j);
+		if (s == 256)        _engine.reduce_topsweep1024(j);
+		else if (s == 128)   _engine.reduce_topsweep512(j);
+		else if (s == 64)    _engine.reduce_topsweep256(j);
+		else if (s == 32)    _engine.reduce_topsweep128(j);
+		else if (s == 16)    _engine.reduce_topsweep64(j);
+		else /*if (s == 8)*/ _engine.reduce_topsweep32(j);
 
 		while (s < n / 4)
 		{
 			s *= 64;
 			j -= 5 * (16 + 4 + 1) * (s / 16);
-			_device.reduce_downsweep64(s / 16, j);
+			_engine.reduce_downsweep64(s / 16, j);
 		}
 
 		// t[4 + k] remainders y[k + 1] / d, t[0] = remainder y[0] / d
 
-		_device.reduce_o();
+		_engine.reduce_o();
 
 		// x size is size / 2, x[0] = X mod B^n, x[1] = Y
 
-		_device.reduce_f();
+		_engine.reduce_f();
 
 		// x size is size / 2, _x[0] = R, _x[1] = Y
 	}
