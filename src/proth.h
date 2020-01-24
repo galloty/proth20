@@ -309,13 +309,13 @@ public:
 		for (uint32_t n = 15000; n < 100000000; n *= 2) if (!validate(536870911, n, engine)) return;
 	}
 
-	void profile(const uint32_t k, const uint32_t n, engine & engine)	// ocl_profile must be defined (ocl.h)
+	void profile(const uint32_t k, const uint32_t n, engine & engine)
 	{
-		gpmp X(k, n, engine);
-		const size_t pCount = 1000;
-		for (size_t i = 0; i < pCount; ++i) X.square();
+		gpmp X(k, n, engine, true);
+		const size_t count = 1000;
+		for (size_t i = 0; i < count; ++i) X.square();
 		std::cout << "Size = " << X.getSize() << std::endl;
-		engine.displayProfiles(pCount);
+		engine.displayProfiles(count);
 
 		// Size = 524288
 		// - sub_ntt64: 1, 11.6 %, 124732 (124732)

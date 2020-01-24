@@ -136,7 +136,7 @@ public:
 
 		// proth & p = proth::getInstance();
 
-		// profile: ocl_profile must be defined (ocl.h)
+		// function profiling
 		// p.profile(45, 5308037, engine0);
 		// p.profile(99739, 14019102, engine0);
 

@@ -29,14 +29,7 @@ namespace ocl
 {
 
 // #define ocl_debug		1
-// #define ocl_profile		1
 #define ocl_fast_exec		1
-
-#if defined (ocl_profile)
-#define	_executeKernel	_executeKernelP
-#else
-#define	_executeKernel	_executeKernelN
-#endif
 
 class oclObject
 {
@@ -193,17 +186,15 @@ private:
 	const size_t _d;
 	const cl_platform_id _platform;
 	const cl_device_id _device;
-#if defined (ocl_profile)
-	bool _selfTuning = true;
-#else
-	bool _selfTuning = false;
-#endif
+	bool _profile = false;
 	bool _isSync = false;
 	size_t _syncCount = 0;
 	cl_ulong _localMemSize = 0;
 	size_t _maxWorkGroupSize = 0;
 	cl_ulong _timerResolution = 0;
 	cl_context _context = nullptr;
+	cl_command_queue _queueF = nullptr;
+	cl_command_queue _queueP = nullptr;
 	cl_command_queue _queue = nullptr;
 	cl_program _program = nullptr;
 
@@ -254,7 +245,9 @@ public:
 		_context = clCreateContext(contextProperties, 1, &_device, nullptr, nullptr, &err_cc);
 		oclFatal(err_cc);
 		cl_int err_ccq;
-		_queue = clCreateCommandQueue(_context, _device, _selfTuning ? CL_QUEUE_PROFILING_ENABLE : 0, &err_ccq);
+		_queueF = clCreateCommandQueue(_context, _device, 0, &err_ccq);
+		_queueP = clCreateCommandQueue(_context, _device, CL_QUEUE_PROFILING_ENABLE, &err_ccq);
+		_queue = _queueF;	// default queue is fast
 		oclFatal(err_ccq);
 
 		if (getVendor(deviceVendor) != EVendor::NVIDIA) _isSync = true;
@@ -290,6 +283,9 @@ private:
 	}
 
 public:
+	void resetProfiles() { _profileMap.clear(); }
+
+public:
 	void displayProfiles(const size_t count) const
 	{
 		cl_ulong ptime = 0;
@@ -307,6 +303,14 @@ public:
 					<< ntime * 100.0 / ptime << " %, " << ntime << " (" << (ntime / ncount) << ")" << std::endl;
 			}
 		}
+	}
+
+public:
+	void setProfiling(const bool enable)
+	{
+		_profile = enable;
+		_queue = enable ? _queueP : _queueF;
+		resetProfiles();
 	}
 
 public:
@@ -485,6 +489,13 @@ protected:
 		profile & prof = _profileMap[kernel];
 		prof.count++;
 		prof.time += dt;
+	}
+
+protected:
+	void _executeKernel(cl_kernel kernel, const size_t globalWorkSize, const size_t localWorkSize = 0)
+	{
+		if (!_profile) _executeKernelN(kernel, globalWorkSize, localWorkSize);
+		else _executeKernelP(kernel, globalWorkSize, localWorkSize);
 	}
 };
 

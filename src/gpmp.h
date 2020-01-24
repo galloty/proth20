@@ -66,6 +66,7 @@ private:
 	const bool _ext1024;
 	engine & _engine;
 	cl_uint2 * const _mem;
+	std::vector<uint32_t> _squarePattern;
 
 private:
 	template <uint32_t p> class Zp
@@ -145,21 +146,12 @@ private:
 		return true;
 	}
 
-public:
-	gpmp(const uint32_t k, const uint32_t n, engine & engine) :
-		_digit_bit(digitBit(k, n)), _size(transformSize(k, n, _digit_bit)), _k(k), _n(n),
-		_ext1024((engine.getMaxWorkGroupSize() >= 1024) && (engine.getLocalMemSize() >= 32768)), _engine(engine), _mem(new cl_uint2[_size])
+private:
+	void _initEngine()
 	{
 		const size_t size = _size;
 		const size_t constant_max_m = 1024;
 		const size_t constant_size = 1024 + 256 + 64 + 16 + 4;	// 1364 * 2 * sizeof(cl_uint4) = 43648 bytes
-
-		const double max_digit = double((uint32_t(1) << _digit_bit) - 1);
-		if ((size / 2) * max_digit * max_digit >= P1P2 / 2)
-		{
-			std::stringstream msg; msg << getDigits() << "-digit numbers are not supported.";
-			throw std::runtime_error(msg.str());
-		}
 
 		std::stringstream src;
 		src << "#define\tdigit_bit\t" << _digit_bit << std::endl << std::endl;
@@ -182,8 +174,8 @@ public:
 
 		_engine.allocMemory(size, constant_size);
 		const cl_uint2 norm = { cl_uint(P1 - (P1 - 1) / size), cl_uint(P2 - (P2 - 1) / size) };
-		const cl_int k_shift = cl_int(arith::log2(k) - 1);
-		_engine.createKernels(norm, cl_uint(n / _digit_bit), cl_int(n % _digit_bit), cl_uint(k), cl_uint((uint64_t(1) << (32 + k_shift)) / k), k_shift, _ext1024);
+		const cl_int k_shift = cl_int(arith::log2(_k) - 1);
+		_engine.createKernels(norm, cl_uint(_n / _digit_bit), cl_int(_n % _digit_bit), cl_uint(_k), cl_uint((uint64_t(1) << (32 + k_shift)) / _k), k_shift, _ext1024);
 
 		// (size + 2) / 3 roots
 		cl_uint4 * const r1ir1 = new cl_uint4[size];
@@ -225,14 +217,14 @@ public:
 
 		cl_uint * const bp = new cl_uint[size / 2];
 		cl_uint * const ibp = new uint32_t[size / 2];
-		const uint32_t ib = arith::invert(uint32_t(1) << _digit_bit, k);
+		const uint32_t ib = arith::invert(uint32_t(1) << _digit_bit, _k);
 		uint32_t bp_i = 1, ibp_i = ib;
 		for (size_t i = 0; i < size / 2; ++i)
 		{
 			bp[i] = cl_uint(bp_i);
 			ibp[i] = cl_uint(ibp_i);
-			bp_i = uint32_t((uint64_t(bp_i) << _digit_bit) % k);
-			ibp_i = uint32_t((uint64_t(ibp_i) * ib) % k);
+			bp_i = uint32_t((uint64_t(bp_i) << _digit_bit) % _k);
+			ibp_i = uint32_t((uint64_t(ibp_i) * ib) % _k);
 		}
 		_engine.writeMemory_bp(bp, ibp);
 		delete[] bp;
@@ -242,12 +234,53 @@ public:
 		_engine.writeMemory_err(&err);
 	}
 
-public:
-	virtual ~gpmp()
+private:
+	void _clearEngine()
 	{
 		_engine.releaseKernels();
 		_engine.releaseMemory();
 		_engine.clearProgram();
+	}
+
+public:
+	gpmp(const uint32_t k, const uint32_t n, engine & engine, const bool profile = false) :
+		_digit_bit(digitBit(k, n)), _size(transformSize(k, n, _digit_bit)), _k(k), _n(n),
+		_ext1024((engine.getMaxWorkGroupSize() >= 1024) && (engine.getLocalMemSize() >= 32768)), _engine(engine), _mem(new cl_uint2[_size])
+	{
+		const double max_digit = double((uint32_t(1) << _digit_bit) - 1);
+		if ((_size / 2) * max_digit * max_digit >= P1P2 / 2)
+		{
+			std::stringstream msg; msg << getDigits() << "-digit numbers are not supported.";
+			throw std::runtime_error(msg.str());
+		}
+
+		engine.setProfiling(true);
+		_initEngine();
+		const size_t patternCount = engine.configure(_ext1024);
+		init(5);
+		for (size_t i = 0; i < patternCount; ++i)
+		{
+			_squarePattern = engine.getPattern(i);
+			// uint32_t m = uint32_t(_size / 4);
+			// for (const uint32_t mi : _squarePattern) { std::cout << mi << " "; m /= mi; }
+			// std::cout << "+ " << m << std::endl;
+
+			square();
+		}
+		// uint32_t m = uint32_t(_size / 4);
+		// for (const uint32_t mi : _squarePattern) { std::cout << mi << " "; m /= mi; }
+		// std::cout << "+ " << m << std::endl;
+
+		_clearEngine();
+		engine.resetProfiles();
+		engine.setProfiling(profile);
+		_initEngine();
+	}
+
+public:
+	virtual ~gpmp()
+	{
+		_clearEngine();
 
 		delete[] _mem;
 	}
@@ -464,21 +497,63 @@ public:
 	{
 		const size_t size = _size;
 
+		const std::vector<uint32_t> & pattern = _squarePattern;
+
 		// x size is size / 2; _x[0] = R, _x[1] = Y; compute (R - Y)^2
 
-		_engine.sub_ntt64();
-
 		cl_uint m = cl_uint(size / 4);
-		cl_uint rindex = (16 + 4 + 1) * (m / 16);
-		m /= 64;
+		cl_uint rindex = 0;
 
-		for (; m > 256; m /= 64)
+		if (pattern[0] == 1024)
 		{
-			_engine.ntt64(m / 16, rindex);
+			_engine.sub_ntt1024();
+			rindex += (256 + 64 + 16 + 4 + 1) * (m / 256);
+			m /= 1024;
+		} 
+		else if (pattern[0] == 256)
+		{
+			_engine.sub_ntt256();
+			rindex += (64 + 16 + 4 + 1) * (m / 64);
+			m /= 256;
+		}
+		else /*if (pattern[0] == 64)*/
+		{
+			_engine.sub_ntt64();
 			rindex += (16 + 4 + 1) * (m / 16);
+			m /= 64;
 		}
 
-		if (m == 256)        _engine.square1024();
+		for (size_t i = 1; i < pattern.size(); ++i)
+		{
+			if (pattern[i] == 1024)
+			{
+				_engine.ntt1024(m / 256, rindex);
+				rindex += (256 + 64 + 16 + 4 + 1) * (m / 256);
+				m /= 1024;
+			} 
+			else if (pattern[i] == 256)
+			{
+				_engine.ntt256(m / 64, rindex);
+				rindex += (64 + 16 + 4 + 1) * (m / 64);
+				m /= 256;
+			}
+			else /*if (pattern[i] == 64)*/
+			{
+				_engine.ntt64(m / 16, rindex);
+				rindex += (16 + 4 + 1) * (m / 16);
+				m /= 64;
+			}
+		}
+
+		// for (; m > 256; m /= 64)
+		// {
+		// 	_engine.ntt64(m / 16, rindex);
+		// 	rindex += (16 + 4 + 1) * (m / 16);
+		// }
+
+		if (m == 1024)       _engine.square4096();
+		else if (m == 512)   _engine.square2048();
+		else if (m == 256)   _engine.square1024();
 		else if (m == 128)   _engine.square512();
 		else if (m == 64)    _engine.square256();
 		else if (m == 32)    _engine.square128();
@@ -487,12 +562,36 @@ public:
 		else if (m == 4)     _engine.square16();
 		else /*if (m == 2)*/ _engine.square8();
 
-		while (m <= cl_uint(size / 4) / 64)
+		for (size_t i = 0; i < pattern.size(); ++i)
 		{
-			m *= 64;
-			rindex -= (16 + 4 + 1) * (m / 16);
-			_engine.intt64(m / 16, rindex);
+			const size_t ri = pattern.size() - 1 - i;
+
+			if (pattern[ri] == 1024)
+			{
+				m *= 1024;
+				rindex -= (256 + 64 + 16 + 4 + 1) * (m / 256);
+				_engine.intt1024(m / 256, rindex);
+			} 
+			else if (pattern[ri] == 256)
+			{
+				m *= 256;
+				rindex -= (64 + 16 + 4 + 1) * (m / 64);
+				_engine.intt256(m / 64, rindex);
+			}
+			else /*if (pattern[ri] == 64)*/
+			{
+				m *= 64;
+				rindex -= (16 + 4 + 1) * (m / 16);
+				_engine.intt64(m / 16, rindex);
+			}
 		}
+
+		// while (m <= cl_uint(size / 4) / 64)
+		// {
+		// 	m *= 64;
+		// 	rindex -= (16 + 4 + 1) * (m / 16);
+		// 	_engine.intt64(m / 16, rindex);
+		// }
 
 		_engine.poly2int0();
 		_engine.poly2int1();
