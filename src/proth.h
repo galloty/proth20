@@ -214,24 +214,33 @@ public:
 		const uint32_t a = 3;
 		gpmp X(k, n, engine);
 
-		std::cout << "Testing " << k << " * 2^" << n << " + 1, size = 2^" << arith::log2(X.getSize()) << " x " << X.getDigitBit() << " bits ";
+		const size_t cnt = X.getPlanSquareSeqCount();
 
-		apowk(X, a, k);
-		checkError(X);
+		std::cout << "Testing " << k << " * 2^" << n << " + 1, size = 2^" << arith::log2(X.getSize()) << " x " << X.getDigitBit() << " bits" << std::endl;
 
-		const uint32_t L = 64;
-
-		for (uint32_t i = 1; i < L * L; ++i)
+		for (size_t j = 0; j < cnt; ++j)
 		{
+			std::cout << X.getPlanSquareSeqString(j);
+			X.setPlanSquareSeq(j);
+
+			apowk(X, a, k);
+			checkError(X);
+
+			const uint32_t L = 64;
+
+			for (uint32_t i = 1; i < L * L; ++i)
+			{
+				X.square();
+				if ((i & (L - 1)) == 0) X.Gerbicz_step();
+				if (_quit) return false;
+			}
+
 			X.square();
-			if ((i & (L - 1)) == 0) X.Gerbicz_step();
-			if (_quit) return false;
+			X.Gerbicz_check(L);
+			checkError(X);
+			std::cout << " valid" << std::endl;
 		}
 
-		X.square();
-		X.Gerbicz_check(L);
-		checkError(X);
-		std::cout << "valid" << std::endl;
 		return true;
 	}
 
@@ -317,38 +326,38 @@ public:
 		std::cout << "Size = " << X.getSize() << std::endl;
 		engine.displayProfiles(count);
 
-		// Size = 524288
-		// - sub_ntt64: 1, 11.6 %, 124732 (124732)
-		// - ntt64: 1, 10.3 %, 109968 (109968)
-		// - intt64: 2, 22.3 %, 238608 (119304)
-		// - square128: 1, 21.1 %, 225818 (225818)
-		// NTT: 65.3 %
-		// - poly2int0: 1, 12.1 %, 130266 (130266)
-		// - poly2int1: 1, 3.99 %, 42799 (42799)
-		// POLY2INT: 16.1 %
-		// - reduce_upsweep64: 2, 2.38 %, 25499 (12749)
-		// - reduce_downsweep64: 2, 3.37 %, 36128 (18064)
-		// - reduce_topsweep64: 1, 0.355 %, 3807 (3807)
-		// - reduce_i: 1, 5.16 %, 55344 (55344)
-		// - reduce_o: 1, 7.13 %, 76430 (76430)
-		// - reduce_f: 1, 0.274 %, 2943 (2943)
-		// REDUCE: 18.6 %
+		// Size = 1048576 (DIV)
+		// - sub_ntt64: 1, 11.2 %, 238387 (238387)
+		// - ntt64: 1, 12.2 %, 259679 (259679)
+		// - intt64: 2, 23 %, 487848 (243924)
+		// - square256: 1, 21.5 %, 455127 (455127)
+		// NTT: 67.9 %
+		// - poly2int0: 1, 11.9 %, 251385 (251385)
+		// - poly2int1: 1, 3.33 %, 70709 (70709)
+		// POLY2INT: 15.2 %
+		// - reduce_upsweep64: 2, 2.05 %, 43515 (21757)
+		// - reduce_downsweep64: 2, 3.09 %, 65538 (32769)
+		// - reduce_topsweep128: 1, 0.199 %, 4230 (4230)
+		// - reduce_i: 1, 5.16 %, 109369 (109369)
+		// - reduce_o: 1, 6.22 %, 131801 (131801)
+		// - reduce_f: 1, 0.135 %, 2853 (2853)
+		// REDUCE: 16.9 %
 
-		// Size = 2097152
-		// - sub_ntt64: 1, 10.6 %, 466566 (466566)
-		// - ntt64: 1, 12 %, 525783 (525783)
-		// - intt64: 2, 23.2 %, 1018108 (509054)
-		// - square512: 1, 23.9 %, 1050873 (1050873)
-		// NTT: 69.7 %
-		// - poly2int0: 1, 10.9 %, 480425 (480425)
-		// - poly2int1: 1, 3.41 %, 149497 (149497)
-		// POLY2INT: 14.3 %
-		// - reduce_upsweep64: 2, 1.81 %, 79589 (39794)
-		// - reduce_downsweep64: 2, 2.83 %, 124330 (62165)
-		// - reduce_topsweep256: 1, 0.103 %, 4507 (4507)
-		// - reduce_i: 1, 4.91 %, 215512 (215512)
-		// - reduce_o: 1, 6.18 %, 271477 (271477)
-		// - reduce_f: 1, 0.065 %, 2853 (2853)
-		// REDUCE: 16.0 %
+		// Size = 4194304 (SOB)
+		// - sub_ntt256: 1, 13.4 %, 1124499 (1124499)
+		// - ntt256: 1, 12.8 %, 1073486 (1073486)
+		// - intt256: 2, 27.1 %, 2272156 (1136078)
+		// - square64: 1, 15.4 %, 1295339 (1295339)
+		// NTT: 68.7 %
+		// - poly2int0: 1, 11.7 %, 980274 (980274)
+		// - poly2int1: 1, 3.13 %, 262930 (262930)
+		// POLY2INT: 14.8 %
+		// - reduce_upsweep64: 2, 1.81 %, 152199 (76099)
+		// - reduce_downsweep64: 2, 2.88 %, 242224 (121112)
+		// - reduce_topsweep512: 1, 0.0589 %, 4948 (4948)
+		// - reduce_i: 1, 5.12 %, 430095 (430095)
+		// - reduce_o: 1, 6.65 %, 558508 (558508)
+		// - reduce_f: 1, 0.0345 %, 2899 (2899)
+		// REDUCE: 16.5 %
 	}
 };

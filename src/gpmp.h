@@ -270,10 +270,12 @@ public:
 			throw std::runtime_error(msg.str());
 		}
 
+		_plan.init(size, _ext1024);
+
 		engine.setProfiling(true);
 		_initEngine();
 
-		const size_t cnt = _plan.getSquareSeqCount(size, _ext1024);
+		const size_t cnt = _plan.getSquareSeqCount();
 		cl_ulong bestTime = cl_ulong(-1);
 		size_t best_i = 0;
 		for (size_t i = 0; i < cnt; ++i)
@@ -309,6 +311,11 @@ public:
 	size_t getSize() const { return _size; }
 	size_t getDigitBit() const { return _digit_bit; }
 	size_t getDigits() const { return size_t(std::ceil(std::log10(_k) + _n * std::log10(2))); }
+
+public:
+	size_t getPlanSquareSeqCount() const { return _plan.getSquareSeqCount(); }
+	void setPlanSquareSeq(const size_t i) { _plan.setSquareSeq(_size, i); }
+	std::string getPlanSquareSeqString(const size_t i) const { return _plan.getSquareSeqString(_size, i); }
 
 public:
 	void display() const

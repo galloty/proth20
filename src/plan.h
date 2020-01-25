@@ -62,6 +62,14 @@ private:
 
 		size_t getSquareSize() const { return _squareSet.size(); }
 		const std::vector<uint32_t> & getSquareSeq(const size_t i) const { return _squareSet.at(i); }
+		std::string getString(const size_t size, const size_t i) const
+		{
+			std::ostringstream ss;
+			size_t m = size;
+			for (uint32_t mi : _squareSet.at(i)) { ss << mi << " "; m /= mi; }
+			ss << "sq_" << m;
+ 			return ss.str();
+		}
 	};
 
 private:
@@ -191,22 +199,13 @@ private:
 	squareSeq _squareSeq;
 
 public:
-	size_t getSquareSeqCount(const size_t size, const bool b1024)
-	{
-		if (size == 0) return 0;
-		_squareSplitter.init(size / 4, b1024);
-		return _squareSplitter.getSquareSize();
-	}
+	plan() {}
+	virtual ~plan() {}
 
 public:
-	void setSquareSeq(const size_t size, const size_t i)
-	{
-		_squareSeq.init(size, _squareSplitter.getSquareSeq(i));
-	}
-
-public:
-	void execSquareSeq(engine & engine)
-	{
-		_squareSeq.exec(engine);
-	}
+	void init(const size_t size, const bool b1024) { _squareSplitter.init(size / 4, b1024); }
+	size_t getSquareSeqCount() const { return _squareSplitter.getSquareSize(); }
+	void setSquareSeq(const size_t size, const size_t i) { _squareSeq.init(size, _squareSplitter.getSquareSeq(i)); }
+	std::string getSquareSeqString(const size_t size, const size_t i) const { return _squareSplitter.getString(size, i); }
+	void execSquareSeq(engine & engine) { _squareSeq.exec(engine); }
 };
