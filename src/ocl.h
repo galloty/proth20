@@ -183,7 +183,6 @@ public:
 class device : oclObject
 {
 private:
-	const size_t _d;
 	const cl_platform_id _platform;
 	const cl_device_id _device;
 	bool _profile = false;
@@ -212,7 +211,7 @@ private:
 	std::map<cl_kernel, profile> _profileMap;
 
 public:
-	device(const platform & parent, const size_t d) : _d(d), _platform(parent.getPlatform(d)), _device(parent.getDevice(d))
+	device(const platform & parent, const size_t d) : _platform(parent.getPlatform(d)), _device(parent.getDevice(d))
 	{
 #if defined (ocl_debug)
 		std::cerr << "Create ocl device " << d << "." << std::endl;
@@ -471,48 +470,42 @@ protected:
 	}
 
 protected:
-	void _executeKernelN(cl_kernel kernel, const size_t globalWorkSize, const size_t localWorkSize = 0)
-	{
-#if !defined (ocl_fast_exec) || defined (ocl_debug)
-		cl_int err =
-#endif
-		clEnqueueNDRangeKernel(_queue, kernel, 1, nullptr, &globalWorkSize, (localWorkSize == 0) ? nullptr : &localWorkSize, 0, nullptr, nullptr);
-#if !defined (ocl_fast_exec) || defined (ocl_debug)
-		oclFatal(err);
-#endif
-		if (_isSync)
-		{
-			++_syncCount;
-			if (_syncCount == 1024) _sync();
-		}
-	}
-
-protected:
-	void _executeKernelP(cl_kernel kernel, const size_t globalWorkSize, const size_t localWorkSize = 0)
-	{
-		_sync();
-		cl_event evt;
-		oclFatal(clEnqueueNDRangeKernel(_queue, kernel, 1, nullptr, &globalWorkSize, (localWorkSize == 0) ? nullptr : &localWorkSize, 0, nullptr, &evt));
-		cl_ulong dt = 0;
-		if (clWaitForEvents(1, &evt) == CL_SUCCESS)
-		{
-			cl_ulong start, end;
-			cl_int err_s = clGetEventProfilingInfo(evt, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, nullptr);
-			cl_int err_e = clGetEventProfilingInfo(evt, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end, nullptr);
-			if ((err_s == CL_SUCCESS) && (err_e == CL_SUCCESS)) dt = end - start;
-		}
-		clReleaseEvent(evt);
-
-		profile & prof = _profileMap[kernel];
-		prof.count++;
-		prof.time += dt;
-	}
-
-protected:
 	void _executeKernel(cl_kernel kernel, const size_t globalWorkSize, const size_t localWorkSize = 0)
 	{
-		if (!_profile) _executeKernelN(kernel, globalWorkSize, localWorkSize);
-		else _executeKernelP(kernel, globalWorkSize, localWorkSize);
+		if (!_profile)
+		{
+#if !defined (ocl_fast_exec) || defined (ocl_debug)
+			cl_int err =
+#endif
+			clEnqueueNDRangeKernel(_queue, kernel, 1, nullptr, &globalWorkSize, (localWorkSize == 0) ? nullptr : &localWorkSize, 0, nullptr, nullptr);
+#if !defined (ocl_fast_exec) || defined (ocl_debug)
+			oclFatal(err);
+#endif
+			if (_isSync)
+			{
+				++_syncCount;
+				if (_syncCount == 1024) _sync();
+			}
+		}
+		else
+		{
+			_sync();
+			cl_event evt;
+			oclFatal(clEnqueueNDRangeKernel(_queue, kernel, 1, nullptr, &globalWorkSize, (localWorkSize == 0) ? nullptr : &localWorkSize, 0, nullptr, &evt));
+			cl_ulong dt = 0;
+			if (clWaitForEvents(1, &evt) == CL_SUCCESS)
+			{
+				cl_ulong start, end;
+				cl_int err_s = clGetEventProfilingInfo(evt, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, nullptr);
+				cl_int err_e = clGetEventProfilingInfo(evt, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end, nullptr);
+				if ((err_s == CL_SUCCESS) && (err_e == CL_SUCCESS)) dt = end - start;
+			}
+			clReleaseEvent(evt);
+
+			profile & prof = _profileMap[kernel];
+			prof.count++;
+			prof.time += dt;
+		}
 	}
 };
 

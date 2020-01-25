@@ -156,6 +156,19 @@ private:
 	}
 
 private:
+	static inline cl_uint2 set2(const cl_uint s0, const cl_uint s1)
+	{
+		cl_uint2 r; r.s[0] = s0; r.s[1] = s1;
+		return r;
+	}
+
+	static inline cl_uint4 set4(const cl_uint s0, const cl_uint s1, const cl_uint s2, const cl_uint s3)
+	{
+		cl_uint4 r; r.s[0] = s0; r.s[1] = s1; r.s[2] = s2; r.s[3] = s3;
+		return r;
+	}
+
+private:
 	void _initEngine()
 	{
 		const size_t size = _size;
@@ -182,7 +195,7 @@ private:
 		_engine.loadProgram(src.str().c_str());
 
 		_engine.allocMemory(size, constant_size);
-		const cl_uint2 norm = { cl_uint(P1 - (P1 - 1) / size), cl_uint(P2 - (P2 - 1) / size) };
+		const cl_uint2 norm = set2(cl_uint(P1 - (P1 - 1) / size), cl_uint(P2 - (P2 - 1) / size));
 		const cl_int k_shift = cl_int(arith::log2(_k) - 1);
 		_engine.createKernels(norm, cl_uint(_n / _digit_bit), cl_int(_n % _digit_bit), cl_uint(_k), cl_uint((uint64_t(1) << (32 + k_shift)) / _k), k_shift, _ext1024);
 
@@ -201,15 +214,15 @@ private:
 
 			for (size_t i = 0; i < m; ++i)
 			{
-				r1ir1[j] = { r1.get1(), r1.get2(), ir1.get1(), ir1.get2() };
+				r1ir1[j] = set4(r1.get1(), r1.get2(), ir1.get1(), ir1.get2());
 				const RNS r1sq = r1 * r1, ir1sq = ir1 * ir1;
-				r2[j] = { r1sq.get1(), r1sq.get2() }; ir2[j] = { ir1sq.get1(), ir1sq.get2() };
+				r2[j] = set2(r1sq.get1(), r1sq.get2()); ir2[j] = set2(ir1sq.get1(), ir1sq.get2());
 				++j;
 
 				if (m <= constant_max_m)
 				{
-					cr1ir1[o + i] = { r1.get1(), r1.get2(), ir1.get1(), ir1.get2() };
-					cr2ir2[o + i] = { r1sq.get1(), r1sq.get2(), ir1sq.get1(), ir1sq.get2() };
+					cr1ir1[o + i] = set4(r1.get1(), r1.get2(), ir1.get1(), ir1.get2());
+					cr2ir2[o + i] = set4(r1sq.get1(), r1sq.get2(), ir1sq.get1(), ir1sq.get2());
 				}
 
 				r1 *= ps; ir1 *= ips;
@@ -416,7 +429,7 @@ public:
 
 		const size_t size = _size;
 		cl_uint2 * const mem = _mem;
-		for (size_t k = 0; k < size; ++k) mem[k] = { 0, 0 };	// read size / 2, the upper part must be zero
+		for (size_t k = 0; k < size; ++k) mem[k] = set2(0, 0);	// read size / 2, the upper part must be zero
 
 		uint32_t version = 0;
 		if (!_readContext(cFile, reinterpret_cast<char *>(&version), sizeof(version))) return false;
@@ -454,13 +467,13 @@ public:
 		const size_t size = _size;
 
 		cl_uint2 * const x = _mem;
-		x[0] = { 1, 0 };
-		for (size_t i = 1; i < size; ++i) x[i] = { 0, 0 };
+		x[0] = set2(1, 0);
+		for (size_t i = 1; i < size; ++i) x[i] = set2(0, 0);
 		_engine.writeMemory_x(x);
 
 		cl_uint2 * const u = _mem;
-		u[0] = { a, 0 };
-		for (size_t i = 1; i < size; ++i) u[i] = { 0, 0 };
+		u[0] = set2(a, 0);
+		for (size_t i = 1; i < size; ++i) u[i] = set2(0, 0);
 		_engine.writeMemory_u(u);
 	}
 
@@ -470,14 +483,14 @@ public:
 		const size_t size = _size;
 
 		cl_uint2 * const x = _mem;
-		for (size_t i = 0; i < size / 2; ++i) x[i] =  { (uint32_t(1) << _digit_bit) - 1, 0 };
-		for (size_t i = size / 2; i < size; ++i) x[i] = { 0, 0 };
+		for (size_t i = 0; i < size / 2; ++i) x[i] = set2((uint32_t(1) << _digit_bit) - 1, 0);
+		for (size_t i = size / 2; i < size; ++i) x[i] = set2(0, 0);
 		_engine.writeMemory_x(x);
 
 		cl_uint2 * const u = _mem;
-		for (size_t i = 0 * size / 4; i < 1 * size / 4; ++i) u[i] = { (uint32_t(1) << _digit_bit) - 1, 0 };
-		for (size_t i = 1 * size / 4; i < 2 * size / 4; ++i) u[i] = { 0, (uint32_t(1) << _digit_bit) - 1 };
-		for (size_t i = size / 2; i < size; ++i) u[i] = { 0, 0 };
+		for (size_t i = 0 * size / 4; i < 1 * size / 4; ++i) u[i] = set2((uint32_t(1) << _digit_bit) - 1, 0);
+		for (size_t i = 1 * size / 4; i < 2 * size / 4; ++i) u[i] = set2(0, (uint32_t(1) << _digit_bit) - 1);
+		for (size_t i = size / 2; i < size; ++i) u[i] = set2(0, 0);
 		_engine.writeMemory_u(u);
 }
 
