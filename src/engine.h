@@ -12,58 +12,6 @@ Please give feedback to the authors if improvement is realized. It is distribute
 class engine : public ocl::device
 {
 private:
-	class splitter
-	{
-	private:
-		bool _b1024 = false;
-		std::vector<std::vector<uint32_t> > _squareSet;
-
-	private:
-		void split(const uint32_t m, const size_t i, std::vector<uint32_t> & p)
-		{
-			if (_b1024 && (m >= 1024 / 4 * CHUNK1024))
-			{
-				p.push_back(1024);
-				split(m / 1024, i + 1, p);
-				p.pop_back();
-			}
-			if (_b1024 && (m >= 256 / 4 * CHUNK256))
-			{
-				p.push_back(256);
-				split(m / 256, i + 1, p);
-				p.pop_back();
-			}
-			if (m >= 64 / 4 * CHUNK64)
-			{
-				p.push_back(64);
-				split(m / 64, i + 1, p);
-				p.pop_back();
-			}
-
-			if ((i != 0) && (m >= 2) && ((m <= 256) || (_b1024 && (m <= 1024))))
-			{
-				_squareSet.push_back(p);
-			}
-		}
-
-	public:
-		splitter() {}
-		virtual ~splitter() {}
-
-	public:
-		void init(const uint32_t n, const bool b1024)
-		{
-			_b1024 = b1024;
-			_squareSet.clear();
-			std::vector<uint32_t> p; split(n, 0, p);
-		}
-
-		size_t getSquareSize() const { return _squareSet.size(); }
-		const std::vector<uint32_t> & getSquareSeq(const size_t i) const { return _squareSet.at(i); }
-	};
-
-private:
-	splitter _splitter;
 	size_t _size = 0, _constant_size = 0;
 	cl_mem _x = nullptr, _y = nullptr, _t = nullptr, _cr = nullptr, _u = nullptr, _tu = nullptr, _v = nullptr, _m1 = nullptr, _m2 = nullptr, _err = nullptr;
 	cl_mem _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr1ir1 = nullptr, _cr2ir2 = nullptr, _bp = nullptr, _ibp = nullptr;
@@ -87,17 +35,6 @@ private:
 public:
 	engine(const ocl::platform & platform, const size_t d) : ocl::device(platform, d) {}
 	virtual ~engine() {}
-
-public:
-	size_t configure(const bool b1024)
-	{
-		if (_size == 0) return 0;
-		_splitter.init(_size / 4, b1024);
-		return _splitter.getSquareSize();
-	}
-
-public:
-	const std::vector<uint32_t> & getSquareSeq(const size_t i) const { return _splitter.getSquareSeq(i); }
 
 public:
 	void allocMemory(const size_t size, const size_t constant_size)
@@ -138,29 +75,15 @@ public:
 #endif
 		if (_size != 0)
 		{
-			_releaseBuffer(_x);
-			_releaseBuffer(_y);
-			_releaseBuffer(_t);
-			_releaseBuffer(_cr);
-			_releaseBuffer(_u);
-			_releaseBuffer(_tu);
-			_releaseBuffer(_v);
-			_releaseBuffer(_m1);
-			_releaseBuffer(_m2);
-			_releaseBuffer(_err);
-
-			_releaseBuffer(_r1ir1);
-			_releaseBuffer(_r2);
-			_releaseBuffer(_ir2);
-			_releaseBuffer(_bp);
-			_releaseBuffer(_ibp);
+			_releaseBuffer(_x); _releaseBuffer(_y); _releaseBuffer(_t); _releaseBuffer(_cr); _releaseBuffer(_u); _releaseBuffer(_tu);
+			_releaseBuffer(_v); _releaseBuffer(_m1); _releaseBuffer(_m2); _releaseBuffer(_err);
+			_releaseBuffer(_r1ir1); _releaseBuffer(_r2); _releaseBuffer(_ir2); _releaseBuffer(_bp); _releaseBuffer(_ibp);
 			_size = 0;
 		}
 
 		if (_constant_size != 0)
 		{
-			_releaseBuffer(_cr1ir1);
-			_releaseBuffer(_cr2ir2);
+			_releaseBuffer(_cr1ir1); _releaseBuffer(_cr2ir2);
 			_constant_size = 0;
 		}
 	}
@@ -319,56 +242,26 @@ public:
 #if defined (ocl_debug)
 		std::cerr << "Release ocl kernels." << std::endl;
 #endif
-		_releaseKernel(_sub_ntt64);
-		_releaseKernel(_ntt64);
-		_releaseKernel(_intt64);
-		_releaseKernel(_sub_ntt256);
-		_releaseKernel(_ntt256);
-		_releaseKernel(_intt256);
-		_releaseKernel(_sub_ntt1024);
-		_releaseKernel(_ntt1024);
-		_releaseKernel(_intt1024);
+		_releaseKernel(_sub_ntt64); _releaseKernel(_ntt64); _releaseKernel(_intt64);
+		_releaseKernel(_sub_ntt256); _releaseKernel(_ntt256); _releaseKernel(_intt256);
+		_releaseKernel(_sub_ntt1024); _releaseKernel(_ntt1024); _releaseKernel(_intt1024);
 
-		_releaseKernel(_square8);
-		_releaseKernel(_square16);
-		_releaseKernel(_square32);
-		_releaseKernel(_square64);
-		_releaseKernel(_square128);
-		_releaseKernel(_square256);
-		_releaseKernel(_square512);
-		_releaseKernel(_square1024);
-		_releaseKernel(_square2048);
-		_releaseKernel(_square4096);
+		_releaseKernel(_square8); _releaseKernel(_square16); _releaseKernel(_square32); _releaseKernel(_square64); _releaseKernel(_square128);
+		_releaseKernel(_square256); _releaseKernel(_square512); _releaseKernel(_square1024); _releaseKernel(_square2048); _releaseKernel(_square4096);
 
-		_releaseKernel(_poly2int0);
-		_releaseKernel(_poly2int1);
+		_releaseKernel(_poly2int0); _releaseKernel(_poly2int1);
 
-		_releaseKernel(_reduce_upsweep64);
-		_releaseKernel(_reduce_downsweep64);
+		_releaseKernel(_reduce_upsweep64); _releaseKernel(_reduce_downsweep64);
 
-		_releaseKernel(_reduce_topsweep32);
-		_releaseKernel(_reduce_topsweep64);
-		_releaseKernel(_reduce_topsweep128);
-		_releaseKernel(_reduce_topsweep256);
-		_releaseKernel(_reduce_topsweep512);
-		_releaseKernel(_reduce_topsweep1024);
+		_releaseKernel(_reduce_topsweep32); _releaseKernel(_reduce_topsweep64); _releaseKernel(_reduce_topsweep128);
+		_releaseKernel(_reduce_topsweep256); _releaseKernel(_reduce_topsweep512); _releaseKernel(_reduce_topsweep1024);
 
-		_releaseKernel(_reduce_i);
-		_releaseKernel(_reduce_o);
-		_releaseKernel(_reduce_f);
-		_releaseKernel(_reduce_x);
-		_releaseKernel(_reduce_z);
+		_releaseKernel(_reduce_i); _releaseKernel(_reduce_o); _releaseKernel(_reduce_f); _releaseKernel(_reduce_x); _releaseKernel(_reduce_z);
 
-		_releaseKernel(_ntt4);
-		_releaseKernel(_intt4);
-		_releaseKernel(_mul2);
-		_releaseKernel(_mul4);
-		_releaseKernel(_set_positive);
-		_releaseKernel(_add1);
+		_releaseKernel(_ntt4); _releaseKernel(_intt4); _releaseKernel(_mul2); _releaseKernel(_mul4);
+		_releaseKernel(_set_positive); _releaseKernel(_add1);
 
-		_releaseKernel(_swap);
-		_releaseKernel(_copy);
-		_releaseKernel(_compare);
+		_releaseKernel(_swap); _releaseKernel(_copy); _releaseKernel(_compare);
 	}
 
 public:
@@ -410,9 +303,9 @@ public:
 	}
 
 public:
-	void sub_ntt64() { _executeKernel(_sub_ntt64, _size / 4, CHUNK64 * (64 / 4)); }
-	void sub_ntt256() { _executeKernel(_sub_ntt256, _size / 4, CHUNK256 * (256 / 4)); }
-	void sub_ntt1024() { _executeKernel(_sub_ntt1024, _size / 4, CHUNK1024 * (1024 / 4)); }
+	void sub_ntt64(const cl_uint, const cl_uint) { _executeKernel(_sub_ntt64, _size / 4, CHUNK64 * (64 / 4)); }
+	void sub_ntt256(const cl_uint, const cl_uint) { _executeKernel(_sub_ntt256, _size / 4, CHUNK256 * (256 / 4)); }
+	void sub_ntt1024(const cl_uint, const cl_uint) { _executeKernel(_sub_ntt1024, _size / 4, CHUNK1024 * (1024 / 4)); }
 
 private:
 	inline void _executeNttKernel(cl_kernel kernel, const cl_uint m, const cl_uint rindex, const size_t size)
@@ -457,24 +350,23 @@ public:
 	}
 
 public:
-	void square8() { _executeKernel(_square8, _size / 4, BLK8 * 8 / 4); }
-	void square16() { _executeKernel(_square16, _size / 4, BLK16 * 16 / 4); }
-	void square32() { _executeKernel(_square32, _size / 4, BLK32 * 32 / 4); }
-	void square64() { _executeKernel(_square64, _size / 4, BLK64 * 64 / 4); }
-	void square128() { _executeKernel(_square128, _size / 4, BLK128 * 128 / 4); }
-	void square256() { _executeKernel(_square256, _size / 4, BLK256 * 256 / 4); }
-	void square512() { _executeKernel(_square512, _size / 4, 512 / 4); }
-	void square1024() { _executeKernel(_square1024, _size / 4, 1024 / 4); }
-	void square2048() { _executeKernel(_square2048, _size / 4, 2048 / 4); }
-	void square4096() { _executeKernel(_square4096, _size / 4, 4096 / 4); }
+	void square8(const cl_uint, const cl_uint) { _executeKernel(_square8, _size / 4, BLK8 * 8 / 4); }
+	void square16(const cl_uint, const cl_uint) { _executeKernel(_square16, _size / 4, BLK16 * 16 / 4); }
+	void square32(const cl_uint, const cl_uint) { _executeKernel(_square32, _size / 4, BLK32 * 32 / 4); }
+	void square64(const cl_uint, const cl_uint) { _executeKernel(_square64, _size / 4, BLK64 * 64 / 4); }
+	void square128(const cl_uint, const cl_uint) { _executeKernel(_square128, _size / 4, BLK128 * 128 / 4); }
+	void square256(const cl_uint, const cl_uint) { _executeKernel(_square256, _size / 4, BLK256 * 256 / 4); }
+	void square512(const cl_uint, const cl_uint) { _executeKernel(_square512, _size / 4, 512 / 4); }
+	void square1024(const cl_uint, const cl_uint) { _executeKernel(_square1024, _size / 4, 1024 / 4); }
+	void square2048(const cl_uint, const cl_uint) { _executeKernel(_square2048, _size / 4, 2048 / 4); }
+	void square4096(const cl_uint, const cl_uint) { _executeKernel(_square4096, _size / 4, 4096 / 4); }
 
 public:
 	void mul2() { _executeKernel(_mul2, _size / 4); }
 	void mul4() { _executeKernel(_mul4, _size / 4); }
 
 public:
-	void poly2int0() { _executeKernel(_poly2int0, _size / P2I_BLK, P2I_WGS); }
-	void poly2int1() { _executeKernel(_poly2int1, _size / P2I_BLK); }
+	void poly2int() { _executeKernel(_poly2int0, _size / P2I_BLK, P2I_WGS); _executeKernel(_poly2int1, _size / P2I_BLK); }
 
 private:
 	inline void _executeUDsweepKernel(cl_kernel kernel, const cl_uint s, const cl_uint j, const size_t size)

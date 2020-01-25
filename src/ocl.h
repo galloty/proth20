@@ -398,15 +398,15 @@ private:
 	}
 
 protected:
-	cl_mem _createBuffer(const cl_mem_flags flags, const size_t size, const bool debug = false) const
+	cl_mem _createBuffer(const cl_mem_flags flags, const size_t size, const bool clear = true) const
 	{
 		cl_int err;
 		cl_mem mem = clCreateBuffer(_context, flags, size, nullptr, &err);
 		oclFatal(err);
-		if (debug)
+		if (clear)
 		{
 			uint8_t * const ptr = new uint8_t[size];
-			for (size_t i = 0; i < size; ++i) ptr[i] = 0xff;
+			for (size_t i = 0; i < size; ++i) ptr[i] = 0x00;	// debug 0xff;
 			oclFatal(clEnqueueWriteBuffer(_queue, mem, CL_TRUE, 0, size, ptr, 0, nullptr, nullptr));
 			delete[] ptr;
 		}

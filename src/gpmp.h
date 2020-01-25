@@ -9,6 +9,7 @@ Please give feedback to the authors if improvement is realized. It is distribute
 
 #include "arith.h"
 #include "engine.h"
+#include "plan.h"
 
 #include <cstdint>
 #include <cmath>
@@ -65,17 +66,8 @@ private:
 	const uint32_t _k, _n;
 	const bool _ext1024;
 	engine & _engine;
+	plan _plan;
 	cl_uint2 * const _mem;
-
-	struct squareSeq
-	{
-		size_t ns;
-		cl_uint s[8];
-
-		squareSeq() : ns(0) {}
-		squareSeq(const std::vector<uint32_t> & seq) { ns = seq.size(); for (size_t i = 0; i < ns; ++i) s[i] = seq[i]; }
-	};
-	squareSeq _squareSeq;
 
 private:
 	template <uint32_t p> class Zp
@@ -269,8 +261,10 @@ public:
 		_digit_bit(digitBit(k, n)), _size(transformSize(k, n, _digit_bit)), _k(k), _n(n),
 		_ext1024((engine.getMaxWorkGroupSize() >= 1024) && (engine.getLocalMemSize() >= 32768)), _engine(engine), _mem(new cl_uint2[_size])
 	{
+		const size_t size = _size;
+
 		const double max_digit = double((uint32_t(1) << _digit_bit) - 1);
-		if ((_size / 2) * max_digit * max_digit >= P1P2 / 2)
+		if ((size / 2) * max_digit * max_digit >= P1P2 / 2)
 		{
 			std::stringstream msg; msg << getDigits() << "-digit numbers are not supported.";
 			throw std::runtime_error(msg.str());
@@ -279,13 +273,13 @@ public:
 		engine.setProfiling(true);
 		_initEngine();
 
-		const size_t cnt = engine.configure(_ext1024);
+		const size_t cnt = _plan.getSquareSeqCount(size, _ext1024);
 		cl_ulong bestTime = cl_ulong(-1);
 		size_t best_i = 0;
 		for (size_t i = 0; i < cnt; ++i)
 		{
 			initProfiling();
-			_squareSeq = squareSeq(engine.getSquareSeq(i));
+			_plan.setSquareSeq(size, i);
 			for (size_t j = 0; j < 16; ++j) square();
 			const cl_ulong time = engine.getProfileTime();
 			if (time < bestTime)
@@ -296,7 +290,7 @@ public:
 			engine.resetProfiles();
 		}
 
-		_squareSeq = squareSeq(engine.getSquareSeq(best_i));
+		_plan.setSquareSeq(size, best_i);
 
 		_clearEngine();
 		engine.setProfiling(profile);
@@ -522,93 +516,11 @@ public:
 public:
 	void square()
 	{
-		const size_t size = _size;
-
-		const squareSeq & seq = _squareSeq;
-
 		// x size is size / 2; _x[0] = R, _x[1] = Y; compute (R - Y)^2
 
-		cl_uint m = cl_uint(size / 4);
-		cl_uint rindex = 0;
+		_plan.execSquareSeq(_engine);
 
-		if (seq.s[0] == 1024)
-		{
-			_engine.sub_ntt1024();
-			rindex += (256 + 64 + 16 + 4 + 1) * (m / 256);
-			m /= 1024;
-		} 
-		else if (seq.s[0] == 256)
-		{
-			_engine.sub_ntt256();
-			rindex += (64 + 16 + 4 + 1) * (m / 64);
-			m /= 256;
-		}
-		else /*if (seq.s[0] == 64)*/
-		{
-			_engine.sub_ntt64();
-			rindex += (16 + 4 + 1) * (m / 16);
-			m /= 64;
-		}
-
-		for (size_t i = 1; i < seq.ns; ++i)
-		{
-			if (seq.s[i] == 1024)
-			{
-				_engine.ntt1024(m / 256, rindex);
-				rindex += (256 + 64 + 16 + 4 + 1) * (m / 256);
-				m /= 1024;
-			} 
-			else if (seq.s[i] == 256)
-			{
-				_engine.ntt256(m / 64, rindex);
-				rindex += (64 + 16 + 4 + 1) * (m / 64);
-				m /= 256;
-			}
-			else /*if (seq.s[i] == 64)*/
-			{
-				_engine.ntt64(m / 16, rindex);
-				rindex += (16 + 4 + 1) * (m / 16);
-				m /= 64;
-			}
-		}
-
-		if (m == 1024)       _engine.square4096();
-		else if (m == 512)   _engine.square2048();
-		else if (m == 256)   _engine.square1024();
-		else if (m == 128)   _engine.square512();
-		else if (m == 64)    _engine.square256();
-		else if (m == 32)    _engine.square128();
-		else if (m == 16)    _engine.square64();
-		else if (m == 8)     _engine.square32();
-		else if (m == 4)     _engine.square16();
-		else /*if (m == 2)*/ _engine.square8();
-
-		for (size_t i = 0; i < seq.ns; ++i)
-		{
-			const size_t ri = seq.ns - 1 - i;
-
-			if (seq.s[ri] == 1024)
-			{
-				m *= 1024;
-				rindex -= (256 + 64 + 16 + 4 + 1) * (m / 256);
-				_engine.intt1024(m / 256, rindex);
-			} 
-			else if (seq.s[ri] == 256)
-			{
-				m *= 256;
-				rindex -= (64 + 16 + 4 + 1) * (m / 64);
-				_engine.intt256(m / 64, rindex);
-			}
-			else /*if (seq.s == 64)*/
-			{
-				m *= 64;
-				rindex -= (16 + 4 + 1) * (m / 16);
-				_engine.intt64(m / 16, rindex);
-			}
-		}
-
-		_engine.poly2int0();
-		_engine.poly2int1();
+		_engine.poly2int();
 
 		// x size is size
 
@@ -651,7 +563,7 @@ public:
 		// if R < Y then add k.2^n + 1 to R. We have 0 < R - Y + k.2^n + 1 <= k.2^n
 		_engine.set_positive();
 
-		_engine.sub_ntt64();
+		_engine.sub_ntt64(0, 0);
 
 		cl_uint m = cl_uint(size / 4);
 		cl_uint rindex = (16 + 4 + 1) * (m / 16);
@@ -689,8 +601,7 @@ public:
 			_engine.intt64(m / 16, rindex);
 		}
 
-		_engine.poly2int0();
-		_engine.poly2int1();
+		_engine.poly2int();
 
 		split();
 	}
