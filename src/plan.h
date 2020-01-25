@@ -102,19 +102,19 @@ private:
 
 			if (seq[0] == 1024)
 			{
-				f[n] = func(engine::sub_ntt1024);
+				f[n] = func(&engine::sub_ntt1024);
 				rindex += (256 + 64 + 16 + 4 + 1) * (m / 256);
 				m /= 1024;
 			} 
 			else if (seq[0] == 256)
 			{
-				f[n] = func(engine::sub_ntt256);
+				f[n] = func(&engine::sub_ntt256);
 				rindex += (64 + 16 + 4 + 1) * (m / 64);
 				m /= 256;
 			}
 			else /*if (seq[0] == 64)*/
 			{
-				f[n] = func(engine::sub_ntt64);
+				f[n] = func(&engine::sub_ntt64);
 				rindex += (16 + 4 + 1) * (m / 16);
 				m /= 64;
 			}
@@ -124,35 +124,35 @@ private:
 			{
 				if (seq[i] == 1024)
 				{
-					f[n] = func(engine::ntt1024, m / 256, rindex);
+					f[n] = func(&engine::ntt1024, m / 256, rindex);
 					rindex += (256 + 64 + 16 + 4 + 1) * (m / 256);
 					m /= 1024;
 				} 
 				else if (seq[i] == 256)
 				{
-					f[n] = func(engine::ntt256, m / 64, rindex);
+					f[n] = func(&engine::ntt256, m / 64, rindex);
 					rindex += (64 + 16 + 4 + 1) * (m / 64);
 					m /= 256;
 				}
 				else /*if (seq[i] == 64)*/
 				{
-					f[n] = func(engine::ntt64, m / 16, rindex);
+					f[n] = func(&engine::ntt64, m / 16, rindex);
 					rindex += (16 + 4 + 1) * (m / 16);
 					m /= 64;
 				}
 				++n;
 			}
 
-			if (m == 1024)       f[n] = func(engine::square4096);
-			else if (m == 512)   f[n] = func(engine::square2048);
-			else if (m == 256)   f[n] = func(engine::square1024);
-			else if (m == 128)   f[n] = func(engine::square512);
-			else if (m == 64)    f[n] = func(engine::square256);
-			else if (m == 32)    f[n] = func(engine::square128);
-			else if (m == 16)    f[n] = func(engine::square64);
-			else if (m == 8)     f[n] = func(engine::square32);
-			else if (m == 4)     f[n] = func(engine::square16);
-			else /*if (m == 2)*/ f[n] = func(engine::square8);
+			if (m == 1024)       f[n] = func(&engine::square4096);
+			else if (m == 512)   f[n] = func(&engine::square2048);
+			else if (m == 256)   f[n] = func(&engine::square1024);
+			else if (m == 128)   f[n] = func(&engine::square512);
+			else if (m == 64)    f[n] = func(&engine::square256);
+			else if (m == 32)    f[n] = func(&engine::square128);
+			else if (m == 16)    f[n] = func(&engine::square64);
+			else if (m == 8)     f[n] = func(&engine::square32);
+			else if (m == 4)     f[n] = func(&engine::square16);
+			else /*if (m == 2)*/ f[n] = func(&engine::square8);
 			++n;
 
 			for (size_t i = 0; i < seq.size(); ++i)
@@ -163,19 +163,19 @@ private:
 				{
 					m *= 1024;
 					rindex -= (256 + 64 + 16 + 4 + 1) * (m / 256);
-					f[n] = func(engine::intt1024, m / 256, rindex);
+					f[n] = func(&engine::intt1024, m / 256, rindex);
 				} 
 				else if (seq[ri] == 256)
 				{
 					m *= 256;
 					rindex -= (64 + 16 + 4 + 1) * (m / 64);
-					f[n] = func(engine::intt256, m / 64, rindex);
+					f[n] = func(&engine::intt256, m / 64, rindex);
 				}
 				else /*if (seq[ri] == 64)*/
 				{
 					m *= 64;
 					rindex -= (16 + 4 + 1) * (m / 16);
-					f[n] = func(engine::intt64, m / 16, rindex);
+					f[n] = func(&engine::intt64, m / 16, rindex);
 				}
 				++n;
 			}

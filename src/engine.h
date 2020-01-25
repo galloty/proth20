@@ -117,7 +117,9 @@ private:
 		_setKernelArg(kernel, 1, sizeof(cl_mem), &_y);
 		_setKernelArg(kernel, 2, sizeof(cl_mem), &_t);
 		_setKernelArg(kernel, 3, sizeof(cl_mem), forward ? &_bp : &_ibp);
-		const cl_uint4 e_d_d_inv_d_shift = { e, d, d_inv, cl_uint(d_shift) };
+		cl_uint4 e_d_d_inv_d_shift;
+		e_d_d_inv_d_shift.s[0] = e; e_d_d_inv_d_shift.s[1] = d;
+		e_d_d_inv_d_shift.s[2] = d_inv; e_d_d_inv_d_shift.s[3] = cl_uint(d_shift);
 		_setKernelArg(kernel, 4, sizeof(cl_uint4), &e_d_d_inv_d_shift);
 		if (forward) _setKernelArg(kernel, 5, sizeof(cl_int), &s);
 		return kernel;
