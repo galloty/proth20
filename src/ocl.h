@@ -138,19 +138,20 @@ public:
 
 			cl_uint num_devices;
 			cl_device_id devices[64];
-			oclFatal(clGetDeviceIDs(platforms[p], CL_DEVICE_TYPE_GPU, 64, devices, &num_devices));
-
-			for (cl_uint d = 0; d < num_devices; ++d)
+			if (oclError(clGetDeviceIDs(platforms[p], CL_DEVICE_TYPE_GPU, 64, devices, &num_devices)))
 			{
-				char deviceName[1024]; oclFatal(clGetDeviceInfo(devices[d], CL_DEVICE_NAME, 1024, deviceName, nullptr));
-				char deviceVendor[1024]; oclFatal(clGetDeviceInfo(devices[d], CL_DEVICE_VENDOR, 1024, deviceVendor, nullptr));
+				for (cl_uint d = 0; d < num_devices; ++d)
+				{
+					char deviceName[1024]; oclFatal(clGetDeviceInfo(devices[d], CL_DEVICE_NAME, 1024, deviceName, nullptr));
+					char deviceVendor[1024]; oclFatal(clGetDeviceInfo(devices[d], CL_DEVICE_VENDOR, 1024, deviceVendor, nullptr));
 
-				std::stringstream ss; ss << "device '" << deviceName << "', vendor '" << deviceVendor << "', platform '" << platformName << "'";
-				deviceDesc device;
-				device.platform_id = platforms[p];
-				device.device_id = devices[d];
-				device.name = ss.str();
-				_devices.push_back(device);
+					std::stringstream ss; ss << "device '" << deviceName << "', vendor '" << deviceVendor << "', platform '" << platformName << "'";
+					deviceDesc device;
+					device.platform_id = platforms[p];
+					device.device_id = devices[d];
+					device.name = ss.str();
+					_devices.push_back(device);
+				}
 			}
 		}
 	}
