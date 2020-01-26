@@ -5,8 +5,6 @@ proth20 is free source code, under the MIT license (see LICENSE). You can redist
 Please give feedback to the authors if improvement is realized. It is distributed in the hope that it will be useful.
 */
 
-#define CHUNK64		16
-
 __kernel
 void ntt4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
 {
@@ -38,6 +36,7 @@ void intt4(__global uint2 * restrict const x, __global const uint4 * restrict co
 	x[j + 0 * m] = addmod(u0, u2); x[j + 2 * m] = submod(u0, u2);
 	x[j + 1 * m] = addmod(u1, u3); x[j + 3 * m] = submod(u1, u3);
 }
+
 
 #define FORWARD4(M, CHUNK, R) \
 { \
@@ -85,6 +84,7 @@ void intt4(__global uint2 * restrict const x, __global const uint4 * restrict co
 	_backward4o(M * m, &xo[j], M * CHUNK, &X[threadIdx * CHUNK | chunk_idx], ir2[R + j], r1ir1[R + j]); \
 }
 
+
 #define SETVAR(M, CHUNK) \
 	__local uint2 X[M * CHUNK]; \
 	const size_t local_id = get_local_id(0), chunk_idx = local_id % CHUNK, threadIdx = local_id / CHUNK, block_idx = get_group_id(0) * CHUNK;
@@ -99,35 +99,131 @@ void intt4(__global uint2 * restrict const x, __global const uint4 * restrict co
 	const size_t bl_i = (block_idx & (m - 1)) | chunk_idx;
 
 
-__kernel __attribute__((reqd_work_group_size(64 / 4 * CHUNK64, 1, 1)))
-void sub_ntt64(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2)
-{
-	SETVAR(64, CHUNK64);
-	SETVAR_SUB_NTT(64);
+#define SUB_NTT64(CHUNK) \
+	SETVAR(64, CHUNK); \
+	SETVAR_SUB_NTT(64); \
+	SUB_FORWARD4i(16, CHUNK); \
+	FORWARD4(4, CHUNK, 16 * m); \
+	FORWARD4o(CHUNK, 16 * m + 4 * m);
 
-	SUB_FORWARD4i(16, CHUNK64);
-	FORWARD4(4, CHUNK64, 16 * m);
-	FORWARD4o(CHUNK64, 16 * m + 4 * m);
+#define NTT64(CHUNK) \
+	SETVAR(64, CHUNK); \
+	SETVAR_NTT(64); \
+	FORWARD4i(16, CHUNK, rindex); \
+	FORWARD4(4, CHUNK, rindex + 16 * m); \
+	FORWARD4o(CHUNK, rindex + 16 * m + 4 * m);
+
+#define INTT64(CHUNK) \
+	SETVAR(64, CHUNK); \
+	SETVAR_NTT(64); \
+	BACKWARD4i(CHUNK, rindex + 16 * m + 4 * m); \
+	BACKWARD4(4, CHUNK, rindex + 16 * m); \
+	BACKWARD4o(16, CHUNK, rindex);
+
+#define SUB_NTT256(CHUNK) \
+	SETVAR(256, CHUNK); \
+	SETVAR_SUB_NTT(256); \
+	SUB_FORWARD4i(64, CHUNK); \
+	FORWARD4(16, CHUNK, 64 * m); \
+	FORWARD4(4, CHUNK, 64 * m + 16 * m); \
+	FORWARD4o(CHUNK, 64 * m + 16 * m + 4 * m);
+
+#define NTT256(CHUNK) \
+	SETVAR(256, CHUNK); \
+	SETVAR_NTT(256); \
+	FORWARD4i(64, CHUNK, rindex); \
+	FORWARD4(16, CHUNK, rindex + 64 * m); \
+	FORWARD4(4, CHUNK, rindex + 64 * m + 16 * m); \
+	FORWARD4o(CHUNK, rindex + 64 * m + 16 * m + 4 * m);
+
+#define INTT256(CHUNK) \
+	SETVAR(256, CHUNK); \
+	SETVAR_NTT(256); \
+	BACKWARD4i(CHUNK, rindex + 64 * m + 16 * m + 4 * m); \
+	BACKWARD4(4, CHUNK, rindex + 64 * m + 16 * m); \
+	BACKWARD4(16, CHUNK, rindex + 64 * m); \
+	BACKWARD4o(64, CHUNK, rindex);
+
+#define SUB_NTT1024(CHUNK) \
+	SETVAR(1024, CHUNK); \
+	SETVAR_SUB_NTT(1024); \
+	SUB_FORWARD4i(256, CHUNK); \
+	FORWARD4(64, CHUNK, 256 * m); \
+	FORWARD4(16, CHUNK, 256 * m + 64 * m); \
+	FORWARD4(4, CHUNK, 256 * m + 64 * m + 16 * m); \
+	FORWARD4o(CHUNK, 256 * m + 64 * m + 16 * m + 4 * m);
+
+#define NTT1024(CHUNK) \
+	SETVAR(1024, CHUNK); \
+	SETVAR_NTT(1024); \
+	FORWARD4i(256, CHUNK, rindex); \
+	FORWARD4(64, CHUNK, rindex + 256 * m); \
+	FORWARD4(16, CHUNK, rindex + 256 * m + 64 * m); \
+	FORWARD4(4, CHUNK, rindex + 256 * m + 64 * m + 16 * m); \
+	FORWARD4o(CHUNK, rindex + 256 * m + 64 * m + 16 * m + 4 * m);
+
+#define INTT1024(CHUNK) \
+	SETVAR(1024, CHUNK); \
+	SETVAR_NTT(1024); \
+	BACKWARD4i(CHUNK, rindex + 256 * m + 64 * m + 16 * m + 4 * m); \
+	BACKWARD4(4, CHUNK, rindex + 256 * m + 64 * m + 16 * m); \
+	BACKWARD4(16, CHUNK, rindex + 256 * m + 64 * m); \
+	BACKWARD4(64, CHUNK, rindex + 256 * m); \
+	BACKWARD4o(256, CHUNK, rindex);
+
+
+__kernel __attribute__((reqd_work_group_size(64 / 4 * 16, 1, 1)))
+void sub_ntt64_16(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2)
+{
+	SUB_NTT64(16);
 }
 
-__kernel __attribute__((reqd_work_group_size(64 / 4 * CHUNK64, 1, 1)))
-void ntt64(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
+__kernel __attribute__((reqd_work_group_size(64 / 4 * 16, 1, 1)))
+void ntt64_16(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
 {
-	SETVAR(64, CHUNK64);
-	SETVAR_NTT(64);
-
-	FORWARD4i(16, CHUNK64, rindex);
-	FORWARD4(4, CHUNK64, rindex + 16 * m);
-	FORWARD4o(CHUNK64, rindex + 16 * m + 4 * m);
+	NTT64(16);
 }
 
-__kernel __attribute__((reqd_work_group_size(64 / 4 * CHUNK64, 1, 1)))
-void intt64(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2, const uint m, const uint rindex)
+__kernel __attribute__((reqd_work_group_size(64 / 4 * 16, 1, 1)))
+void intt64_16(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2, const uint m, const uint rindex)
 {
-	SETVAR(64, CHUNK64);
-	SETVAR_NTT(64);
+	INTT64(16);
+}
 
-	BACKWARD4i(CHUNK64, rindex + 16 * m + 4 * m);
-	BACKWARD4(4, CHUNK64, rindex + 16 * m);
-	BACKWARD4o(16, CHUNK64, rindex);
+
+__kernel __attribute__((reqd_work_group_size(256 / 4 * 4, 1, 1)))
+void sub_ntt256_4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2)
+{
+	SUB_NTT256(4);
+}
+
+__kernel __attribute__((reqd_work_group_size(256 / 4 * 4, 1, 1)))
+void ntt256_4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
+{
+	NTT256(4);
+}
+
+__kernel __attribute__((reqd_work_group_size(256 / 4 * 4, 1, 1)))
+void intt256_4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2, const uint m, const uint rindex)
+{
+	INTT256(4);
+}
+
+
+__kernel __attribute__((reqd_work_group_size(1024 / 4 * 1, 1, 1)))
+void sub_ntt1024_1(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2)
+{
+	SUB_NTT1024(1);
+}
+
+__kernel __attribute__((reqd_work_group_size(1024 / 4 * 1, 1, 1)))
+void ntt1024_1(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
+{
+	NTT1024(1);
+}
+
+__kernel __attribute__((reqd_work_group_size(1024 / 4 * 1, 1, 1)))
+void intt1024_1(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2, const uint m, const uint rindex)
+{
+	INTT1024(1);
 }

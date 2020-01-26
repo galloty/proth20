@@ -5,42 +5,41 @@ proth20 is free source code, under the MIT license (see LICENSE). You can redist
 Please give feedback to the authors if improvement is realized. It is distributed in the hope that it will be useful.
 */
 
-#define CHUNK256	8
-
-__kernel __attribute__((reqd_work_group_size(256 / 4 * CHUNK256, 1, 1)))
-void sub_ntt256(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2)
+__kernel __attribute__((reqd_work_group_size(256 / 4 * 8, 1, 1)))
+void sub_ntt256_8(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2)
 {
-	SETVAR(256, CHUNK256);
-	SETVAR_SUB_NTT(256);
-
-	SUB_FORWARD4i(64, CHUNK256);
-	FORWARD4(16, CHUNK256, 64 * m);
-	FORWARD4(4, CHUNK256, 64 * m + 16 * m);
-	FORWARD4o(CHUNK256, 64 * m + 16 * m + 4 * m);
+	SUB_NTT256(8);
 }
 
-__kernel __attribute__((reqd_work_group_size(256 / 4 * CHUNK256, 1, 1)))
-void ntt256(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
+__kernel __attribute__((reqd_work_group_size(256 / 4 * 8, 1, 1)))
+void ntt256_8(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
 {
-	SETVAR(256, CHUNK256);
-	SETVAR_NTT(256);
-
-	FORWARD4i(64, CHUNK256, rindex);
-	FORWARD4(16, CHUNK256, rindex + 64 * m);
-	FORWARD4(4, CHUNK256, rindex + 64 * m + 16 * m);
-	FORWARD4o(CHUNK256, rindex + 64 * m + 16 * m + 4 * m);
+	NTT256(8);
 }
 
-__kernel __attribute__((reqd_work_group_size(256 / 4 * CHUNK256, 1, 1)))
-void intt256(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2, const uint m, const uint rindex)
+__kernel __attribute__((reqd_work_group_size(256 / 4 * 8, 1, 1)))
+void intt256_8(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2, const uint m, const uint rindex)
 {
-	SETVAR(256, CHUNK256);
-	SETVAR_NTT(256);
+	INTT256(8);
+}
 
-	BACKWARD4i(CHUNK256, rindex + 64 * m + 16 * m + 4 * m);
-	BACKWARD4(4, CHUNK256, rindex + 64 * m + 16 * m);
-	BACKWARD4(16, CHUNK256, rindex + 64 * m);
-	BACKWARD4o(64, CHUNK256, rindex);
+
+__kernel __attribute__((reqd_work_group_size(1024 / 4 * 2, 1, 1)))
+void sub_ntt1024_2(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2)
+{
+	SUB_NTT1024(2);
+}
+
+__kernel __attribute__((reqd_work_group_size(1024 / 4 * 2, 1, 1)))
+void ntt1024_2(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
+{
+	NTT1024(2);
+}
+
+__kernel __attribute__((reqd_work_group_size(1024 / 4 * 2, 1, 1)))
+void intt1024_2(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2, const uint m, const uint rindex)
+{
+	INTT1024(2);
 }
 
 

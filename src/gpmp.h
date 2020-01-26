@@ -143,10 +143,17 @@ private:
 		std::string line;
 		while (std::getline(clFile, line))
 		{
-			hFile << "\"" << line << "\\n\" \\" << std::endl;
+			hFile << "\"";
+			for (char c : line)
+			{
+				if ((c == '\\') || (c == '\"')) hFile << '\\';
+				hFile << c;
+			}
+			hFile << " \\n\" \\" << std::endl;
+
 			src << line << std::endl;
 		}
-		hFile << ";" << std::endl;
+		hFile << "\"\";" << std::endl;
 
 		hFile.close();
 		clFile.close();
@@ -198,7 +205,8 @@ private:
 		_engine.allocMemory(size, constant_size);
 		const cl_uint2 norm = set2(cl_uint(P1 - (P1 - 1) / size), cl_uint(P2 - (P2 - 1) / size));
 		const cl_int k_shift = cl_int(arith::log2(_k) - 1);
-		_engine.createKernels(norm, cl_uint(_n / _digit_bit), cl_int(_n % _digit_bit), cl_uint(_k), cl_uint((uint64_t(1) << (32 + k_shift)) / _k), k_shift, _ext1024);
+		_engine.createKernels(norm, cl_uint(_n / _digit_bit), cl_int(_n % _digit_bit), cl_uint(_k),
+			cl_uint((uint64_t(1) << (32 + k_shift)) / _k), k_shift, _ext512, _ext1024);
 
 		// (size + 2) / 3 roots
 		cl_uint4 * const r1ir1 = new cl_uint4[size];
@@ -327,7 +335,7 @@ public:
 public:
 	size_t getPlanSquareSeqCount() const { return _plan.getSquareSeqCount(); }
 	void setPlanSquareSeq(const size_t i) { _plan.setSquareSeq(_size, i); }
-	std::string getPlanSquareSeqString(const size_t i) const { return _plan.getSquareSeqString(_size, i); }
+	std::string getPlanSquareSeqString() const { return _plan.getSquareSeqString(_size); }
 
 public:
 	void display() const
@@ -582,7 +590,7 @@ public:
 		// if R < Y then add k.2^n + 1 to R. We have 0 < R - Y + k.2^n + 1 <= k.2^n
 		_engine.set_positive();
 
-		_engine.sub_ntt64(0, 0);
+		_engine.sub_ntt64_16(0, 0);
 
 		cl_uint m = cl_uint(size / 4);
 		cl_uint rindex = (16 + 4 + 1) * (m / 16);
@@ -590,7 +598,7 @@ public:
 
 		for (; m > 256; m /= 64)
 		{
-			_engine.ntt64(m / 16, rindex);
+			_engine.ntt64_16(m / 16, rindex);
 			rindex += (16 + 4 + 1) * (m / 16);
 		}
 
@@ -617,7 +625,7 @@ public:
 		{
 			m *= 64;
 			rindex -= (16 + 4 + 1) * (m / 16);
-			_engine.intt64(m / 16, rindex);
+			_engine.intt64_16(m / 16, rindex);
 		}
 
 		_engine.poly2int();

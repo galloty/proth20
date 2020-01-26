@@ -107,7 +107,8 @@ public:
 		const bool found = X.restoreContext(i0, chrono.previousTime);
 
 		std::cout << (found ? "Resuming from a checkpoint " : "Testing ");
-		std::cout << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^" << arith::log2(X.getSize()) << " x " << X.getDigitBit() << " bits" << std::endl;
+		std::cout << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^" << arith::log2(X.getSize())
+			<< " x " << X.getDigitBit() << " bits, " << X.getPlanSquareSeqString() << std::endl;
 
 		chrono.resetTime();
 
@@ -226,8 +227,8 @@ public:
 
 		for (size_t j = 0; j < cnt; ++j)
 		{
-			std::cout << X.getPlanSquareSeqString(j);
 			X.setPlanSquareSeq(j);
+			std::cout << X.getPlanSquareSeqString();
 
 			if (!apowk(X, a, k)) return false;
 			checkError(X);
@@ -266,18 +267,18 @@ public:
 		primeList.push_back(number(1139, 2641));
 		primeList.push_back(number(1035, 5336));
 		primeList.push_back(number(965, 10705));
-		primeList.push_back(number(1027, 21468));		// size = 2^11, 64      sq32
-		primeList.push_back(number(1109, 42921));		// size = 2^12, 64      sq64
-		primeList.push_back(number(1085, 85959));		// size = 2^13, 64     sq128 64-bit 32-bit
-		primeList.push_back(number(1015, 171214));		// size = 2^14, 64     sq256, 0.073  0.071
-		primeList.push_back(number(1197, 343384));		// size = 2^15, 64     sq512, 0.107  0.095
-		primeList.push_back(number(1089, 685641));		// size = 2^16, 64    sq1024, 0.170  0.163
-		primeList.push_back(number(1005, 1375758));		// size = 2^17, 256    sq512, 0.291  0.284
-		primeList.push_back(number(1089, 2746155));		// size = 2^18, 256   sq1024, 0.542  0.527
-		primeList.push_back(number(45, 5308037));		// size = 2^19, 256   sq2048, 1.04   1.02
-		primeList.push_back(number(6679881, 6679881));	// size = 2^20, 256 256 sq16, 2.05   1.97
-		primeList.push_back(number(3, 10829346));		// size = 2^21, 256 256 sq32, 4.14   4.01
-		primeList.push_back(number(10223, 31172165));	// size = 2^22, 256 256 sq64, 8.43   8.13
+		primeList.push_back(number(1027, 21468));		// size = 2^11, 64_16        sq_32
+		primeList.push_back(number(1109, 42921));		// size = 2^12, 64_16        sq_64
+		primeList.push_back(number(1085, 85959));		// size = 2^13, 64_16       sq_128  64-bit 32-bit
+		primeList.push_back(number(1015, 171214));		// size = 2^14, 256_8        sq_64, 0.075  0.071
+		primeList.push_back(number(1197, 343384));		// size = 2^15, 1024_4       sq_32, 0.102  0.095
+		primeList.push_back(number(1089, 685641));		// size = 2^16, 256_8       sq_256, 0.170  0.163
+		primeList.push_back(number(1005, 1375758));		// size = 2^17, 256_8       sq_512, 0.291  0.284
+		primeList.push_back(number(1089, 2746155));		// size = 2^18, 256_8      sq_1024, 0.542  0.527
+		primeList.push_back(number(45, 5308037));		// size = 2^19, 256_8      sq_2048, 1.04   1.02
+		primeList.push_back(number(6679881, 6679881));	// size = 2^20, 256_8  256_8 sq_16, 2.05   1.97
+		primeList.push_back(number(3, 10829346));		// size = 2^21, 256_8  256_8 sq_32, 4.14   3.97
+		primeList.push_back(number(10223, 31172165));	// size = 2^22, 256_16 256_8 sq_64, 8.43   8.04
 
 		for (const auto & p : primeList) if (!check(p.k, p.n, engine, bench, true)) return;
 	}

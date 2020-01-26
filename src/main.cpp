@@ -137,8 +137,8 @@ public:
 		// proth & p = proth::getInstance();
 
 		// function profiling
-		// p.profile(45, 5308037, engine0);
-		// p.profile(99739, 14019102, engine0);
+		// p.profile(13, 5523860, engine0);		// DIV
+		// p.profile(10223, 31172165, engine0);	// SOB
 
 		// bench
 		// p.bench(engine0);
