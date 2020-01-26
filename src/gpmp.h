@@ -16,8 +16,14 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #include <sstream>
 #include <fstream>
 
-#include "proth_ocl.h"
-#include "proth_1024_ocl.h"
+#include "ocl/modarith.h"
+#include "ocl/NTT.h"
+#include "ocl/square.h"
+#include "ocl/poly2int.h"
+#include "ocl/reduce.h"
+#include "ocl/misc.h"
+#include "ocl/squareNTT_512.h"
+#include "ocl/squareNTT_1024.h"
 
 class gpmp
 {
@@ -64,7 +70,7 @@ private:
 	const int _digit_bit;
 	const size_t _size;
 	const uint32_t _k, _n;
-	const bool _ext1024;
+	const bool _ext512, _ext1024;
 	engine & _engine;
 	plan _plan;
 	cl_uint2 * const _mem;
@@ -170,18 +176,21 @@ private:
 		std::stringstream src;
 		src << "#define\tdigit_bit\t" << _digit_bit << std::endl << std::endl;
 
-		if (!readOpenCL("ocl/proth.cl", "src/proth_ocl.h", "src_proth_ocl", src))
-		{
-			// if .cl file is not found then program is proth_ocl.h
-			src << src_proth_ocl;
-		}
+		// if xxx.cl file is not found then source is src_ocl_xxx string in src/ocl/xxx.h
+		if (!readOpenCL("ocl/modarith.cl", "src/ocl/modarith.h", "src_ocl_modarith", src)) src << src_ocl_modarith;	
+		if (!readOpenCL("ocl/NTT.cl", "src/ocl/NTT.h", "src_ocl_NTT", src)) src << src_ocl_NTT;	
+		if (!readOpenCL("ocl/square.cl", "src/ocl/square.h", "src_ocl_square", src)) src << src_ocl_square;	
+		if (!readOpenCL("ocl/poly2int.cl", "src/ocl/poly2int.h", "src_ocl_poly2int", src)) src << src_ocl_poly2int;	
+		if (!readOpenCL("ocl/reduce.cl", "src/ocl/reduce.h", "src_ocl_reduce", src)) src << src_ocl_reduce;	
+		if (!readOpenCL("ocl/misc.cl", "src/ocl/misc.h", "src_ocl_misc", src)) src << src_ocl_misc;	
 
+		if (_ext512)
+		{
+			if (!readOpenCL("ocl/squareNTT_512.cl", "src/ocl/squareNTT_512.h", "src_ocl_squareNTT_512", src)) src << src_ocl_squareNTT_512;	
+		}
 		if (_ext1024)
 		{
-			if (!readOpenCL("ocl/proth_1024.cl", "src/proth_1024_ocl.h", "src_proth_1024_ocl", src))
-			{
-				src << src_proth_1024_ocl;
-			}
+			if (!readOpenCL("ocl/squareNTT_1024.cl", "src/ocl/squareNTT_1024.h", "src_ocl_squareNTT_1024", src)) src << src_ocl_squareNTT_1024;	
 		}
 
 		_engine.loadProgram(src.str().c_str());
@@ -257,9 +266,10 @@ private:
 	}
 
 public:
-	gpmp(const uint32_t k, const uint32_t n, engine & engine, const bool profile = false) :
+	gpmp(const uint32_t k, const uint32_t n, engine & engine, const bool profile = false, const bool profiling = true) :
 		_digit_bit(digitBit(k, n)), _size(transformSize(k, n, _digit_bit)), _k(k), _n(n),
-		_ext1024((engine.getMaxWorkGroupSize() >= 1024) && (engine.getLocalMemSize() >= 32768)), _engine(engine), _mem(new cl_uint2[_size])
+		_ext512(engine.getMaxWorkGroupSize() >= 512), _ext1024((engine.getMaxWorkGroupSize() >= 1024) && (engine.getLocalMemSize() >= 32768)),
+		_engine(engine), _mem(new cl_uint2[_size])
 	{
 		const size_t size = _size;
 
@@ -270,33 +280,35 @@ public:
 			throw std::runtime_error(msg.str());
 		}
 
-		_plan.init(size, _ext1024);
+		_plan.init(size, _ext512, _ext1024);
 
-		engine.setProfiling(true);
-		_initEngine();
-
-		const size_t cnt = _plan.getSquareSeqCount();
-		cl_ulong bestTime = cl_ulong(-1);
 		size_t best_i = 0;
-		for (size_t i = 0; i < cnt; ++i)
+		if (profiling)
 		{
-			initProfiling();
-			_plan.setSquareSeq(size, i);
-			for (size_t j = 0; j < 16; ++j) square();
-			const cl_ulong time = engine.getProfileTime();
-			if (time < bestTime)
+			engine.setProfiling(true);
+			_initEngine();
+
+			cl_ulong bestTime = cl_ulong(-1);
+			for (size_t i = 0, cnt = _plan.getSquareSeqCount(); i < cnt; ++i)
 			{
-				bestTime = time;
-				best_i = i;
+				initProfiling();
+				_plan.setSquareSeq(size, i);
+				for (size_t j = 0; j < 16; ++j) square();
+				const cl_ulong time = engine.getProfileTime();
+				if (time < bestTime)
+				{
+					bestTime = time;
+					best_i = i;
+				}
+				engine.resetProfiles();
 			}
-			engine.resetProfiles();
+
+			_clearEngine();
 		}
 
-		_plan.setSquareSeq(size, best_i);
-
-		_clearEngine();
 		engine.setProfiling(profile);
 		_initEngine();
+		_plan.setSquareSeq(size, best_i);
 	}
 
 public:

@@ -12,39 +12,49 @@ Please give feedback to the authors if improvement is realized. It is distribute
 class plan
 {
 private:
+	struct slice
+	{
+		uint32_t m;
+		uint32_t chunk;
+
+		slice(const uint32_t m, const uint32_t chunk) : m(m), chunk(chunk) {}
+	};
+	typedef std::vector<slice> solution;
+
+private:
 	class squareSplitter
 	{
 	private:
-		bool _b1024 = false;
-		std::vector<std::vector<uint32_t> > _squareSet;
+		bool _b512 = false, _b1024 = false;
+		std::vector<solution> _squareSet;
 
 	private:
-		void split(const uint32_t m, const size_t i, std::vector<uint32_t> & p)
+		void split(const uint32_t m, const size_t i, solution & sol)
 		{
 			static const size_t CHUNK64 = 16, CHUNK256 = 8, CHUNK1024 = 4;	// TODO
 
 			if (_b1024 && (m >= 1024 / 4 * CHUNK1024))
 			{
-				p.push_back(1024);
-				split(m / 1024, i + 1, p);
-				p.pop_back();
+				sol.push_back(slice(1024, CHUNK1024));
+				split(m / 1024, i + 1, sol);
+				sol.pop_back();
 			}
-			if (_b1024 && (m >= 256 / 4 * CHUNK256))
+			if (_b512 && (m >= 256 / 4 * CHUNK256))
 			{
-				p.push_back(256);
-				split(m / 256, i + 1, p);
-				p.pop_back();
+				sol.push_back(slice(256, CHUNK256));
+				split(m / 256, i + 1, sol);
+				sol.pop_back();
 			}
 			if (m >= 64 / 4 * CHUNK64)
 			{
-				p.push_back(64);
-				split(m / 64, i + 1, p);
-				p.pop_back();
+				sol.push_back(slice(64, CHUNK64));
+				split(m / 64, i + 1, sol);
+				sol.pop_back();
 			}
 
-			if ((i != 0) && (m >= 2) && ((m <= 256) || (_b1024 && (m <= 1024))))
+			if ((i != 0) && (m >= 2) && ((m <= 256) || (_b512 && (m <= 512)) || (_b1024 && (m <= 1024))))
 			{
-				_squareSet.push_back(p);
+				_squareSet.push_back(sol);
 			}
 		}
 
@@ -53,20 +63,20 @@ private:
 		virtual ~squareSplitter() {}
 
 	public:
-		void init(const uint32_t n, const bool b1024)
+		void init(const uint32_t n, const bool b512, const bool b1024)
 		{
-			_b1024 = b1024;
+			_b512 = b512; _b1024 = b1024;
 			_squareSet.clear();
-			std::vector<uint32_t> p; split(n, 0, p);
+			solution sol; split(n, 0, sol);
 		}
 
 		size_t getSquareSize() const { return _squareSet.size(); }
-		const std::vector<uint32_t> & getSquareSeq(const size_t i) const { return _squareSet.at(i); }
+		const solution & getSquareSeq(const size_t i) const { return _squareSet.at(i); }
 		std::string getString(const size_t size, const size_t i) const
 		{
 			std::ostringstream ss;
 			size_t m = size;
-			for (uint32_t mi : _squareSet.at(i)) { ss << mi << " "; m /= mi; }
+			for (const slice & s : _squareSet.at(i)) { ss << s.m << " "; m /= s.m; }
 			ss << "sq_" << m;
  			return ss.str();
 		}
@@ -93,26 +103,26 @@ private:
 		virtual ~squareSeq() {}
 
 	public:
-		void init(const size_t size, const std::vector<uint32_t> & seq)
+		void init(const size_t size, const solution & sol)
 		{
 			size_t n = 0;
 
 			cl_uint m = cl_uint(size / 4);
 			cl_uint rindex = 0;
 
-			if (seq[0] == 1024)
+			if (sol[0].m == 1024)
 			{
 				f[n] = func(&engine::sub_ntt1024);
 				rindex += (256 + 64 + 16 + 4 + 1) * (m / 256);
 				m /= 1024;
-			} 
-			else if (seq[0] == 256)
+			}
+			else if (sol[0].m == 256)
 			{
 				f[n] = func(&engine::sub_ntt256);
 				rindex += (64 + 16 + 4 + 1) * (m / 64);
 				m /= 256;
 			}
-			else /*if (seq[0] == 64)*/
+			else /*if (sol[0].m == 64)*/
 			{
 				f[n] = func(&engine::sub_ntt64);
 				rindex += (16 + 4 + 1) * (m / 16);
@@ -120,21 +130,21 @@ private:
 			}
 			++n;
 
-			for (size_t i = 1; i < seq.size(); ++i)
+			for (size_t i = 1; i < sol.size(); ++i)
 			{
-				if (seq[i] == 1024)
+				if (sol[i].m == 1024)
 				{
 					f[n] = func(&engine::ntt1024, m / 256, rindex);
 					rindex += (256 + 64 + 16 + 4 + 1) * (m / 256);
 					m /= 1024;
 				} 
-				else if (seq[i] == 256)
+				else if (sol[i].m == 256)
 				{
 					f[n] = func(&engine::ntt256, m / 64, rindex);
 					rindex += (64 + 16 + 4 + 1) * (m / 64);
 					m /= 256;
 				}
-				else /*if (seq[i] == 64)*/
+				else /*if (sol[i].m == 64)*/
 				{
 					f[n] = func(&engine::ntt64, m / 16, rindex);
 					rindex += (16 + 4 + 1) * (m / 16);
@@ -155,23 +165,23 @@ private:
 			else /*if (m == 2)*/ f[n] = func(&engine::square8);
 			++n;
 
-			for (size_t i = 0; i < seq.size(); ++i)
+			for (size_t i = 0; i < sol.size(); ++i)
 			{
-				const size_t ri = seq.size() - 1 - i;
+				const size_t ri = sol.size() - 1 - i;
 
-				if (seq[ri] == 1024)
+				if (sol[ri].m == 1024)
 				{
 					m *= 1024;
 					rindex -= (256 + 64 + 16 + 4 + 1) * (m / 256);
 					f[n] = func(&engine::intt1024, m / 256, rindex);
 				} 
-				else if (seq[ri] == 256)
+				else if (sol[ri].m == 256)
 				{
 					m *= 256;
 					rindex -= (64 + 16 + 4 + 1) * (m / 64);
 					f[n] = func(&engine::intt256, m / 64, rindex);
 				}
-				else /*if (seq[ri] == 64)*/
+				else /*if (sol[ri].m == 64)*/
 				{
 					m *= 64;
 					rindex -= (16 + 4 + 1) * (m / 16);
@@ -203,7 +213,7 @@ public:
 	virtual ~plan() {}
 
 public:
-	void init(const size_t size, const bool b1024) { _squareSplitter.init(size / 4, b1024); }
+	void init(const size_t size, const bool b512, const bool b1024) { _squareSplitter.init(size / 4, b512, b1024); }
 	size_t getSquareSeqCount() const { return _squareSplitter.getSquareSize(); }
 	void setSquareSeq(const size_t size, const size_t i) { _squareSeq.init(size, _squareSplitter.getSquareSeq(i)); }
 	std::string getSquareSeqString(const size_t size, const size_t i) const { return _squareSplitter.getString(size, i); }

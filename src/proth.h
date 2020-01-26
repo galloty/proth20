@@ -46,7 +46,7 @@ private:
 	}
 
 public:
-	static void apowk(gpmp & X, const uint32_t a, const uint32_t k)
+	bool apowk(gpmp & X, const uint32_t a, const uint32_t k) const
 	{
 		// X = a^k, left-to-right algorithm
 		bool s = false;
@@ -61,6 +61,8 @@ public:
 				s = true;
 				X.mul();				// x = iNTT(NTT(x).tu)
 			}
+
+			if (_quit) return false;
 		}
 		X.norm();
 		X.copy_x_v();
@@ -78,10 +80,14 @@ public:
 			X.swap_x_u();				// x <-> u
 			X.square();
 			X.swap_x_u();				// u = u^2
+
+			if (_quit) return false;
 		}
 		X.norm();
 		X.copy_x_u();
 		X.compare_u_v();
+
+		return true;
 	}
 
 public:
@@ -109,7 +115,7 @@ public:
 		{
 			i0 = 0;
 			chrono.previousTime = 0;
-			apowk(X, a, k);
+			if (!apowk(X, a, k)) return false;
 			checkError(X);	// Sync GPU before benchmark
 		}
 
@@ -209,10 +215,10 @@ public:
 	}
 
 public:
-	bool validate(const uint32_t k, const uint32_t n, engine & engine)
+	bool validate(const uint32_t k, const uint32_t n, const uint32_t L, engine & engine)
 	{
 		const uint32_t a = 3;
-		gpmp X(k, n, engine);
+		gpmp X(k, n, engine, false, false);
 
 		const size_t cnt = X.getPlanSquareSeqCount();
 
@@ -223,10 +229,8 @@ public:
 			std::cout << X.getPlanSquareSeqString(j);
 			X.setPlanSquareSeq(j);
 
-			apowk(X, a, k);
+			if (!apowk(X, a, k)) return false;
 			checkError(X);
-
-			const uint32_t L = 64;
 
 			for (uint32_t i = 1; i < L * L; ++i)
 			{
@@ -315,7 +319,8 @@ public:
 
 	void validation(engine & engine)
 	{
-		for (uint32_t n = 15000; n < 100000000; n *= 2) if (!validate(536870911, n, engine)) return;
+		if (!validate(536870911, 3000000, 4, engine)) return;
+		for (uint32_t n = 15000; n < 100000000; n *= 2) if (!validate(536870911, n, 16, engine)) return;
 	}
 
 	void profile(const uint32_t k, const uint32_t n, engine & engine)
