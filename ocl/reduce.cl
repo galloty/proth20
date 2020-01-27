@@ -23,9 +23,11 @@ void reduce_upsweep64(__global uint * restrict const t, const uint d, const uint
 	__global const uint4 * const tj1_4 = (__global const uint4 *)&tj[0];
 	const uint4 u = tj1_4[k];
 	const uint u01 = _addmod(u.s0, u.s1, d), u23 = _addmod(u.s2, u.s3, d), u0123 = _addmod(u01, u23, d);
-	tj[4 * (16 * s) + k] = u23; tj[5 * (16 * s) + k] = u0123; T[i] = u0123;
+	T[i] = u0123;
 
 	barrier(CLK_LOCAL_MEM_FENCE);
+
+	tj[4 * (16 * s) + k] = u23; tj[5 * (16 * s) + k] = u0123; 
 
 	if (i < R64 / 4)
 	{
@@ -79,11 +81,13 @@ void reduce_downsweep64(__global uint * restrict const t, const uint d, const ui
 		T_4[i] = (uint4)(u012, u02, u03, u0);
 	}
 
+	__global uint4 * const tj1_4 = (__global uint4 *)&tj[0];
+	const uint u2 = tj[4 * (16 * s) + k];
+	const uint4 u13 = tj1_4[k];
+
 	barrier(CLK_LOCAL_MEM_FENCE);
 
-	__global uint4 * const tj1_4 = (__global uint4 *)&tj[0];
-	const uint u2 = tj[4 * (16 * s) + k], u0 = T[i], u02 = _addmod(u0, u2, d);
-	const uint4 u13 = tj1_4[k];
+	const uint u0 = T[i], u02 = _addmod(u0, u2, d);
 	const uint u012 = _addmod(u02, u13.s1, d), u03 = _addmod(u0, u13.s3, d);
 	tj1_4[k] = (uint4)(u012, u02, u03, u0);
 }
@@ -294,7 +298,7 @@ void reduce_i(__global const uint2 * restrict const x, __global uint * restrict 
 	const uint e = e_d_d_inv_d_shift.s0, d = e_d_d_inv_d_shift.s1, d_inv = e_d_d_inv_d_shift.s2;
 	const int d_shift = (int)(e_d_d_inv_d_shift.s3);
 
-	const uint xs = ((x[e + k + 1].s0 << (digit_bit - s)) | (x[e + k].s0 >> s)) & digit_mask;
+	const uint xs = ((x[e + k].s0 >> s) | (x[e + k + 1].s0 << (digit_bit - s))) & digit_mask;
 	const uint u = _rem(xs * (ulong)(bp[k]), d, d_inv, d_shift);
 
 	y[k] = xs;
@@ -322,8 +326,7 @@ void reduce_o(__global uint2 * restrict const x, __global const uint * restrict 
 	const uint r = (uint)(q) - q_d * d;
 	const uint c = (r >= d) ? 1 : 0;
 
-	const uint2 x_k = x[k];
-	x[k] = (uint2)((k > e) ? 0 : x_k.s0, q_d + c);
+	x[k] = (uint2)((k > e) ? 0 : x[k].s0, q_d + c);
 }
 
 __kernel

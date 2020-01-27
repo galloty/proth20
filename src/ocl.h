@@ -186,6 +186,9 @@ class device : oclObject
 private:
 	const cl_platform_id _platform;
 	const cl_device_id _device;
+#if defined (ocl_debug)
+	const size_t _d;
+#endif
 	bool _profile = false;
 	bool _isSync = false;
 	size_t _syncCount = 0;
@@ -213,6 +216,9 @@ private:
 
 public:
 	device(const platform & parent, const size_t d) : _platform(parent.getPlatform(d)), _device(parent.getDevice(d))
+#if defined (ocl_debug)
+		, _d(d)
+#endif
 	{
 #if defined (ocl_debug)
 		std::cerr << "Create ocl device " << d << "." << std::endl;

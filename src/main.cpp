@@ -60,7 +60,7 @@ public:
 public:
 	void run(const std::vector<std::string> & args)
 	{
-		std::cout << "proth20 0.2.0" << std::endl;
+		std::cout << "proth20 0.3.0" << std::endl;
 		std::cout << "Copyright (c) 2020, Yves Gallot" << std::endl;
 		std::cout << "proth20 is free source code, under the MIT license." << std::endl;
 
@@ -143,7 +143,6 @@ public:
 		// bench
 		// p.bench(engine0);
 		// p.test_prime(engine0, true);
-		// p.test_composite(engine0, true);
 
 		// full test
 		// p.test_composite(engine0);

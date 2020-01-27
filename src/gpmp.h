@@ -149,7 +149,7 @@ private:
 				if ((c == '\\') || (c == '\"')) hFile << '\\';
 				hFile << c;
 			}
-			hFile << " \\n\" \\" << std::endl;
+			hFile << "\\n\" \\" << std::endl;
 
 			src << line << std::endl;
 		}

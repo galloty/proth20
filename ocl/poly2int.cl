@@ -9,7 +9,7 @@ Please give feedback to the authors if improvement is realized. It is distribute
 	__local long L[P2I_WGS * P2I_BLK]; \
 	__local uint X[P2I_WGS * P2I_BLK];
  
-inline poly2int0(__local long * restrict const L, __local uint * restrict const X, const size_t P2I_BLK, const size_t P2I_WGS,
+inline void poly2int0(__local long * restrict const L, __local uint * restrict const X, const size_t P2I_BLK, const size_t P2I_WGS,
  	__global uint2 * restrict const x, __global long * restrict const cr, const uint2 norm)
  {
 	const size_t i = get_local_id(0), blk = get_group_id(0);

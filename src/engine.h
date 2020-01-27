@@ -207,11 +207,8 @@ public:
 		_square256 = _createSquareKernel("square256");
 		_square512 = _createSquareKernel("square512");
 		_square1024 = _createSquareKernel("square1024");
-		if (ext1024)
-		{
-			_square2048 = _createSquareKernel("square2048");
-			_square4096 = _createSquareKernel("square4096");
-		}
+		if (ext512) _square2048 = _createSquareKernel("square2048");
+		if (ext1024) _square4096 = _createSquareKernel("square4096");
 
 		_poly2int0_4_16 = _createPoly2int0Kernel("poly2int0_4_16", norm);
 		_poly2int0_4_32 = _createPoly2int0Kernel("poly2int0_4_32", norm);
