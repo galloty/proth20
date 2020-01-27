@@ -290,23 +290,39 @@ public:
 
 		_plan.init(size, _ext512, _ext1024);
 
-		size_t best_i = 0;
+		size_t bestSq_i = 0, bestP2i_i = 0;
 		if (profiling)
 		{
 			engine.setProfiling(true);
 			_initEngine();
 
-			cl_ulong bestTime = cl_ulong(-1);
+			cl_ulong bestSqTime = cl_ulong(-1);
 			for (size_t i = 0, cnt = _plan.getSquareSeqCount(); i < cnt; ++i)
 			{
 				initProfiling();
 				_plan.setSquareSeq(size, i);
 				for (size_t j = 0; j < 16; ++j) square();
 				const cl_ulong time = engine.getProfileTime();
-				if (time < bestTime)
+				if (time < bestSqTime)
 				{
-					bestTime = time;
-					best_i = i;
+					bestSqTime = time;
+					bestSq_i = i;
+				}
+				engine.resetProfiles();
+			}
+			_plan.setSquareSeq(size, bestSq_i);
+
+			cl_ulong bestP2iTime = cl_ulong(-1);
+			for (size_t i = 0, cnt = _plan.getPoly2intCount(); i < cnt; ++i)
+			{
+				initProfiling();
+				_plan.setPoly2intFn(i);
+				for (size_t j = 0; j < 16; ++j) square();
+				const cl_ulong time = engine.getProfileTime();
+				if (time < bestP2iTime)
+				{
+					bestP2iTime = time;
+					bestP2i_i = i;
 				}
 				engine.resetProfiles();
 			}
@@ -316,7 +332,8 @@ public:
 
 		engine.setProfiling(profile);
 		_initEngine();
-		_plan.setSquareSeq(size, best_i);
+		_plan.setSquareSeq(size, bestSq_i);
+		_plan.setPoly2intFn(bestP2i_i);
 	}
 
 public:
@@ -333,9 +350,11 @@ public:
 	size_t getDigits() const { return size_t(std::ceil(std::log10(_k) + _n * std::log10(2))); }
 
 public:
+	std::string getPlanString() const { return _plan.getPlanString(_size); }
 	size_t getPlanSquareSeqCount() const { return _plan.getSquareSeqCount(); }
 	void setPlanSquareSeq(const size_t i) { _plan.setSquareSeq(_size, i); }
-	std::string getPlanSquareSeqString() const { return _plan.getSquareSeqString(_size); }
+	size_t getPlanPoly2intCount() const { return _plan.getPoly2intCount(); }
+	void setPlanPoly2intFn(const size_t i) { _plan.setPoly2intFn(i); }
 
 public:
 	void display() const
@@ -546,8 +565,7 @@ public:
 		// x size is size / 2; _x[0] = R, _x[1] = Y; compute (R - Y)^2
 
 		_plan.execSquareSeq(_engine);
-
-		_engine.poly2int();
+		_plan.execPoly2intFn(_engine);
 
 		// x size is size
 
@@ -628,7 +646,7 @@ public:
 			_engine.intt64_16(m / 16, rindex);
 		}
 
-		_engine.poly2int();
+		_engine.poly2int_16_16();
 
 		split();
 	}

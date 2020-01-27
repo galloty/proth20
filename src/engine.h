@@ -24,7 +24,9 @@ private:
 	cl_kernel _sub_ntt1024_4 = nullptr, _ntt1024_4 = nullptr, _intt1024_4 = nullptr;
 	cl_kernel _square8 = nullptr, _square16 = nullptr, _square32 = nullptr, _square64 = nullptr, _square128 = nullptr, _square256 = nullptr;
 	cl_kernel _square512 = nullptr, _square1024 = nullptr, _square2048 = nullptr, _square4096 = nullptr;
-	cl_kernel _poly2int0 = nullptr, _poly2int1 = nullptr;
+	cl_kernel _poly2int0_4_16 = nullptr, _poly2int0_4_32 = nullptr, _poly2int0_4_64 = nullptr, _poly2int1_4 = nullptr;
+	cl_kernel _poly2int0_8_16 = nullptr, _poly2int0_8_32 = nullptr, _poly2int0_8_64 = nullptr, _poly2int1_8 = nullptr;
+	cl_kernel _poly2int0_16_8 = nullptr, _poly2int0_16_16 = nullptr, _poly2int0_16_32 = nullptr, _poly2int1_16 = nullptr;
 	cl_kernel _reduce_upsweep64 = nullptr, _reduce_downsweep64 = nullptr;
 	cl_kernel _reduce_topsweep32 = nullptr, _reduce_topsweep64 = nullptr, _reduce_topsweep128 = nullptr;
 	cl_kernel _reduce_topsweep256 = nullptr, _reduce_topsweep512 = nullptr, _reduce_topsweep1024 = nullptr;
@@ -33,8 +35,7 @@ private:
 	cl_kernel _set_positive = nullptr, _add1 = nullptr, _swap = nullptr, _copy = nullptr, _compare = nullptr;
 
 	// Must be identical to ocl defines
-	static const size_t BLK8 = 32, BLK16 = 16, BLK32 = 8, BLK64 = 4, BLK128 = 2, BLK256 = 1;
-	static const size_t P2I_WGS = 16, P2I_BLK = 16, RED_BLK = 4;
+	static const size_t BLK8 = 32, BLK16 = 16, BLK32 = 8, BLK64 = 4, BLK128 = 2, BLK256 = 1, RED_BLK = 4;
 
 public:
 	engine(const ocl::platform & platform, const size_t d) : ocl::device(platform, d) {}
@@ -50,7 +51,7 @@ public:
 		_x = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);				// main buffer, square & mul multiplier, NTT => size
 		_y = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * (size / 2));		// reduce
 		_t = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint) * 2 * (size / 2));	// reduce: division algorithm
-		_cr = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_long) * size / P2I_BLK);	// carry
+		_cr = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_long) * size / 4);			// carry
 		_u = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);				// mul multiplicand, NTT => size. d(t) in Gerbicz error checking
 		_tu = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);			// NTT of mul multiplicand
 		_v = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size / 2);			// u(0) in Gerbicz error checking
@@ -113,6 +114,35 @@ private:
 	}
 
 private:
+	inline cl_kernel _createPoly2int0Kernel(const char * const kernelName, const cl_uint2 norm)
+	{
+		cl_kernel kernel = _createKernel(kernelName);
+		_setKernelArg(kernel, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(kernel, 1, sizeof(cl_mem), &_cr);
+		_setKernelArg(kernel, 2, sizeof(cl_uint2), &norm);
+		return kernel;
+	}
+
+private:
+	inline cl_kernel _createPoly2int1Kernel(const char * const kernelName)
+	{
+		cl_kernel kernel = _createKernel(kernelName);
+		_setKernelArg(kernel, 0, sizeof(cl_mem), &_x);
+		_setKernelArg(kernel, 1, sizeof(cl_mem), &_cr);
+		_setKernelArg(kernel, 2, sizeof(cl_mem), &_err);
+		return kernel;
+	}
+
+private:
+	inline cl_kernel _createSweepKernel(const char * const kernelName, const cl_uint d)
+	{
+		cl_kernel kernel = _createKernel(kernelName);
+		_setKernelArg(kernel, 0, sizeof(cl_mem), &_t);
+		_setKernelArg(kernel, 1, sizeof(cl_uint), &d);
+		return kernel;
+	}
+
+private:
 	inline cl_kernel _createReduceKernel(const char * const kernelName, const bool forward,
 		const cl_uint e, const cl_int s, const cl_uint d, const cl_uint d_inv, const cl_int d_shift)
 	{
@@ -126,15 +156,6 @@ private:
 		e_d_d_inv_d_shift.s[2] = d_inv; e_d_d_inv_d_shift.s[3] = cl_uint(d_shift);
 		_setKernelArg(kernel, 4, sizeof(cl_uint4), &e_d_d_inv_d_shift);
 		if (forward) _setKernelArg(kernel, 5, sizeof(cl_int), &s);
-		return kernel;
-	}
-
-private:
-	inline cl_kernel _createSweepKernel(const char * const kernelName, const cl_uint d)
-	{
-		cl_kernel kernel = _createKernel(kernelName);
-		_setKernelArg(kernel, 0, sizeof(cl_mem), &_t);
-		_setKernelArg(kernel, 1, sizeof(cl_uint), &d);
 		return kernel;
 	}
 
@@ -192,15 +213,20 @@ public:
 			_square4096 = _createSquareKernel("square4096");
 		}
 
-		_poly2int0 = _createKernel("poly2int0");
-		_setKernelArg(_poly2int0, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_poly2int0, 1, sizeof(cl_mem), &_cr);
-		_setKernelArg(_poly2int0, 2, sizeof(cl_uint2), &norm);
+		_poly2int0_4_16 = _createPoly2int0Kernel("poly2int0_4_16", norm);
+		_poly2int0_4_32 = _createPoly2int0Kernel("poly2int0_4_32", norm);
+		_poly2int0_4_64 = _createPoly2int0Kernel("poly2int0_4_64", norm);
+		_poly2int1_4 = _createPoly2int1Kernel("poly2int1_4");
 
-		_poly2int1 = _createKernel("poly2int1");
-		_setKernelArg(_poly2int1, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_poly2int1, 1, sizeof(cl_mem), &_cr);
-		_setKernelArg(_poly2int1, 2, sizeof(cl_mem), &_err);
+		_poly2int0_8_16 = _createPoly2int0Kernel("poly2int0_8_16", norm);
+		_poly2int0_8_32 = _createPoly2int0Kernel("poly2int0_8_32", norm);
+		_poly2int0_8_64 = _createPoly2int0Kernel("poly2int0_8_64", norm);
+		_poly2int1_8 = _createPoly2int1Kernel("poly2int1_8");
+
+		_poly2int0_16_8 = _createPoly2int0Kernel("poly2int0_16_8", norm);
+		_poly2int0_16_16 = _createPoly2int0Kernel("poly2int0_16_16", norm);
+		_poly2int0_16_32 = _createPoly2int0Kernel("poly2int0_16_32", norm);
+		_poly2int1_16 = _createPoly2int1Kernel("poly2int1_16");
 
 		_reduce_upsweep64 = _createSweepKernel("reduce_upsweep64", d);
 		_reduce_downsweep64 = _createSweepKernel("reduce_downsweep64", d);
@@ -277,7 +303,9 @@ public:
 		_releaseKernel(_square8); _releaseKernel(_square16); _releaseKernel(_square32); _releaseKernel(_square64); _releaseKernel(_square128);
 		_releaseKernel(_square256); _releaseKernel(_square512); _releaseKernel(_square1024); _releaseKernel(_square2048); _releaseKernel(_square4096);
 
-		_releaseKernel(_poly2int0); _releaseKernel(_poly2int1);
+		_releaseKernel(_poly2int0_4_16); _releaseKernel(_poly2int0_4_32); _releaseKernel(_poly2int0_4_64); _releaseKernel(_poly2int1_4);
+		_releaseKernel(_poly2int0_8_16); _releaseKernel(_poly2int0_8_32); _releaseKernel(_poly2int0_8_64); _releaseKernel(_poly2int1_8);
+		_releaseKernel(_poly2int0_16_8); _releaseKernel(_poly2int0_16_16); _releaseKernel(_poly2int0_16_32); _releaseKernel(_poly2int1_16);
 
 		_releaseKernel(_reduce_upsweep64); _releaseKernel(_reduce_downsweep64);
 
@@ -408,7 +436,16 @@ public:
 	void mul4() { _executeKernel(_mul4, _size / 4); }
 
 public:
-	void poly2int() { _executeKernel(_poly2int0, _size / P2I_BLK, P2I_WGS); _executeKernel(_poly2int1, _size / P2I_BLK); }
+	// BLK >= 4 because the length of _cr is size / 4
+	void poly2int_4_16() { _executeKernel(_poly2int0_4_16, _size / 4, 16); _executeKernel(_poly2int1_4, _size / 4); }
+	void poly2int_4_32() { _executeKernel(_poly2int0_4_32, _size / 4, 32); _executeKernel(_poly2int1_4, _size / 4); }
+	void poly2int_4_64() { _executeKernel(_poly2int0_4_64, _size / 4, 64); _executeKernel(_poly2int1_4, _size / 4); }
+	void poly2int_8_16() { _executeKernel(_poly2int0_8_16, _size / 8, 16); _executeKernel(_poly2int1_8, _size / 8); }
+	void poly2int_8_32() { _executeKernel(_poly2int0_8_32, _size / 8, 32); _executeKernel(_poly2int1_8, _size / 8); }
+	void poly2int_8_64() { _executeKernel(_poly2int0_8_64, _size / 8, 64); _executeKernel(_poly2int1_8, _size / 8); }
+	void poly2int_16_8() { _executeKernel(_poly2int0_16_8, _size / 16, 8); _executeKernel(_poly2int1_16, _size / 16); }
+	void poly2int_16_16() { _executeKernel(_poly2int0_16_16, _size / 16, 16); _executeKernel(_poly2int1_16, _size / 16); }
+	void poly2int_16_32() { _executeKernel(_poly2int0_16_32, _size / 16, 32); _executeKernel(_poly2int1_16, _size / 16); }
 
 private:
 	inline void _executeUDsweepKernel(cl_kernel kernel, const cl_uint s, const cl_uint j, const size_t size)

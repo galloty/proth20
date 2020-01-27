@@ -149,7 +149,7 @@ public:
 		// p.test_composite(engine0);
 		// p.test_prime(engine0);
 
-		// validation (TODO validate every splitter seq)
+		// validation
 		// p.validation(engine0);
 		// p.validation(engine1);
 	}

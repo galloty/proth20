@@ -108,7 +108,7 @@ public:
 
 		std::cout << (found ? "Resuming from a checkpoint " : "Testing ");
 		std::cout << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^" << arith::log2(X.getSize())
-			<< " x " << X.getDigitBit() << " bits, " << X.getPlanSquareSeqString() << std::endl;
+			<< " x " << X.getDigitBit() << " bits, plan: " << X.getPlanString() << std::endl;
 
 		chrono.resetTime();
 
@@ -221,14 +221,16 @@ public:
 		const uint32_t a = 3;
 		gpmp X(k, n, engine, false, false);
 
-		const size_t cnt = X.getPlanSquareSeqCount();
-
 		std::cout << "Testing " << k << " * 2^" << n << " + 1, size = 2^" << arith::log2(X.getSize()) << " x " << X.getDigitBit() << " bits" << std::endl;
 
-		for (size_t j = 0; j < cnt; ++j)
+		const size_t cntSq = X.getPlanSquareSeqCount(), cntP2i = X.getPlanPoly2intCount();
+
+		for (size_t j = 0, cnt = std::max(cntSq, cntP2i); j < cnt; ++j)
 		{
-			X.setPlanSquareSeq(j);
-			std::cout << X.getPlanSquareSeqString();
+			X.setPlanSquareSeq(j % cntSq);
+			X.setPlanPoly2intFn(j % cntP2i);
+
+			std::cout << X.getPlanString();
 
 			if (!apowk(X, a, k)) return false;
 			checkError(X);
@@ -267,18 +269,18 @@ public:
 		primeList.push_back(number(1139, 2641));
 		primeList.push_back(number(1035, 5336));
 		primeList.push_back(number(965, 10705));
-		primeList.push_back(number(1027, 21468));		// size = 2^11, 64_16        sq_32
-		primeList.push_back(number(1109, 42921));		// size = 2^12, 64_16        sq_64
-		primeList.push_back(number(1085, 85959));		// size = 2^13, 64_16       sq_128  64-bit 32-bit
-		primeList.push_back(number(1015, 171214));		// size = 2^14, 256_8        sq_64, 0.075  0.071
-		primeList.push_back(number(1197, 343384));		// size = 2^15, 1024_4       sq_32, 0.102  0.095
-		primeList.push_back(number(1089, 685641));		// size = 2^16, 256_8       sq_256, 0.170  0.163
-		primeList.push_back(number(1005, 1375758));		// size = 2^17, 256_8       sq_512, 0.291  0.284
-		primeList.push_back(number(1089, 2746155));		// size = 2^18, 256_8      sq_1024, 0.542  0.527
-		primeList.push_back(number(45, 5308037));		// size = 2^19, 256_8      sq_2048, 1.04   1.02
-		primeList.push_back(number(6679881, 6679881));	// size = 2^20, 256_8  256_8 sq_16, 2.05   1.97
-		primeList.push_back(number(3, 10829346));		// size = 2^21, 256_8  256_8 sq_32, 4.14   3.97
-		primeList.push_back(number(10223, 31172165));	// size = 2^22, 256_16 256_8 sq_64, 8.43   8.04
+		primeList.push_back(number(1027, 21468));		// size = 2^11
+		primeList.push_back(number(1109, 42921));		// size = 2^12
+		primeList.push_back(number(1085, 85959));		// size = 2^13  64-bit 32-bit
+		primeList.push_back(number(1015, 171214));		// size = 2^14, 0.071  0.070  256_16 sq_64 p2i_16_16
+		primeList.push_back(number(1197, 343384));		// size = 2^15, 0.097  0.094  256_16 sq_128 p2i_8_32
+		primeList.push_back(number(1089, 685641));		// size = 2^16, 0.163  0.156  256_8 sq_256 p2i_8_64
+		primeList.push_back(number(1005, 1375758));		// size = 2^17, 0.288  0.280  256_8 sq_512 p2i_8_64
+		primeList.push_back(number(1089, 2746155));		// size = 2^18, 0.537  0.523  256_8 sq_1024 p2i_8_64
+		primeList.push_back(number(45, 5308037));		// size = 2^19, 1.03   1.01   256_8 sq_2048 p2i_8_32
+		primeList.push_back(number(6679881, 6679881));	// size = 2^20, 2.04   1.96   256_8 256_8 sq_16 p2i_8_32
+		primeList.push_back(number(3, 10829346));		// size = 2^21, 4.13   3.95   256_16 256_8 sq_32 p2i_8_32
+		primeList.push_back(number(10223, 31172165));	// size = 2^22, 8.37   8.00   256_16 256_8 sq_64 p2i_8_32
 
 		for (const auto & p : primeList) if (!check(p.k, p.n, engine, bench, true)) return;
 	}
@@ -333,37 +335,37 @@ public:
 		engine.displayProfiles(count);
 
 		// Size = 1048576 (DIV)
-		// - sub_ntt64: 1, 11.2 %, 238387 (238387)
-		// - ntt64: 1, 12.2 %, 259679 (259679)
-		// - intt64: 2, 23 %, 487848 (243924)
-		// - square256: 1, 21.5 %, 455127 (455127)
-		// NTT: 67.9 %
-		// - poly2int0: 1, 11.9 %, 251385 (251385)
-		// - poly2int1: 1, 3.33 %, 70709 (70709)
-		// POLY2INT: 15.2 %
-		// - reduce_upsweep64: 2, 2.05 %, 43515 (21757)
-		// - reduce_downsweep64: 2, 3.09 %, 65538 (32769)
-		// - reduce_topsweep128: 1, 0.199 %, 4230 (4230)
-		// - reduce_i: 1, 5.16 %, 109369 (109369)
-		// - reduce_o: 1, 6.22 %, 131801 (131801)
-		// - reduce_f: 1, 0.135 %, 2853 (2853)
-		// REDUCE: 16.9 %
+		// - sub_ntt256_8: 1, 14 %, 284358 (284358)
+		// - ntt256_8: 1, 13.4 %, 272659 (272659)
+		// - intt256_8: 2, 28.3 %, 573739 (286869)
+		// - square16: 1, 10.9 %, 220778 (220778)
+		// NTT: 66.6 %
+		// - poly2int0: 1, 12.4 %, 250847 (250847)
+		// - poly2int1: 1, 3.47 %, 70514 (70514)
+		// POLY2INT: 15.9 %
+		// - reduce_upsweep64: 2, 2.12 %, 43019 (21509)
+		// - reduce_downsweep64: 2, 3.25 %, 65931 (32965)
+		// - reduce_topsweep128: 1, 0.215 %, 4356 (4356)
+		// - reduce_i: 1, 5.39 %, 109437 (109437)
+		// - reduce_o: 1, 6.49 %, 131733 (131733)
+		// - reduce_f: 1, 0.139 %, 2820 (2820)
+		// REDUCE: 17.5 %
 
 		// Size = 4194304 (SOB)
-		// - sub_ntt256: 1, 13.4 %, 1124499 (1124499)
-		// - ntt256: 1, 12.8 %, 1073486 (1073486)
-		// - intt256: 2, 27.1 %, 2272156 (1136078)
-		// - square64: 1, 15.4 %, 1295339 (1295339)
-		// NTT: 68.7 %
-		// - poly2int0: 1, 11.7 %, 980274 (980274)
-		// - poly2int1: 1, 3.13 %, 262930 (262930)
+		// - sub_ntt256_8: 1, 13.3 %, 1119339 (1119339)
+		// - ntt256_8: 1, 12.9 %, 1079779 (1079779)
+		// - intt256_8: 2, 26.8 %, 2254810 (1127405)
+		// - square64: 1, 15.5 %, 1302657 (1302657)
+		// NTT: 68.5 %
+		// - poly2int0: 1, 11.7 %, 985017 (985017)
+		// - poly2int1: 1, 3.13 %, 262918 (262918)
 		// POLY2INT: 14.8 %
-		// - reduce_upsweep64: 2, 1.81 %, 152199 (76099)
-		// - reduce_downsweep64: 2, 2.88 %, 242224 (121112)
-		// - reduce_topsweep512: 1, 0.0589 %, 4948 (4948)
-		// - reduce_i: 1, 5.12 %, 430095 (430095)
-		// - reduce_o: 1, 6.65 %, 558508 (558508)
-		// - reduce_f: 1, 0.0345 %, 2899 (2899)
-		// REDUCE: 16.5 %
+		// - reduce_upsweep64: 2, 1.83 %, 153736 (76868)
+		// - reduce_downsweep64: 2, 2.9 %, 243389 (121694)
+		// - reduce_topsweep512: 1, 0.0652 %, 5477 (5477)
+		// - reduce_i: 1, 5.12 %, 429824 (429824)
+		// - reduce_o: 1, 6.65 %, 558391 (558391)
+		// - reduce_f: 1, 0.0363 %, 3047 (3047)
+		// REDUCE: 16.7 %
 	}
 };

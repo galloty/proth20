@@ -222,16 +222,56 @@ private:
 private:
 	squareSplitter _squareSplitter;
 	squareSeq _squareSeq;
-	size_t _seq_i = 0;
+	size_t _square_i = 0;
+
+	struct p2i
+	{
+		void(engine::*_fn)();
+		std::string _name;
+
+		p2i() : _fn(nullptr) {}
+		p2i(void(engine::*fn)(), const std::string & name) : _fn(fn), _name(name) {}
+	};
+
+	std::vector<p2i> _p2iFn;
+	void(engine::*_poly2intFn)() = nullptr;
+	size_t _poly2int_i = 0;
 
 public:
 	plan() {}
 	virtual ~plan() {}
 
 public:
-	void init(const size_t size, const bool b512, const bool b1024) { _squareSplitter.init(size / 4, b512, b1024); }
+	void init(const size_t size, const bool b512, const bool b1024)
+	{
+		_squareSplitter.init(size / 4, b512, b1024);
+
+		_p2iFn.push_back(p2i(&engine::poly2int_4_16, "p2i_4_16"));
+		_p2iFn.push_back(p2i(&engine::poly2int_4_32, "p2i_4_32"));
+		_p2iFn.push_back(p2i(&engine::poly2int_4_64, "p2i_4_64"));
+		_p2iFn.push_back(p2i(&engine::poly2int_8_16, "p2i_8_16"));
+		_p2iFn.push_back(p2i(&engine::poly2int_8_32, "p2i_8_32"));
+		_p2iFn.push_back(p2i(&engine::poly2int_8_64, "p2i_8_64"));
+		_p2iFn.push_back(p2i(&engine::poly2int_16_8, "p2i_16_8"));
+		_p2iFn.push_back(p2i(&engine::poly2int_16_16, "p2i_16_16"));
+		_p2iFn.push_back(p2i(&engine::poly2int_16_32, "p2i_16_32"));
+
+		setSquareSeq(size, 0);
+		setPoly2intFn(0);
+	}
+
+public:
 	size_t getSquareSeqCount() const { return _squareSplitter.getSquareSize(); }
-	void setSquareSeq(const size_t size, const size_t i) { _seq_i = i; _squareSeq.init(size, _squareSplitter.getSquareSeq(i)); }
-	std::string getSquareSeqString(const size_t size) const { return _squareSplitter.getString(size, _seq_i); }
+	void setSquareSeq(const size_t size, const size_t i) { _square_i = i; _squareSeq.init(size, _squareSplitter.getSquareSeq(i)); }
 	void execSquareSeq(engine & engine) { _squareSeq.exec(engine); }
+	std::string getSquareSeqString(const size_t size) const { return _squareSplitter.getString(size, _square_i); }
+
+public:
+	size_t getPoly2intCount() const { return _p2iFn.size(); }
+	void setPoly2intFn(const size_t i) { _poly2int_i = i; _poly2intFn = _p2iFn[i]._fn; }
+	void execPoly2intFn(engine & engine) { (engine.*_poly2intFn)(); }
+	std::string getPoly2intString() const { return _p2iFn[_poly2int_i]._name; }
+
+public:
+	std::string getPlanString(const size_t size) const { return getSquareSeqString(size) + " " + getPoly2intString(); }
 };
