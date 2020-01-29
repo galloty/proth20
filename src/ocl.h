@@ -7,6 +7,7 @@ Please give feedback to the authors if improvement is realized. It is distribute
 
 #pragma once
 
+#define CL_TARGET_OPENCL_VERSION 110
 #if defined (__APPLE__)
 	#include <OpenCL/cl.h>
 	#include <OpenCL/cl_ext.h>
@@ -14,13 +15,14 @@ Please give feedback to the authors if improvement is realized. It is distribute
 	#include <CL/cl.h>
 #endif
 
+#include "pio.h"
+
 #include <cstdint>
 #include <string>
 #include <vector>
 #include <map>
 #include <algorithm>
 #include <cstring>
-#include <iostream>
 #include <iomanip>
 #include <sstream>
 #include <fstream>
@@ -170,10 +172,13 @@ public:
 public:
 	void displayDevices() const
 	{
+		std::ostringstream ss;
 		for (size_t i = 0, n = _devices.size(); i < n; ++i)
 		{
-			std::cout << i << " - " << _devices[i].name << "." << std::endl;
+			ss << i << " - " << _devices[i].name << "." << std::endl;
 		}
+		ss << std::endl;
+		pio::print(ss.str());
 	}
 
 public:
@@ -239,13 +244,14 @@ public:
 		oclFatal(clGetDeviceInfo(_device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(_maxWorkGroupSize), &_maxWorkGroupSize, nullptr));
 		oclFatal(clGetDeviceInfo(_device, CL_DEVICE_PROFILING_TIMER_RESOLUTION, sizeof(_timerResolution), &_timerResolution, nullptr));
 
-		std::cout << "Running on device '" << deviceName<< "', vendor '" << deviceVendor
+		std::ostringstream ss;
+		ss << "Running on device '" << deviceName<< "', vendor '" << deviceVendor
 			<< "', version '" << deviceVersion << "' and driver '" << driverVersion << "'." << std::endl;
+		ss << computeUnits << " compUnits @ " << maxClockFrequency << "MHz, mem=" << (memSize >> 20) << "MB, cache="
+			<< (memCacheSize >> 10) << "kB, cacheLine=" << memCacheLineSize << "B, localMem=" << (_localMemSize >> 10)
+			<< "kB, constMem=" << (memConstSize >> 10) << "kB, maxWorkGroup=" << _maxWorkGroupSize << "." << std::endl << std::endl;
+		pio::print(ss.str());
 
-		std::cout << computeUnits << " computeUnits @ " << maxClockFrequency << " MHz, memSize = " << (memSize >> 20) << " MB, cacheSize = "
-			<< (memCacheSize >> 10) << " kB, cacheLineSize = " << memCacheLineSize << " B, localMemSize = " << (_localMemSize >> 10)
-			<< " kB, constMemSize = " << (memConstSize >> 10) << " kB, maxWorkGroupSize = " << _maxWorkGroupSize << "." << std::endl << std::endl;
-		
 		const cl_context_properties contextProperties[3] = { CL_CONTEXT_PLATFORM, (cl_context_properties)_platform, 0 };
 		cl_int err_cc;
 		_context = clCreateContext(contextProperties, 1, &_device, nullptr, nullptr, &err_cc);
@@ -314,6 +320,7 @@ public:
 		for (auto it : _profileMap) ptime += it.second.time;
 		ptime /= count;
 
+		std::ostringstream ss;
 		for (auto it : _profileMap)
 		{
 			const profile & prof = it.second;
@@ -321,10 +328,11 @@ public:
 			{
 				const size_t ncount = prof.count / count;
 				const cl_ulong ntime = prof.time / count;
-				std::cout << "- " << prof.name << ": " << ncount << ", " << std::setprecision(3)
+				ss << "- " << prof.name << ": " << ncount << ", " << std::setprecision(3)
 					<< ntime * 100.0 / ptime << " %, " << ntime << " (" << (ntime / ncount) << ")" << std::endl;
 			}
 		}
+		pio::display(ss.str());
 	}
 
 public:
