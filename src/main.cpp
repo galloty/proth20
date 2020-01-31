@@ -5,6 +5,7 @@ proth20 is free source code, under the MIT license (see LICENSE). You can redist
 Please give feedback to the authors if improvement is realized. It is distributed in the hope that it will be useful.
 */
 
+#include "pio.h"
 #include "ocl.h"
 #include "proth.h"
 
@@ -57,33 +58,48 @@ public:
 		return *pInstance;
 	}
 
+private:
+	static std::string header()
+	{
+		std::ostringstream ss;
+		ss << "proth20 0.3.0" << std::endl;
+		ss << "Copyright (c) 2020, Yves Gallot" << std::endl;
+		ss << "proth20 is free source code, under the MIT license." << std::endl;
+		return ss.str();
+	}
+
+private:
+	static std::string usage()
+	{
+		std::ostringstream ss;
+		ss << "Usage: proth20 [options]  options may be specified in any order" << std::endl;
+		ss << "  -q \"k*2^n+1\"            test expression primality" << std::endl;
+		ss << "  -d <n> or --device <n>  set device number=<n> (default 0)" << std::endl;
+		ss << "  -b                      run benchmark" << std::endl;
+		ss << "  -v or -V                print the startup banner and immediately exit" << std::endl;
+		ss << std::endl;
+		return ss.str();
+	}
+
 public:
 	void run(const std::vector<std::string> & args)
 	{
-		std::cout << "proth20 0.3.0" << std::endl;
-		std::cout << "Copyright (c) 2020, Yves Gallot" << std::endl;
-		std::cout << "proth20 is free source code, under the MIT license." << std::endl;
+		pio::print(header());
 
 		// if -v or -V exit
 		for (const std::string & arg : args)
 		{
 			if ((arg[0] == '-') && ((arg[1] == 'v') || (arg[1] == 'V'))) return;
 		}
-		std::cout << std::endl;
+		std::ostringstream ss; ss << std::endl; pio::print(ss.str());
 
 		if (args.empty())	// print usage, display devices and exit
 		{
-			std::cout << "Usage: proth20 [options]  options may be specified in any order" << std::endl;
-			std::cout << "  -q \"k*2^n+1\"            test expression primality" << std::endl;
-			std::cout << "  -d <n> or --device <n>  set device number=<n> (default 0)" << std::endl;
-			std::cout << "  -b                      run benchmark" << std::endl;
-			std::cout << "  -v or -V                print the startup banner and immediately exit" << std::endl;
-			std::cout << std::endl;
+			pio::print(usage());
 		}
 
 		ocl::platform platform;
 		platform.displayDevices();
-		std::cout << std::endl;
 
 		bool bBench = false, bPrime = false;
 		uint32_t k = 0, n = 0;
@@ -166,7 +182,8 @@ int main(int argc, char * argv[])
 	}
 	catch (const std::runtime_error & e)
 	{
-		std::cerr << std::endl << "error: " << e.what() << std::endl;
+		std::ostringstream ss; ss << std::endl << "error: " << e.what() << std::endl;
+		pio::error(ss.str());
 		return EXIT_FAILURE;
 	}
 

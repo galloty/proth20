@@ -45,7 +45,8 @@ public:
 	void allocMemory(const size_t size, const size_t constant_size)
 	{
 #if defined (ocl_debug)
-		std::cerr << "Alloc gpu memory." << std::endl;
+		std::ostringstream ss; ss << "Alloc gpu memory." << std::endl;
+		pio::display(ss.str());
 #endif
 		_size = size;
 		_x = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size);				// main buffer, square & mul multiplier, NTT => size
@@ -76,7 +77,8 @@ public:
 	void releaseMemory()
 	{
 #if defined (ocl_debug)
-		std::cerr << "Free gpu memory." << std::endl;
+		std::ostringstream ss; ss << "Free gpu memory." << std::endl;
+		pio::display(ss.str());
 #endif
 		if (_size != 0)
 		{
@@ -164,7 +166,8 @@ public:
 		const cl_uint d_inv, const cl_int d_shift, const bool ext512, const bool ext1024)
 	{
 #if defined (ocl_debug)
-		std::cerr << "Create ocl kernels." << std::endl;
+		std::ostringstream ss; ss << "Create ocl kernels." << std::endl;
+		pio::display(ss.str());
 #endif
 		const cl_uint n = cl_uint(_size / 2);
 		const cl_ulong ds = cl_ulong(d) << s;
@@ -287,7 +290,8 @@ public:
 	void releaseKernels()
 	{
 #if defined (ocl_debug)
-		std::cerr << "Release ocl kernels." << std::endl;
+		std::ostringstream ss; ss << "Release ocl kernels." << std::endl;
+		pio::display(ss.str());
 #endif
 		_releaseKernel(_sub_ntt64_16); _releaseKernel(_ntt64_16); _releaseKernel(_intt64_16);
 		_releaseKernel(_sub_ntt256_4); _releaseKernel(_ntt256_4); _releaseKernel(_intt256_4);

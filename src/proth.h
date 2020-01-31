@@ -10,6 +10,7 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #include "ocl.h"
 #include "arith.h"
 #include "gpmp.h"
+#include "pio.h"
 #include "timer.h"
 
 class proth
@@ -96,7 +97,9 @@ public:
 		uint32_t a = 0;
 		if (!arith::proth_prime_quad_nonres(k, n, 3, a))
 		{
-			std::cout << k << " * 2^" << n << " + 1 is divisible by " << a << std::endl;
+			std::ostringstream ssr; ssr << k << " * 2^" << n << " + 1 is divisible by " << a << std::endl;
+			pio::print(ssr.str());
+			pio::result(ssr.str());
 			return true;
 		}
 
@@ -106,9 +109,10 @@ public:
 		uint32_t i0;
 		const bool found = X.restoreContext(i0, chrono.previousTime);
 
-		std::cout << (found ? "Resuming from a checkpoint " : "Testing ");
-		std::cout << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^" << arith::log2(X.getSize())
+		std::ostringstream sst; sst << (found ? "Resuming from a checkpoint " : "Testing ");
+		sst << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^" << arith::log2(X.getSize())
 			<< " x " << X.getDigitBit() << " bits, plan: " << X.getPlanString() << std::endl;
+		pio::print(sst.str());
 
 		chrono.resetTime();
 
@@ -137,14 +141,16 @@ public:
 				if (bench) checkError(X);	// Sync GPU
 				const double elapsedTime = chrono.getBenchTime();
 				const double mulTime = elapsedTime / benchCount, estimatedTime = mulTime * (n - i);
-				std::cout << std::setprecision(3) << " " << i * 100.0 / n << "% done, "
+				std::ostringstream ssb; ssb << std::setprecision(3) << " " << i * 100.0 / n << "% done, "
 					<< timer::formatTime(estimatedTime) << " remaining, " <<  mulTime * 1e3 << " ms/mul.";
 				if (bench)
 				{
-					std::cout << std::endl;
+					ssb << std::endl;
+					pio::display(ssb.str());
 					return true;
 				}
-				std::cout << "        \r" << std::flush;
+				ssb << "        \r";
+				pio::display(ssb.str());
 				benchIter = benchCount;
 				chrono.resetBenchTime();
 			}
@@ -196,20 +202,16 @@ public:
 
 		const std::string res = (isPrime) ? "                        " : std::string(", RES64 = ") + res64String(res64);
 
-		std::stringstream ss; ss << k << " * 2^" << n << " + 1 is " << (isPrime ? "prime" : "composite")
+		std::ostringstream ssr; ssr << k << " * 2^" << n << " + 1 is " << (isPrime ? "prime" : "composite")
 			 << ", a = " << a << ", time = " << timer::formatTime(chrono.getElapsedTime()) << res << std::endl;
 
-		std::cout << "\r" << ss.str();
-		std::ofstream resFile("presults.txt", std::ios::app);
-		if (resFile.is_open())
-		{
-			resFile << ss.str();
-			resFile.close();
-		}
+		pio::display(std::string("\r") + ssr.str());
+		pio::result(ssr.str());
 
-		if (checkRes)
+		if (checkRes && (res64 != r64))
 		{
-			if (res64 != r64) std::cout << "Error: " << res64String(res64) << " != " << res64String(r64) << std::endl;
+			std::ostringstream ss; ss << res64String(res64) << " != " << res64String(r64);
+			throw std::runtime_error(ss.str());
 		}
 
 		return true;
@@ -221,7 +223,9 @@ public:
 		const uint32_t a = 3;
 		gpmp X(k, n, engine, false, false);
 
-		std::cout << "Testing " << k << " * 2^" << n << " + 1, size = 2^" << arith::log2(X.getSize()) << " x " << X.getDigitBit() << " bits" << std::endl;
+		std::ostringstream sst;
+		sst << "Testing " << k << " * 2^" << n << " + 1, size = 2^" << arith::log2(X.getSize()) << " x " << X.getDigitBit() << " bits" << std::endl;
+		pio::display(sst.str());
 
 		const size_t cntSq = X.getPlanSquareSeqCount(), cntP2i = X.getPlanPoly2intCount();
 
@@ -230,7 +234,7 @@ public:
 			X.setPlanSquareSeq(j % cntSq);
 			X.setPlanPoly2intFn(j % cntP2i);
 
-			std::cout << X.getPlanString();
+			pio::display(X.getPlanString());
 
 			if (!apowk(X, a, k)) return false;
 			checkError(X);
@@ -245,7 +249,8 @@ public:
 			X.square();
 			X.Gerbicz_check(L);
 			checkError(X);
-			std::cout << " valid" << std::endl;
+			std::ostringstream ss; ss << " valid" << std::endl;
+			pio::display(ss.str());
 		}
 
 		return true;
@@ -331,7 +336,8 @@ public:
 		gpmp X(k, n, engine, true);
 		const size_t count = 1000;
 		for (size_t i = 0; i < count; ++i) X.square();
-		std::cout << "Size = " << X.getSize() << std::endl;
+		std::ostringstream ss; ss << "Size = " << X.getSize() << std::endl;
+		pio::display(ss.str());
 		engine.displayProfiles(count);
 
 		// Size = 1048576 (DIV)

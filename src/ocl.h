@@ -128,7 +128,8 @@ public:
 	platform()
 	{
 #if defined (ocl_debug)
-		std::cerr << "Create ocl platform." << std::endl;
+		std::ostringstream ss; ss << "Create ocl platform." << std::endl;
+		pio::display(ss.str());
 #endif
 		cl_uint num_platforms;
 		cl_platform_id platforms[64];
@@ -162,7 +163,8 @@ public:
 	virtual ~platform()
 	{
 #if defined (ocl_debug)
-		std::cerr << "Delete ocl platform." << std::endl;
+		std::ostringstream ss; ss << "Delete ocl platform." << std::endl;
+		pio::display(ss.str());
 #endif
 	}
 
@@ -226,7 +228,8 @@ public:
 #endif
 	{
 #if defined (ocl_debug)
-		std::cerr << "Create ocl device " << d << "." << std::endl;
+		std::ostringstream ss; ss << "Create ocl device " << d << "." << std::endl;
+		pio::display(ss.str());
 #endif
 
 		char deviceName[1024]; oclFatal(clGetDeviceInfo(_device, CL_DEVICE_NAME, 1024, deviceName, nullptr));
@@ -244,13 +247,13 @@ public:
 		oclFatal(clGetDeviceInfo(_device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(_maxWorkGroupSize), &_maxWorkGroupSize, nullptr));
 		oclFatal(clGetDeviceInfo(_device, CL_DEVICE_PROFILING_TIMER_RESOLUTION, sizeof(_timerResolution), &_timerResolution, nullptr));
 
-		std::ostringstream ss;
-		ss << "Running on device '" << deviceName<< "', vendor '" << deviceVendor
+		std::ostringstream ssd;
+		ssd << "Running on device '" << deviceName<< "', vendor '" << deviceVendor
 			<< "', version '" << deviceVersion << "' and driver '" << driverVersion << "'." << std::endl;
-		ss << computeUnits << " compUnits @ " << maxClockFrequency << "MHz, mem=" << (memSize >> 20) << "MB, cache="
+		ssd << computeUnits << " compUnits @ " << maxClockFrequency << "MHz, mem=" << (memSize >> 20) << "MB, cache="
 			<< (memCacheSize >> 10) << "kB, cacheLine=" << memCacheLineSize << "B, localMem=" << (_localMemSize >> 10)
 			<< "kB, constMem=" << (memConstSize >> 10) << "kB, maxWorkGroup=" << _maxWorkGroupSize << "." << std::endl << std::endl;
-		pio::print(ss.str());
+		pio::print(ssd.str());
 
 		const cl_context_properties contextProperties[3] = { CL_CONTEXT_PLATFORM, (cl_context_properties)_platform, 0 };
 		cl_int err_cc;
@@ -269,7 +272,8 @@ public:
 	virtual ~device()
 	{
 #if defined (ocl_debug)
-		std::cerr << "Delete ocl device " << _d << "." << std::endl;
+		std::ostringstream ss; ss << "Delete ocl device " << _d << "." << std::endl;
+		pio::display(ss.str());
 #endif
 		oclFatal(clReleaseCommandQueue(_queue));
 		oclFatal(clReleaseContext(_context));
@@ -347,7 +351,8 @@ public:
 	void loadProgram(const std::string & programSrc)
 	{
 #if defined (ocl_debug)
-		std::cerr << "Load ocl program." << std::endl;
+		std::ostringstream ss; ss << "Load ocl program." << std::endl;
+		pio::display(ss.str());
 #endif
 		const char * src[1]; src[0] = programSrc.c_str();
 		cl_int err_cpws;
@@ -371,7 +376,8 @@ public:
 				char * buildLog = new char[logSize + 1];
 				clGetProgramBuildInfo(_program, _device, CL_PROGRAM_BUILD_LOG, logSize, buildLog, nullptr);
 				buildLog[logSize] = '\0';
-				std::cerr << buildLog << std::endl;
+				std::ostringstream ss; ss << buildLog << std::endl;
+				pio::print(ss.str());
 #if defined (ocl_debug)
 				std::ofstream fileOut("pgm.log"); 
 				fileOut << buildLog << std::endl;
@@ -398,7 +404,8 @@ public:
 	void clearProgram()
 	{
 #if defined (ocl_debug)
-		std::cerr << "Clear ocl program." << std::endl;
+		std::ostringstream ss; ss << "Clear ocl program." << std::endl;
+		pio::display(ss.str());
 #endif
 		oclFatal(clReleaseProgram(_program));
 		_program = nullptr;

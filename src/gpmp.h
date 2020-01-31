@@ -9,6 +9,7 @@ Please give feedback to the authors if improvement is realized. It is distribute
 
 #include "arith.h"
 #include "engine.h"
+#include "pio.h"
 #include "plan.h"
 
 #include <cstdint>
@@ -284,8 +285,8 @@ public:
 		const double max_digit = double((uint32_t(1) << _digit_bit) - 1);
 		if ((size / 2) * max_digit * max_digit >= P1P2 / 2)
 		{
-			std::stringstream msg; msg << getDigits() << "-digit numbers are not supported.";
-			throw std::runtime_error(msg.str());
+			std::stringstream ss; ss << getDigits() << "-digit numbers are not supported.";
+			throw std::runtime_error(ss.str());
 		}
 
 		_plan.init(size, _ext512, _ext1024);
@@ -362,13 +363,14 @@ public:
 		const size_t size = _size / 2;
 		cl_uint2 * const x = _mem;
 		_engine.readMemory_x(x);
-		std::cout << std::endl;
+		std::stringstream ss; ss << std::endl;
 		for (size_t i = 0; i < size; ++i)
 		{
-			if (x[i].s[0] != 0) std::cout << " " << i << ":0 " << x[i].s[0];
-			if (x[i].s[1] != 0) std::cout << " " << i << ":0 " << x[i].s[1];
+			if (x[i].s[0] != 0) ss << " " << i << ":0 " << x[i].s[0];
+			if (x[i].s[1] != 0) ss << " " << i << ":0 " << x[i].s[1];
 		}
-		std::cout << std::endl;
+		ss << std::endl;
+		pio::display(ss.str());
 	}
 
 public:
@@ -394,10 +396,12 @@ public:
 			range[ls_max].first = n_max;
 			n_min = n_max; n_max = 2 * n_min + 1000;
 		}
+		std::stringstream ss;
 		for (size_t i = 17; i <= 24; ++i)
 		{
-			std::cout << "2^" << i << ": [" << range[i].first << "-" << range[i].second << "]" << std::endl;
+			ss << "2^" << i << ": [" << range[i].first << "-" << range[i].second << "]" << std::endl;
 		}
+		pio::display(ss.str());
 	}
 
 public:
@@ -431,7 +435,8 @@ public:
 		std::ofstream cFile("proth.ctx", std::ios::binary);
 		if (!cFile.is_open())
 		{
-			std::cerr << "cannot write 'proth.ctx' file" << std::endl;
+			std::ostringstream ss; ss << "cannot write 'proth.ctx' file " << std::endl;
+			pio::error(ss.str());
 			return false;
 		}
 
