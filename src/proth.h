@@ -28,10 +28,13 @@ public:
 		return *pInstance;
 	}
 
+public:
 	void quit() { _quit = true; }
+	void setBoinc(const bool isBoinc) { _isBoinc = isBoinc; }
 
 private:
 	volatile bool _quit = false;
+	bool _isBoinc = false;
 
 private:
 	static std::string res64String(const uint64_t res64)
@@ -98,8 +101,13 @@ public:
 		if (!arith::proth_prime_quad_nonres(k, n, 3, a))
 		{
 			std::ostringstream ssr; ssr << k << " * 2^" << n << " + 1 is divisible by " << a << std::endl;
-			pio::print(ssr.str());
+			pio::display(ssr.str());
 			pio::result(ssr.str());
+			if (_isBoinc)
+			{
+				std::ostringstream sso; sso << k << " * 2^" << n << " + 1 is complete, a = " << a << ", time = " << timer::formatTime(0.0) << std::endl;
+				pio::print(sso.str());
+			}
 			return true;
 		}
 

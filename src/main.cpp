@@ -8,6 +8,7 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #include "pio.h"
 #include "ocl.h"
 #include "proth.h"
+#include "boinc.h"
 
 #include <cstdlib>
 #include <stdexcept>
@@ -59,12 +60,13 @@ public:
 	}
 
 private:
-	static std::string header()
+	static std::string header(const bool nl = false)
 	{
 		std::ostringstream ss;
 		ss << "proth20 0.3.0" << std::endl;
 		ss << "Copyright (c) 2020, Yves Gallot" << std::endl;
 		ss << "proth20 is free source code, under the MIT license." << std::endl;
+		if (nl) ss << std::endl;
 		return ss.str();
 	}
 
@@ -77,6 +79,7 @@ private:
 		ss << "  -d <n> or --device <n>  set device number=<n> (default 0)" << std::endl;
 		ss << "  -b                      run benchmark" << std::endl;
 		ss << "  -v or -V                print the startup banner and immediately exit" << std::endl;
+		ss << "  -boinc                  operate as a BOINC client app" << std::endl;
 		ss << std::endl;
 		return ss.str();
 	}
@@ -84,24 +87,39 @@ private:
 public:
 	void run(const std::vector<std::string> & args)
 	{
-		pio::print(header());
+		bool bBoinc = false;
+		for (const std::string & arg : args) if (arg == "-boinc") bBoinc = true;
+		pio::getInstance().setBoinc(bBoinc);
 
-		// if -v or -V exit
+		if (bBoinc)
+		{
+			const int retval = boinc_init();
+			if (retval != 0)
+			{
+				std::ostringstream ss; ss << "boinc_init returned " << retval;
+				throw std::runtime_error(ss.str());
+			}
+		}
+
+		// if -v or -V then print header to stderr and exit
 		for (const std::string & arg : args)
 		{
-			if ((arg[0] == '-') && ((arg[1] == 'v') || (arg[1] == 'V'))) return;
+			if ((arg[0] == '-') && ((arg[1] == 'v') || (arg[1] == 'V')))
+			{
+				pio::error(header());
+				if (bBoinc) boinc_finish(EXIT_SUCCESS);
+				return;
+			}
 		}
-		std::ostringstream ss; ss << std::endl; pio::print(ss.str());
 
-		if (args.empty())	// print usage, display devices and exit
-		{
-			pio::print(usage());
-		}
+		pio::print(header(true));
+
+		if (args.empty()) pio::print(usage());	// print usage, display devices and exit
 
 		ocl::platform platform;
 		platform.displayDevices();
 
-		bool bBench = false, bPrime = false;
+		bool bPrime = false, bBench = false;
 		uint32_t k = 0, n = 0;
 		size_t d = 0;
 		// parse args
@@ -110,13 +128,14 @@ public:
 			const std::string & arg = args[i];
 
 			if (arg == "-b") bBench = true;
-			if (arg.substr(0, 2) == "-q")
+			else if (arg.substr(0, 2) == "-q")
 			{
 				const std::string exp = ((arg == "-q") && (i + 1 < size)) ? args[++i] : arg.substr(2);
 				auto k_end = exp.find('*');
 				if (k_end != std::string::npos) k = std::atoi(exp.substr(0, k_end).c_str());
 				auto n_start = exp.find('^'), n_end = exp.find('+');
 				if ((n_start != std::string::npos) && (n_end != std::string::npos)) n = std::atoi(exp.substr(n_start + 1, n_end).c_str());
+				if (k > 0) while (k % 2 == 0) { k /= 2; ++n; }				
 				if ((k < 3) || (n < 32)) throw std::runtime_error("invalid expression");
 
 				if (k > 99999999) throw std::runtime_error("k > 99999999 is not supported");
@@ -124,7 +143,7 @@ public:
 
 				bPrime = true;
 			}
-			if (arg.substr(0, 2) == "-d")
+			else if (arg.substr(0, 2) == "-d")
 			{
 				const std::string dev = ((arg == "-d") && (i + 1 < size)) ? args[++i] : arg.substr(2);
 				d = std::atoi(dev.c_str());
@@ -132,25 +151,28 @@ public:
 			}
 		}
 
+		proth & p = proth::getInstance();
+		p.setBoinc(bBoinc);
+
 		if (bBench)
 		{
 			engine engine(platform, d);
-			proth::getInstance().bench(engine);
+			p.bench(engine);
 		}
 
 		if (bPrime)
 		{
 			engine engine(platform, d);
-			proth::getInstance().check(k, n, engine);
+			p.check(k, n, engine);
 		}
+
+		if (bBoinc) boinc_finish(EXIT_SUCCESS);
 
 		// gpmp::printRanges(10000);
 
 		// engine engine0(platform, 0);
 		// test Intel GPU
 		// engine engine1(platform, 1);
-
-		// proth & p = proth::getInstance();
 
 		// function profiling
 		// p.profile(13, 5523860, engine0);		// DIV
@@ -183,7 +205,7 @@ int main(int argc, char * argv[])
 	catch (const std::runtime_error & e)
 	{
 		std::ostringstream ss; ss << std::endl << "error: " << e.what() << std::endl;
-		pio::error(ss.str());
+		pio::error(ss.str(), true);
 		return EXIT_FAILURE;
 	}
 

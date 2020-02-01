@@ -1,6 +1,6 @@
 CC = g++ -m64 -std=c++17
 RM = cmd \/C del
-CFLAGS = -Wall -Wextra -fexceptions
+CFLAGS = -Wall -Wextra -fexceptions -DBOINC
 DFLAGS = -g
 RFLAGS = -O2
 
@@ -9,6 +9,9 @@ SRC_DIR = src
 
 OCl_INC = -I Khronos
 OCL_LIB = C:/Windows/System32/OpenCL.dll
+
+BOINC_INC = -I ../boinc/api -I ../boinc/lib -I ../boinc/win_build
+BOINC_LIB = ../boinc/lib64/libboinc_api.a ../boinc/lib64/libboinc.a
 
 EXEC_RELEASE = $(BIN_DIR)\proth20.exe
 EXEC_DEBUG = $(BIN_DIR)\proth20d.exe
@@ -35,13 +38,13 @@ setdflags:
 	$(eval RDFLAGS = $(DFLAGS))
 
 $(EXEC_RELEASE): clean setrflags $(OBJS)
-	$(CC) $(OBJS) $(RFLAGS) $(OCL_LIB) -static -o $@
+	$(CC) $(OBJS) $(RFLAGS) $(OCL_LIB) $(BOINC_LIB) -static -o $@
 	$(RM) $(OBJS)
 
 $(EXEC_DEBUG): clean setdflags $(OBJS)
-	$(CC) $(OBJS) $(DFLAGS) $(OCL_LIB) -o $@
+	$(CC) $(OBJS) $(DFLAGS) $(OCL_LIB) $(BOINC_LIB) -o $@
 	$(RM) $(OBJS)
 
 .cpp.o:
-	$(CC) $(CFLAGS) $(RDFLAGS) $(OCl_INC) -c $< -o $@
+	$(CC) $(CFLAGS) $(RDFLAGS) $(OCl_INC) $(BOINC_INC) -c $< -o $@
 
