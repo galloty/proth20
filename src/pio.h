@@ -40,7 +40,7 @@ private:
 	// print: console: cout, boinc: stderr
 	void _print(const std::string & str) const
 	{
-		if (_isBoinc) { std::fprintf(stderr, str.c_str()); }
+		if (_isBoinc) { std::fprintf(stderr, str.c_str()); std::fflush(stderr); }
 		else { std::cout << str; }
 	}
 
@@ -55,7 +55,7 @@ private:
 	// error: normal: cerr, boinc: stderr
 	void _error(const std::string & str, const bool fatal) const
 	{
-		if (_isBoinc) { std::fprintf(stderr, str.c_str()); if (fatal) boinc_finish(EXIT_FAILURE); }
+		if (_isBoinc) { std::fprintf(stderr, str.c_str()); std::fflush(stderr); if (fatal) boinc_finish(EXIT_FAILURE); }
 		else { std::cerr << str; }
 	}
 
@@ -65,12 +65,10 @@ private:
 	{
 		if (_isBoinc)
 		{
-			char out_path[512];
-			boinc_resolve_filename("out", out_path, sizeof(out_path));
-			FILE * const out_file = boinc_fopen(out_path, "w");
+			FILE * const out_file = _open("out", "w");
 			if (out_file == nullptr) throw std::runtime_error("Cannot write results to out file");
-			fprintf(out_file, str.c_str());
-			fclose(out_file);
+			std::fprintf(out_file, str.c_str());
+			std::fclose(out_file);
 			return true;
 		}
 		std::ofstream resFile("presults.txt", std::ios::app);
@@ -80,9 +78,23 @@ private:
 		return true;
 	}
 
+private:
+	FILE * _open(const char * const filename, const char * const mode) const
+	{
+		if (_isBoinc)
+		{
+			char path[512];
+			boinc_resolve_filename(filename, path, sizeof(path));
+			return boinc_fopen(path, mode);
+		}
+		return std::fopen(filename, mode);
+	}
+
 public:
 	static void print(const std::string & str) { getInstance()._print(str); }
 	static void display(const std::string & str) { getInstance()._display(str); }
 	static void error(const std::string & str, const bool fatal = false) { getInstance()._error(str, fatal); }
 	static bool result(const std::string & str) { return getInstance()._result(str); }
+
+	static FILE * open(const char * const filename, const char * const mode) { return getInstance()._open(filename, mode); }
 };

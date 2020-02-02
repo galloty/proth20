@@ -15,7 +15,6 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #include <cstdint>
 #include <cmath>
 #include <sstream>
-#include <fstream>
 
 #include "ocl/modarith.h"
 #include "ocl/NTT.h"
@@ -413,27 +412,27 @@ public:
 	}
 
 private:
-	static bool _writeContext(std::ofstream & cFile, const char * const ptr, const size_t size)
+	static bool _writeContext(FILE * const cFile, const char * const ptr, const size_t size)
 	{
-		cFile.write(ptr, size);
-		if (cFile.good()) return true;
-		cFile.close();
+		const size_t ret = std::fwrite(ptr , sizeof(char), size, cFile);
+		if (ret == size * sizeof(char)) return true;
+		std::fclose(cFile);
 		return false;
 	}
 
-	static bool _readContext(std::ifstream & cFile, char * const ptr, const size_t size)
+	static bool _readContext(FILE * const cFile, char * const ptr, const size_t size)
 	{
-		cFile.read(ptr, size);
-		if (cFile.good()) return true;
-		cFile.close();
+		const size_t ret = std::fread(ptr , sizeof(char), size, cFile);
+		if (ret == size * sizeof(char)) return true;
+		std::fclose(cFile);
 		return false;
 	}
 
 public:
 	bool saveContext(const uint32_t i, const double elapsedTime)
 	{
-		std::ofstream cFile("proth.ctx", std::ios::binary);
-		if (!cFile.is_open())
+		FILE * const cFile = pio::open("proth.ctx", "wb");
+		if (cFile == nullptr)
 		{
 			std::ostringstream ss; ss << "cannot write 'proth.ctx' file " << std::endl;
 			pio::error(ss.str());
@@ -462,15 +461,15 @@ public:
 		_engine.readMemory_v(mem);
 		if (!_writeContext(cFile, reinterpret_cast<const char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
 
-		cFile.close();
+		std::fclose(cFile);
 		return true;
 	}
 
 public:
 	bool restoreContext(uint32_t & i, double & elapsedTime)
 	{
-		std::ifstream cFile("proth.ctx", std::ios::binary);
-		if (!cFile.is_open()) return false;
+		FILE * const cFile = pio::open("proth.ctx", "rb");
+		if (cFile == nullptr) return false;
 
 		const size_t size = _size;
 		cl_uint2 * const mem = _mem;
@@ -502,7 +501,7 @@ public:
 		if (!_readContext(cFile, reinterpret_cast<char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
 		_engine.writeMemory_v(mem);
 
-		cFile.close();
+		std::fclose(cFile);
 		return true;
 	}
 

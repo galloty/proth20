@@ -139,6 +139,8 @@ public:
 		chrono.resetBenchTime();
 		chrono.resetRecordTime();
 
+		if (_isBoinc) boinc_fraction_done(double(i0) / double(n));
+
 		// X = X^(2^(n - 1))
 		for (uint32_t i = i0 + 1; i < n; ++i)
 		{
@@ -146,21 +148,25 @@ public:
 
 			if (--benchIter == 0)
 			{
-				if (bench) checkError(X);	// Sync GPU
-				const double elapsedTime = chrono.getBenchTime();
-				const double mulTime = elapsedTime / benchCount, estimatedTime = mulTime * (n - i);
-				std::ostringstream ssb; ssb << std::setprecision(3) << " " << i * 100.0 / n << "% done, "
-					<< timer::formatTime(estimatedTime) << " remaining, " <<  mulTime * 1e3 << " ms/mul.";
-				if (bench)
+				if (_isBoinc) boinc_fraction_done(double(i) / double(n));
+				else
 				{
-					ssb << std::endl;
+					if (bench) checkError(X);	// Sync GPU
+					const double elapsedTime = chrono.getBenchTime();
+					const double mulTime = elapsedTime / benchCount, estimatedTime = mulTime * (n - i);
+					std::ostringstream ssb; ssb << std::setprecision(3) << " " << i * 100.0 / n << "% done, "
+						<< timer::formatTime(estimatedTime) << " remaining, " <<  mulTime * 1e3 << " ms/mul.";
+					if (bench)
+					{
+						ssb << std::endl;
+						pio::display(ssb.str());
+						return true;
+					}
+					ssb << "        \r";
 					pio::display(ssb.str());
-					return true;
+					chrono.resetBenchTime();
 				}
-				ssb << "        \r";
-				pio::display(ssb.str());
 				benchIter = benchCount;
-				chrono.resetBenchTime();
 			}
 
 			// Robert Gerbicz error checking algorithm
@@ -173,12 +179,24 @@ public:
 
 			if (i % 1024 == 0)
 			{
-				const double elapsedTime = chrono.getRecordTime();
-				if (elapsedTime > 600)
+				if (_isBoinc)
 				{
-					checkError(X);
-					X.saveContext(i, chrono.getElapsedTime());
-					chrono.resetRecordTime();
+					if (boinc_time_to_checkpoint() != 0)
+					{
+						checkError(X);
+						X.saveContext(i, chrono.getElapsedTime());
+						boinc_checkpoint_completed();
+					}
+				}
+				else
+				{
+					const double elapsedTime = chrono.getRecordTime();
+					if (elapsedTime > 600)
+					{
+						checkError(X);
+						X.saveContext(i, chrono.getElapsedTime());
+						chrono.resetRecordTime();
+					}
 				}
 			}
 
@@ -208,13 +226,22 @@ public:
 			}
 		}
 
+		if (_isBoinc) boinc_fraction_done(1.0);
+
 		const std::string res = (isPrime) ? "                        " : std::string(", RES64 = ") + res64String(res64);
+		const std::string runtime = timer::formatTime(chrono.getElapsedTime());
 
 		std::ostringstream ssr; ssr << k << " * 2^" << n << " + 1 is " << (isPrime ? "prime" : "composite")
-			 << ", a = " << a << ", time = " << timer::formatTime(chrono.getElapsedTime()) << res << std::endl;
+			 << ", a = " << a << ", time = " << runtime << res << std::endl;
 
 		pio::display(std::string("\r") + ssr.str());
 		pio::result(ssr.str());
+
+		if (_isBoinc)
+		{
+			std::ostringstream sso; sso << k << " * 2^" << n << " + 1 is complete, a = " << a << ", time = " << runtime << std::endl;
+			pio::print(sso.str());
+		}
 
 		if (checkRes && (res64 != r64))
 		{

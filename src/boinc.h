@@ -20,18 +20,18 @@ int boinc_finish(const int status) { std::cout << "boinc_finish(" << status << "
 
 static int boinc_resolve_filename(const char * const virtual_name, char * const physical_name, const int len)
 {
-	strncpy(physical_name, virtual_name, len);
+	strncpy(physical_name, virtual_name, len - 1);
 	return 0;
 }
 
 static FILE * boinc_fopen(const char * const path, const char * const mode)
 {
-	return fopen(path, mode);
+	return std::fopen(path, mode);
 }
 
-static int boinc_time_to_checkpoint() { return 1; }
+static int boinc_time_to_checkpoint() { static int cnt = 0; ++cnt; if (cnt == 20) { cnt = 0; return 1; } return 0; }
 static int boinc_checkpoint_completed() { return 0; }
 
-static int boinc_fraction_done(double) { return 0; }
+static int boinc_fraction_done(const double f) { std::cout << "boinc_fraction_done(" << f << ")" << std::endl; return 0; }
 
 #endif
