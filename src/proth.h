@@ -13,6 +13,9 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #include "pio.h"
 #include "timer.h"
 
+#include <thread>
+#include <chrono>
+
 class proth
 {
 private:
@@ -41,6 +44,20 @@ private:
 	{
 		std::stringstream ss; ss << std::uppercase << std::hex << std::setfill('0') << std::setw(16) << res64;
 		return ss.str();
+	}
+
+private:
+	static bool boincQuitRequest(const BOINC_STATUS & status)
+	{
+		if ((status.quit_request | status.abort_request | status.no_heartbeat) == 0) return false;
+
+		std::ostringstream ss; ss << std::endl << "Terminating because BOINC ";
+		if (status.quit_request != 0) ss << "requested that we should quit.";
+		else if (status.abort_request != 0) ss << "requested that we should abort.";
+		else if (status.no_heartbeat != 0) ss << "heartbeat was lost.";
+		ss << std::endl;
+		pio::print(ss.str());
+		return true;
 	}
 
 private:
@@ -181,6 +198,32 @@ public:
 			{
 				if (_isBoinc)
 				{
+					BOINC_STATUS status;
+					boinc_get_status(&status);
+					bool quit = boincQuitRequest(status);
+					if (quit || (status.suspended != 0))
+					{
+						checkError(X);
+						X.saveContext(i, chrono.getElapsedTime());
+					}
+					if (quit) return false;
+						
+					if (status.suspended != 0)
+					{
+						std::ostringstream ss_s; ss_s << std::endl << "BOINC client is suspended." << std::endl;
+						pio::print(ss_s.str());
+
+						while (status.suspended != 0)
+						{
+							std::this_thread::sleep_for(std::chrono::seconds(1));
+							boinc_get_status(&status);
+							if (boincQuitRequest(status)) return false;
+						}
+
+						std::ostringstream ss_r; ss_r << "BOINC client is resumed." << std::endl;
+						pio::print(ss_r.str());
+					}
+
 					if (boinc_time_to_checkpoint() != 0)
 					{
 						checkError(X);

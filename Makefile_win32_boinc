@@ -1,0 +1,30 @@
+CC = g++ -m32 -std=c++17
+RM = cmd \/C del
+CFLAGS = -Wall -Wextra -fexceptions -DBOINC
+CLFLAGS = -O2
+
+BIN_DIR = bin
+SRC_DIR = src
+
+OCl_INC = -I Khronos
+OCL_LIB = -Wl,-enable-stdcall-fixup C:/Windows/SysWOW64/OpenCL.dll
+
+BOINC_INC = -I ../boinc/api -I ../boinc/lib -I ../boinc/win_build
+BOINC_LIB = ../boinc/lib32/libboinc_api.a ../boinc/lib32/libboinc.a
+
+EXEC = $(BIN_DIR)\proth20.exe
+
+OBJS = src\main.o
+
+build: $(EXEC)
+
+clean:
+	$(RM) $(EXEC)
+
+$(EXEC): clean $(OBJS)
+	$(CC) $(OBJS) $(CLFLAGS) $(OCL_LIB) $(BOINC_LIB) -static -o $@
+	$(RM) $(OBJS)
+
+.cpp.o:
+	$(CC) $(CFLAGS) $(CLFLAGS) $(OCl_INC) $(BOINC_INC) -c $< -o $@
+
