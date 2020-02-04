@@ -44,17 +44,19 @@ void set_positive(__global uint2 * restrict const x, const uint n, const uint e,
 __kernel
 void add1(__global uint2 * restrict const x, const uint e, const ulong ds)
 {
-	uint c = 1;
-	for (size_t k = 0; c != 0; ++k)
-	{
-		c += x[k].s0;
-		x[k].s0 = (uint)(c) & digit_mask;
-		c >>= digit_bit;
-	}
-
+	// s0: += 1
 	// s1: 0 => k.2^n + 1 for reduce_z step
 
-	x[0].s1 = 1;
+	uint c = x[0].s0 + 1;
+	x[0] = (uint2)(c & digit_mask, 1);
+	c >>= digit_bit;
+
+	for (size_t k = 1; c != 0; ++k)
+	{
+		c += x[k].s0;
+		x[k].s0 = c & digit_mask;
+		c >>= digit_bit;
+	}
 
 	ulong l = ds;
 	for (size_t k = e; l != 0; ++k)

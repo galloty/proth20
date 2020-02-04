@@ -353,8 +353,7 @@ static const char * const src_ocl_reduce = \
 "	}\n" \
 "}\n" \
 "\n" \
-"__kernel\n" \
-"void reduce_x(__global uint2 * restrict const x, const uint n, __global int * const err)\n" \
+"inline void _reduce_x(__global uint2 * restrict const x, const uint n, __global int * const err)\n" \
 "{\n" \
 "	int c = 0;\n" \
 "	for (size_t k = 0; k < n; ++k)\n" \
@@ -369,28 +368,24 @@ static const char * const src_ocl_reduce = \
 "}\n" \
 "\n" \
 "__kernel\n" \
+"void reduce_x(__global uint2 * restrict const x, const uint n, __global int * const err)\n" \
+"{\n" \
+"	_reduce_x(x, n, err);\n" \
+"}\n" \
+"\n" \
+"__kernel\n" \
 "void reduce_z(__global uint2 * restrict const x, const uint n, __global int * const err)\n" \
 "{\n" \
 "	// s0 = x, s1 = k.2^n + 1\n" \
-"	// if s0 >= s1, s0 -= s1;\n" \
+"	// if s0 >= s1 then s0 -= s1;\n" \
 "\n" \
 "	for (size_t i = 0; i < n; ++i)\n" \
 "	{\n" \
-"		const size_t j = n - 1 - i;\n" \
-"		const uint2 x_j = x[j];\n" \
-"		if (x_j.s0 < x_j.s1) return;\n" \
-"		if (x_j.s0 > x_j.s1) break;\n" \
+"		const uint2 x_k = x[n - 1 - i];\n" \
+"		if (x_k.s0 < x_k.s1) return;\n" \
+"		if (x_k.s0 > x_k.s1) break;\n" \
 "	}\n" \
 "\n" \
-"	int c = 0;\n" \
-"	for (size_t k = 0; k < n; ++k)\n" \
-"	{\n" \
-"		const uint2 x_k = x[k];\n" \
-"		c += x_k.s0 - x_k.s1;\n" \
-"		x[k] = (uint2)((uint)(c) & digit_mask, 0);\n" \
-"		c >>= digit_bit;\n" \
-"	}\n" \
-"\n" \
-"	if (c != 0) atomic_or(err, c);\n" \
+"	_reduce_x(x, n, err);\n" \
 "}\n" \
 "";

@@ -345,8 +345,7 @@ void reduce_f(__global uint2 * restrict const x, __global const uint * restrict 
 	}
 }
 
-__kernel
-void reduce_x(__global uint2 * restrict const x, const uint n, __global int * const err)
+inline void _reduce_x(__global uint2 * restrict const x, const uint n, __global int * const err)
 {
 	int c = 0;
 	for (size_t k = 0; k < n; ++k)
@@ -361,27 +360,23 @@ void reduce_x(__global uint2 * restrict const x, const uint n, __global int * co
 }
 
 __kernel
+void reduce_x(__global uint2 * restrict const x, const uint n, __global int * const err)
+{
+	_reduce_x(x, n, err);
+}
+
+__kernel
 void reduce_z(__global uint2 * restrict const x, const uint n, __global int * const err)
 {
 	// s0 = x, s1 = k.2^n + 1
-	// if s0 >= s1, s0 -= s1;
+	// if s0 >= s1 then s0 -= s1;
 
 	for (size_t i = 0; i < n; ++i)
 	{
-		const size_t j = n - 1 - i;
-		const uint2 x_j = x[j];
-		if (x_j.s0 < x_j.s1) return;
-		if (x_j.s0 > x_j.s1) break;
+		const uint2 x_k = x[n - 1 - i];
+		if (x_k.s0 < x_k.s1) return;
+		if (x_k.s0 > x_k.s1) break;
 	}
 
-	int c = 0;
-	for (size_t k = 0; k < n; ++k)
-	{
-		const uint2 x_k = x[k];
-		c += x_k.s0 - x_k.s1;
-		x[k] = (uint2)((uint)(c) & digit_mask, 0);
-		c >>= digit_bit;
-	}
-
-	if (c != 0) atomic_or(err, c);
+	_reduce_x(x, n, err);
 }

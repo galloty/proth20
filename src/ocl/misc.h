@@ -52,17 +52,19 @@ static const char * const src_ocl_misc = \
 "__kernel\n" \
 "void add1(__global uint2 * restrict const x, const uint e, const ulong ds)\n" \
 "{\n" \
-"	uint c = 1;\n" \
-"	for (size_t k = 0; c != 0; ++k)\n" \
-"	{\n" \
-"		c += x[k].s0;\n" \
-"		x[k].s0 = (uint)(c) & digit_mask;\n" \
-"		c >>= digit_bit;\n" \
-"	}\n" \
-"\n" \
+"	// s0: += 1\n" \
 "	// s1: 0 => k.2^n + 1 for reduce_z step\n" \
 "\n" \
-"	x[0].s1 = 1;\n" \
+"	uint c = x[0].s0 + 1;\n" \
+"	x[0] = (uint2)(c & digit_mask, 1);\n" \
+"	c >>= digit_bit;\n" \
+"\n" \
+"	for (size_t k = 1; c != 0; ++k)\n" \
+"	{\n" \
+"		c += x[k].s0;\n" \
+"		x[k].s0 = c & digit_mask;\n" \
+"		c >>= digit_bit;\n" \
+"	}\n" \
 "\n" \
 "	ulong l = ds;\n" \
 "	for (size_t k = e; l != 0; ++k)\n" \
