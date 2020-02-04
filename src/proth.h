@@ -128,7 +128,7 @@ public:
 			return true;
 		}
 
-		gpmp X(k, n, engine);
+		gpmp X(k, n, engine, _isBoinc);
 
 		chronometer chrono;
 		uint32_t i0;
@@ -299,7 +299,7 @@ public:
 	bool validate(const uint32_t k, const uint32_t n, const uint32_t L, engine & engine)
 	{
 		const uint32_t a = 3;
-		gpmp X(k, n, engine, false, false);
+		gpmp X(k, n, engine, _isBoinc, false);
 
 		std::ostringstream sst;
 		sst << "Testing " << k << " * 2^" << n << " + 1, size = 2^" << arith::log2(X.getSize()) << " x " << X.getDigitBit() << " bits" << std::endl;
@@ -411,7 +411,7 @@ public:
 
 	void profile(const uint32_t k, const uint32_t n, engine & engine)
 	{
-		gpmp X(k, n, engine, true);
+		gpmp X(k, n, engine, _isBoinc, true, true);
 		const size_t count = 1000;
 		for (size_t i = 0; i < count; ++i) X.square();
 		std::ostringstream ss; ss << "Size = " << X.getSize() << std::endl;

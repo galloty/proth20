@@ -63,7 +63,7 @@ private:
 	static std::string header(const bool nl = false)
 	{
 		std::ostringstream ss;
-		ss << "proth20 0.3.0" << std::endl;
+		ss << "proth20 0.4.0" << std::endl;
 		ss << "Copyright (c) 2020, Yves Gallot" << std::endl;
 		ss << "proth20 is free source code, under the MIT license." << std::endl;
 		if (nl) ss << std::endl;

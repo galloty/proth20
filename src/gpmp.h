@@ -70,6 +70,7 @@ private:
 	const int _digit_bit;
 	const size_t _size;
 	const uint32_t _k, _n;
+	const bool _isBoinc;
 	const bool _ext512, _ext1024;
 	engine & _engine;
 	plan _plan;
@@ -123,8 +124,10 @@ private:
 	};
 
 private:
-	static bool readOpenCL(const char * const clFileName, const char * const headerFileName, const char * const varName, std::stringstream & src)
+	bool readOpenCL(const char * const clFileName, const char * const headerFileName, const char * const varName, std::stringstream & src) const
 	{
+		if (_isBoinc) return false;
+
 		std::ifstream clFile(clFileName);
 		if (!clFile.is_open()) return false;
 		
@@ -274,8 +277,8 @@ private:
 	}
 
 public:
-	gpmp(const uint32_t k, const uint32_t n, engine & engine, const bool profile = false, const bool profiling = true) :
-		_digit_bit(digitBit(k, n)), _size(transformSize(k, n, _digit_bit)), _k(k), _n(n),
+	gpmp(const uint32_t k, const uint32_t n, engine & engine, const bool isBoinc, const bool bestPlan = true, const bool profile = false) :
+		_digit_bit(digitBit(k, n)), _size(transformSize(k, n, _digit_bit)), _k(k), _n(n), _isBoinc(isBoinc),
 		_ext512(engine.getMaxWorkGroupSize() >= 512), _ext1024((engine.getMaxWorkGroupSize() >= 1024) && (engine.getLocalMemSize() >= 32768)),
 		_engine(engine), _mem(new cl_uint2[_size])
 	{
@@ -291,7 +294,7 @@ public:
 		_plan.init(size, _ext512, _ext1024);
 
 		size_t bestSq_i = 0, bestP2i_i = 0;
-		if (profiling)
+		if (bestPlan)
 		{
 			engine.setProfiling(true);
 			_initEngine();
