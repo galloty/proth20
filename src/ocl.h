@@ -197,7 +197,11 @@ private:
 	const size_t _d;
 #endif
 	bool _profile = false;
+#if defined (__APPLE__)
+	bool _isSync = true;
+#else
 	bool _isSync = false;
+#endif
 	size_t _syncCount = 0;
 	cl_ulong _localMemSize = 0;
 	size_t _maxWorkGroupSize = 0;

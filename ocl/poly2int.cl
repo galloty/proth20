@@ -57,15 +57,35 @@ inline void poly2int1(const size_t P2I_BLK, __global uint2 * restrict const x, _
 
 	int f = (int)(l);
 #pragma unroll
-	for (size_t j = 1; j < P2I_BLK; ++j)
+	for (size_t j = 1; j < P2I_BLK - 1; ++j)
 	{
 		f += xi[j].s0;
 		xi[j].s0 = (uint)(f) & digit_mask;
 		f >>= digit_bit;					// f = -1, 0 or 1
-		if (f == 0) break;
+		if (f == 0) return;
 	}
 
-	if (f != 0) atomic_or(err, f);
+	f += xi[P2I_BLK - 1].s0;
+	xi[P2I_BLK - 1].s0 = (uint)(f);
+	f >>= digit_bit;
+	if (f != 0) atomic_or(&err[1], f);
+}
+
+__kernel
+void poly2int2(__global uint2 * restrict const x, const uint size, __global int * const err)
+{
+	if (err[1] == 0) return;
+
+	int f = 0;
+	for (size_t k = 0; k < size; ++k)
+	{
+		f += x[k].s0;
+		x[k] = (uint)(f) & digit_mask;
+		f >>= digit_bit;
+	}
+
+	err[0] = f;
+	err[1] = 0;
 }
 
 // P2I_BLK = 4

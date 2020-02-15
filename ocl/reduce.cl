@@ -5,8 +5,6 @@ proth20 is free source code, under the MIT license (see LICENSE). You can redist
 Please give feedback to the authors if improvement is realized. It is distributed in the hope that it will be useful.
 */
 
-#define	RED_BLK		4
-
 #define	R64		(RED_BLK * 64 / 4)
 
 __kernel __attribute__((reqd_work_group_size(R64, 1, 1)))

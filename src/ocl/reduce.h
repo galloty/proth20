@@ -13,8 +13,6 @@ static const char * const src_ocl_reduce = \
 "Please give feedback to the authors if improvement is realized. It is distributed in the hope that it will be useful.\n" \
 "*/\n" \
 "\n" \
-"#define	RED_BLK		4\n" \
-"\n" \
 "#define	R64		(RED_BLK * 64 / 4)\n" \
 "\n" \
 "__kernel __attribute__((reqd_work_group_size(R64, 1, 1)))\n" \

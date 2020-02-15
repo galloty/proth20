@@ -27,6 +27,7 @@ private:
 	cl_kernel _poly2int0_4_16 = nullptr, _poly2int0_4_32 = nullptr, _poly2int0_4_64 = nullptr, _poly2int1_4 = nullptr;
 	cl_kernel _poly2int0_8_16 = nullptr, _poly2int0_8_32 = nullptr, _poly2int0_8_64 = nullptr, _poly2int1_8 = nullptr;
 	cl_kernel _poly2int0_16_8 = nullptr, _poly2int0_16_16 = nullptr, _poly2int0_16_32 = nullptr, _poly2int1_16 = nullptr;
+	cl_kernel _poly2int2  = nullptr;
 	cl_kernel _reduce_upsweep64 = nullptr, _reduce_downsweep64 = nullptr;
 	cl_kernel _reduce_topsweep32 = nullptr, _reduce_topsweep64 = nullptr, _reduce_topsweep128 = nullptr;
 	cl_kernel _reduce_topsweep256 = nullptr, _reduce_topsweep512 = nullptr, _reduce_topsweep1024 = nullptr;
@@ -34,12 +35,25 @@ private:
 	cl_kernel _ntt4 = nullptr, _intt4 = nullptr, _mul2 = nullptr, _mul4 = nullptr;
 	cl_kernel _set_positive = nullptr, _add1 = nullptr, _swap = nullptr, _copy = nullptr, _compare = nullptr;
 
-	// Must be identical to ocl defines
 	static const size_t BLK8 = 32, BLK16 = 16, BLK32 = 8, BLK64 = 4, BLK128 = 2, BLK256 = 1, RED_BLK = 4;
 
 public:
 	engine(const ocl::platform & platform, const size_t d) : ocl::device(platform, d) {}
 	virtual ~engine() {}
+
+public:
+	std::string oclDefines() const
+	{
+		std::stringstream ss;
+		ss << "#define\tBLK8\t" << BLK8 << std::endl;
+		ss << "#define\tBLK16\t" << BLK16 << std::endl;
+		ss << "#define\tBLK32\t" << BLK32 << std::endl;
+		ss << "#define\tBLK64\t" << BLK64 << std::endl;
+		ss << "#define\tBLK128\t" << BLK128 << std::endl;
+		ss << "#define\tBLK256\t" << BLK256 << std::endl;
+		ss << "#define\tRED_BLK\t" << RED_BLK << std::endl;
+		return ss.str();
+	}
 
 public:
 	void allocMemory(const size_t size, const size_t constant_size)
@@ -58,7 +72,7 @@ public:
 		_v = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * size / 2);			// u(0) in Gerbicz error checking
 		_m1 = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * (size / 2));		// memory register #1
 		_m2 = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_uint2) * (size / 2));		// memory register #2
-		_err = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_int));					// error checking
+		_err = _createBuffer(CL_MEM_READ_WRITE, sizeof(cl_int) * 2);				// error checking
 
 		_r1ir1 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * size);			// NTT roots
 		_r2 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint2) * size);				// NTT roots (square)
@@ -228,6 +242,12 @@ public:
 		_poly2int0_16_32 = _createPoly2int0Kernel("poly2int0_16_32", norm);
 		_poly2int1_16 = _createPoly2int1Kernel("poly2int1_16");
 
+		_poly2int2 = _createKernel("poly2int2");
+		_setKernelArg(_poly2int2, 0, sizeof(cl_mem), &_x);
+		const cl_uint size = cl_uint(_size);
+		_setKernelArg(_poly2int2, 1, sizeof(cl_uint), &size);
+		_setKernelArg(_poly2int2, 2, sizeof(cl_mem), &_err);
+
 		_reduce_upsweep64 = _createSweepKernel("reduce_upsweep64", d);
 		_reduce_downsweep64 = _createSweepKernel("reduce_downsweep64", d);
 
@@ -307,6 +327,7 @@ public:
 		_releaseKernel(_poly2int0_4_16); _releaseKernel(_poly2int0_4_32); _releaseKernel(_poly2int0_4_64); _releaseKernel(_poly2int1_4);
 		_releaseKernel(_poly2int0_8_16); _releaseKernel(_poly2int0_8_32); _releaseKernel(_poly2int0_8_64); _releaseKernel(_poly2int1_8);
 		_releaseKernel(_poly2int0_16_8); _releaseKernel(_poly2int0_16_16); _releaseKernel(_poly2int0_16_32); _releaseKernel(_poly2int1_16);
+		_releaseKernel(_poly2int2);
 
 		_releaseKernel(_reduce_upsweep64); _releaseKernel(_reduce_downsweep64);
 
@@ -335,7 +356,7 @@ public:
 	void readMemory_m1(cl_uint2 * const ptr) { _readBuffer(_m1, ptr, sizeof(cl_uint2) * _size / 2); }
 
 	void readMemory_err(cl_int * const ptr) { _readBuffer(_err, ptr, sizeof(cl_int)); }
-	void writeMemory_err(const cl_int * const ptr) { _writeBuffer(_err, ptr, sizeof(cl_int)); }
+	void clearMemory_err() { cl_int err[2]; err[0] = err[1] = 0; _writeBuffer(_err, err, sizeof(cl_int) * 2); }
 
 public:
 	void writeMemory_r(const cl_uint4 * const ptr_r1ir1, const cl_uint2 * const ptr_r2, const cl_uint2 * const ptr_ir2)
@@ -447,6 +468,7 @@ public:
 	void poly2int_16_8() { _executeKernel(_poly2int0_16_8, _size / 16, 8); _executeKernel(_poly2int1_16, _size / 16); }
 	void poly2int_16_16() { _executeKernel(_poly2int0_16_16, _size / 16, 16); _executeKernel(_poly2int1_16, _size / 16); }
 	void poly2int_16_32() { _executeKernel(_poly2int0_16_32, _size / 16, 32); _executeKernel(_poly2int1_16, _size / 16); }
+	void poly2int_fix() { _executeKernel(_poly2int2, 1); }
 
 private:
 	inline void _executeUDsweepKernel(cl_kernel kernel, const cl_uint s, const cl_uint j, const size_t size)

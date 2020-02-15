@@ -39,6 +39,8 @@ private:
 	volatile bool _quit = false;
 	bool _isBoinc = false;
 
+static constexpr uint32_t benchCount(const uint32_t n) { return (n < 100000) ? 50000 : 50000000 / (n / 1000); }
+
 private:
 	static std::string res64String(const uint64_t res64)
 	{
@@ -63,7 +65,11 @@ private:
 private:
 	static void checkError(gpmp & X)
 	{
-		if (X.getError() != 0) throw std::runtime_error("GPU error detected!");
+		int err = X.getError();
+		if (err != 0)
+		{
+			throw std::runtime_error("GPU error detected!");
+		}
 	}
 
 public:
@@ -71,7 +77,7 @@ public:
 	{
 		// X = a^k, left-to-right algorithm
 		bool s = false;
-		X.init(a);						// x = 1, u = a
+		X.init(1, a);					// x = 1, u = a
 		X.setMultiplicand();			// x = 1, tu = NTT(u)
 		for (int b = 0; b < 32; ++b)
 		{
@@ -89,7 +95,7 @@ public:
 		X.copy_x_v();
 
 		// X = a^k, right-to-left algorithm
-		X.init(a);						// x = 1, u = a
+		X.init(1, a);					// x = 1, u = a
 		for (uint32_t b = 1; b <= uint32_t(k); b *= 2)
 		{
 			if ((k & b) != 0)
@@ -151,8 +157,8 @@ public:
 
 		const uint32_t L = 1 << (arith::log2(n) / 2);
 
-		const uint32_t benchCount = (n < 100000) ? 50000 : 50000000 / (n / 1000);
-		uint32_t benchIter = benchCount;
+		const uint32_t benchCnt = benchCount(n);
+		uint32_t benchIter = benchCnt;
 		chrono.resetBenchTime();
 		chrono.resetRecordTime();
 
@@ -170,7 +176,7 @@ public:
 				{
 					if (bench) checkError(X);	// Sync GPU
 					const double elapsedTime = chrono.getBenchTime();
-					const double mulTime = elapsedTime / benchCount, estimatedTime = mulTime * (n - i);
+					const double mulTime = elapsedTime / benchCnt, estimatedTime = mulTime * (n - i);
 					std::ostringstream ssb; ssb << std::setprecision(3) << " " << i * 100.0 / n << "% done, "
 						<< timer::formatTime(estimatedTime) << " remaining, " <<  mulTime * 1e3 << " ms/mul.";
 					if (bench)
@@ -183,7 +189,7 @@ public:
 					pio::display(ssb.str());
 					chrono.resetBenchTime();
 				}
-				benchIter = benchCount;
+				benchIter = benchCnt;
 			}
 
 			// Robert Gerbicz error checking algorithm
@@ -296,6 +302,130 @@ public:
 	}
 
 public:
+	bool check_gfn(const uint32_t k, const uint32_t n, engine & engine)
+	{
+		gpmp X(k, n, engine, false);
+
+		chronometer chrono;
+		uint32_t i0;
+		const bool found = false;	// TODO: X.restoreContext(i0, chrono.previousTime);
+
+		std::ostringstream sst; sst << "GFN divisibility: " << std::endl;
+		sst << (found ? "Resuming from a checkpoint " : "Testing ");
+		sst << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^" << arith::log2(X.getSize())
+			<< " x " << X.getDigitBit() << " bits, plan: " << X.getPlanString() << std::endl;
+		pio::print(sst.str());
+
+		chrono.resetTime();
+
+		if (!found)
+		{
+			i0 = 0;
+			chrono.previousTime = 0;
+			X.init(2, 2);
+			X.copy_x_v();
+		}
+
+		const uint32_t L = 1 << (arith::log2(n) / 2);
+
+		const uint32_t benchCnt = benchCount(n);
+		uint32_t benchIter = benchCnt;
+		chrono.resetBenchTime();
+		chrono.resetRecordTime();
+
+		uint32_t fermat_m = 0;
+
+		// X = X^(2^(n - 1))
+		for (uint32_t i = i0 + 1; i < n; ++i)
+		{
+			X.square();
+
+			if (--benchIter == 0)
+			{
+				const double elapsedTime = chrono.getBenchTime();
+				const double mulTime = elapsedTime / benchCnt, estimatedTime = mulTime * (n - i);
+				std::ostringstream ssb; ssb << std::setprecision(3) << " " << i * 100.0 / n << "% done, "
+					<< timer::formatTime(estimatedTime) << " remaining, " <<  mulTime * 1e3 << " ms/mul.";
+				ssb << "        \r";
+				pio::display(ssb.str());
+				chrono.resetBenchTime();
+				benchIter = benchCnt;
+			}
+
+			// Robert Gerbicz error checking algorithm
+			// u is d(t) and v is u(0). They must be set before the loop
+			// if (i == n - 1) X.set_bug();	// test
+			if ((i & (L - 1)) == 0)
+			{
+				X.Gerbicz_step();
+			}
+
+			if (i + 50 >= n)
+			{
+				if (fermat_m == 0)
+				{
+					uint64_t res64;
+					if (X.isMinusOne(res64))
+					{
+						checkError(X);
+						fermat_m = i;
+					}
+				}
+			}
+			else
+			{
+				if (i % 1024 == 0)
+				{
+					const double elapsedTime = chrono.getRecordTime();
+					if (elapsedTime > 600)
+					{
+						checkError(X);
+						X.saveContext(i, chrono.getElapsedTime());
+						chrono.resetRecordTime();
+					}
+				}
+
+				if (_quit)
+				{
+					checkError(X);
+					X.saveContext(i, chrono.getElapsedTime());
+					return false;
+				}
+			}
+		}
+
+		for (uint32_t i = n; true; ++i)
+		{
+			X.square();
+
+			if ((i & (L - 1)) == 0)
+			{
+				X.Gerbicz_check(L);
+				checkError(X);
+				break;
+			}
+		}
+
+		const std::string runtime = timer::formatTime(chrono.getElapsedTime());
+
+		std::ostringstream ssr; ssr << k << " * 2^" << n << " + 1 ";
+		if (fermat_m != 0)
+		{
+			ssr << "divides F(" << fermat_m << ")";
+		}
+		else 
+		{
+			ssr << "doesn't divide any Fermat number";
+		}
+		ssr << ", time = " << runtime << std::endl;
+
+		pio::display(std::string("\r") + ssr.str());
+		pio::result(ssr.str());
+
+		return true;
+	}
+
+public:
 	bool validate(const uint32_t k, const uint32_t n, const uint32_t L, engine & engine)
 	{
 		const uint32_t a = 3;
@@ -386,6 +516,19 @@ public:
 
 		// check residues
 		for (const auto & c : compositeList) if (!check(c.k, c.n, engine, bench, true, c.res64)) return;
+	}
+
+	void test_gfn(engine & engine)
+	{
+		std::vector<number>	gfnDivList;
+		gfnDivList.push_back(number(332436749, 9865));
+		gfnDivList.push_back(number(5, 23473));
+		gfnDivList.push_back(number(165, 49095));
+		gfnDivList.push_back(number(189, 90061));
+		gfnDivList.push_back(number(3, 213321));
+		gfnDivList.push_back(number(3, 382449));
+
+		for (const auto & d : gfnDivList) if (!check_gfn(d.k, d.n, engine)) return;
 	}
 
 	void bench(engine & engine)

@@ -17,4 +17,6 @@ An OpenCL SDK is not required. OpenCL header files are included in the project a
 
 ## TODO
 
-- add BOINC interface
+- test BOINC interface
+- compute the multiplicative order of *a* modulo *k*·2<sup>*n*</sup> + 1
+- check the divisibility of Fermat and generalized Fermat numbers

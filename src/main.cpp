@@ -185,6 +185,7 @@ public:
 		// full test
 		// p.test_composite(engine0);
 		// p.test_prime(engine0);
+		// p.test_gfn(engine0);
 
 		// validation
 		// p.validation(engine0);

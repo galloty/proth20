@@ -186,6 +186,8 @@ private:
 		std::stringstream src;
 		src << "#define\tdigit_bit\t" << _digit_bit << std::endl << std::endl;
 
+		src << _engine.oclDefines() << std::endl;
+
 		// if xxx.cl file is not found then source is src_ocl_xxx string in src/ocl/xxx.h
 		if (!readOpenCL("ocl/modarith.cl", "src/ocl/modarith.h", "src_ocl_modarith", src)) src << src_ocl_modarith;	
 		if (!readOpenCL("ocl/NTT.cl", "src/ocl/NTT.h", "src_ocl_NTT", src)) src << src_ocl_NTT;	
@@ -264,8 +266,7 @@ private:
 		delete[] bp;
 		delete[] ibp;
 
-		cl_int err = 0;
-		_engine.writeMemory_err(&err);
+		_engine.clearMemory_err();
 	}
 
 private:
@@ -509,17 +510,17 @@ public:
 	}
 
 public:
-	void init(const uint32_t a)
+	void init(const uint32_t x0, const uint32_t u0)
 	{
 		const size_t size = _size;
 
 		cl_uint2 * const x = _mem;
-		x[0] = set2(1, 0);
+		x[0] = set2(x0, 0);
 		for (size_t i = 1; i < size; ++i) x[i] = set2(0, 0);
 		_engine.writeMemory_x(x);
 
 		cl_uint2 * const u = _mem;
-		u[0] = set2(a, 0);
+		u[0] = set2(u0, 0);
 		for (size_t i = 1; i < size; ++i) u[i] = set2(0, 0);
 		_engine.writeMemory_u(u);
 	}
@@ -573,6 +574,7 @@ public:
 
 		_plan.execSquareSeq(_engine);
 		_plan.execPoly2intFn(_engine);
+		_engine.poly2int_fix();
 
 		// x size is size
 

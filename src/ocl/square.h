@@ -13,13 +13,6 @@ static const char * const src_ocl_square = \
 "Please give feedback to the authors if improvement is realized. It is distributed in the hope that it will be useful.\n" \
 "*/\n" \
 "\n" \
-"#define BLK8		32\n" \
-"#define BLK16		16\n" \
-"#define BLK32		8\n" \
-"#define BLK64		4\n" \
-"#define BLK128		2\n" \
-"#define BLK256		1\n" \
-"\n" \
 "__kernel\n" \
 "void mul2(__global uint2 * restrict const x, __global const uint2 * restrict const y)\n" \
 "{\n" \

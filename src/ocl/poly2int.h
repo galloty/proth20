@@ -65,15 +65,35 @@ static const char * const src_ocl_poly2int = \
 "\n" \
 "	int f = (int)(l);\n" \
 "#pragma unroll\n" \
-"	for (size_t j = 1; j < P2I_BLK; ++j)\n" \
+"	for (size_t j = 1; j < P2I_BLK - 1; ++j)\n" \
 "	{\n" \
 "		f += xi[j].s0;\n" \
 "		xi[j].s0 = (uint)(f) & digit_mask;\n" \
 "		f >>= digit_bit;					// f = -1, 0 or 1\n" \
-"		if (f == 0) break;\n" \
+"		if (f == 0) return;\n" \
 "	}\n" \
 "\n" \
-"	if (f != 0) atomic_or(err, f);\n" \
+"	f += xi[P2I_BLK - 1].s0;\n" \
+"	xi[P2I_BLK - 1].s0 = (uint)(f);\n" \
+"	f >>= digit_bit;\n" \
+"	if (f != 0) atomic_or(&err[1], f);\n" \
+"}\n" \
+"\n" \
+"__kernel\n" \
+"void poly2int2(__global uint2 * restrict const x, const uint size, __global int * const err)\n" \
+"{\n" \
+"	if (err[1] == 0) return;\n" \
+"\n" \
+"	int f = 0;\n" \
+"	for (size_t k = 0; k < size; ++k)\n" \
+"	{\n" \
+"		f += x[k].s0;\n" \
+"		x[k] = (uint)(f) & digit_mask;\n" \
+"		f >>= digit_bit;\n" \
+"	}\n" \
+"\n" \
+"	err[0] = f;\n" \
+"	err[1] = 0;\n" \
 "}\n" \
 "\n" \
 "// P2I_BLK = 4\n" \

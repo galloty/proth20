@@ -5,13 +5,6 @@ proth20 is free source code, under the MIT license (see LICENSE). You can redist
 Please give feedback to the authors if improvement is realized. It is distributed in the hope that it will be useful.
 */
 
-#define BLK8		32
-#define BLK16		16
-#define BLK32		8
-#define BLK64		4
-#define BLK128		2
-#define BLK256		1
-
 __kernel
 void mul2(__global uint2 * restrict const x, __global const uint2 * restrict const y)
 {
