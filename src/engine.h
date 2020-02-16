@@ -130,12 +130,11 @@ private:
 	}
 
 private:
-	inline cl_kernel _createPoly2int0Kernel(const char * const kernelName, const cl_uint2 norm)
+	inline cl_kernel _createPoly2int0Kernel(const char * const kernelName)
 	{
 		cl_kernel kernel = _createKernel(kernelName);
 		_setKernelArg(kernel, 0, sizeof(cl_mem), &_x);
 		_setKernelArg(kernel, 1, sizeof(cl_mem), &_cr);
-		_setKernelArg(kernel, 2, sizeof(cl_uint2), &norm);
 		return kernel;
 	}
 
@@ -176,7 +175,7 @@ private:
 	}
 
 public:
-	void createKernels(const cl_uint2 norm, const cl_uint e, const cl_int s, const cl_uint d,
+	void createKernels(const cl_uint e, const cl_int s, const cl_uint d,
 		const cl_uint d_inv, const cl_int d_shift, const bool ext512, const bool ext1024)
 	{
 #if defined (ocl_debug)
@@ -227,19 +226,19 @@ public:
 		if (ext512) _square2048 = _createSquareKernel("square2048");
 		if (ext1024) _square4096 = _createSquareKernel("square4096");
 
-		_poly2int0_4_16 = _createPoly2int0Kernel("poly2int0_4_16", norm);
-		_poly2int0_4_32 = _createPoly2int0Kernel("poly2int0_4_32", norm);
-		_poly2int0_4_64 = _createPoly2int0Kernel("poly2int0_4_64", norm);
+		_poly2int0_4_16 = _createPoly2int0Kernel("poly2int0_4_16");
+		_poly2int0_4_32 = _createPoly2int0Kernel("poly2int0_4_32");
+		_poly2int0_4_64 = _createPoly2int0Kernel("poly2int0_4_64");
 		_poly2int1_4 = _createPoly2int1Kernel("poly2int1_4");
 
-		_poly2int0_8_16 = _createPoly2int0Kernel("poly2int0_8_16", norm);
-		_poly2int0_8_32 = _createPoly2int0Kernel("poly2int0_8_32", norm);
-		_poly2int0_8_64 = _createPoly2int0Kernel("poly2int0_8_64", norm);
+		_poly2int0_8_16 = _createPoly2int0Kernel("poly2int0_8_16");
+		_poly2int0_8_32 = _createPoly2int0Kernel("poly2int0_8_32");
+		_poly2int0_8_64 = _createPoly2int0Kernel("poly2int0_8_64");
 		_poly2int1_8 = _createPoly2int1Kernel("poly2int1_8");
 
-		_poly2int0_16_8 = _createPoly2int0Kernel("poly2int0_16_8", norm);
-		_poly2int0_16_16 = _createPoly2int0Kernel("poly2int0_16_16", norm);
-		_poly2int0_16_32 = _createPoly2int0Kernel("poly2int0_16_32", norm);
+		_poly2int0_16_8 = _createPoly2int0Kernel("poly2int0_16_8");
+		_poly2int0_16_16 = _createPoly2int0Kernel("poly2int0_16_16");
+		_poly2int0_16_32 = _createPoly2int0Kernel("poly2int0_16_32");
 		_poly2int1_16 = _createPoly2int1Kernel("poly2int1_16");
 
 		_poly2int2 = _createKernel("poly2int2");

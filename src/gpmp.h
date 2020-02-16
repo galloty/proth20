@@ -188,6 +188,9 @@ private:
 
 		src << _engine.oclDefines() << std::endl;
 
+		src << "#define\tpconst_norm\t(uint2)(" << cl_uint(P1 - (P1 - 1) / size) << "u, " << cl_uint(P2 - (P2 - 1) / size) << "u)" << std::endl;
+		src << std::endl;
+
 		// if xxx.cl file is not found then source is src_ocl_xxx string in src/ocl/xxx.h
 		if (!readOpenCL("ocl/modarith.cl", "src/ocl/modarith.h", "src_ocl_modarith", src)) src << src_ocl_modarith;	
 		if (!readOpenCL("ocl/NTT.cl", "src/ocl/NTT.h", "src_ocl_NTT", src)) src << src_ocl_NTT;	
@@ -208,9 +211,8 @@ private:
 		_engine.loadProgram(src.str().c_str());
 
 		_engine.allocMemory(size, constant_size);
-		const cl_uint2 norm = set2(cl_uint(P1 - (P1 - 1) / size), cl_uint(P2 - (P2 - 1) / size));
 		const cl_int k_shift = cl_int(arith::log2(_k) - 1);
-		_engine.createKernels(norm, cl_uint(_n / _digit_bit), cl_int(_n % _digit_bit), cl_uint(_k),
+		_engine.createKernels(cl_uint(_n / _digit_bit), cl_int(_n % _digit_bit), cl_uint(_k),
 			cl_uint((uint64_t(1) << (32 + k_shift)) / _k), k_shift, _ext512, _ext1024);
 
 		// (size + 2) / 3 roots
