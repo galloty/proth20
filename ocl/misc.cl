@@ -6,14 +6,14 @@ Please give feedback to the authors if improvement is realized. It is distribute
 */
 
 __kernel
-void set_positive(__global uint2 * restrict const x, const uint n, const uint e, const ulong ds)
+void set_positive(__global uint2 * restrict const x)
 {
 	// x.s0 = R, x.s1 = Y
 	// if R < Y then add k.2^n + 1 to R.
 
-	for (size_t i = 0; i < n; ++i)
+	for (size_t i = 0; i < pconst_size / 2; ++i)
 	{
-		const size_t j = n - 1 - i;
+		const size_t j = pconst_size / 2 - 1 - i;
 		const uint2 x_j = x[j];
 		if (x_j.s0 > x_j.s1) return;
 		if (x_j.s0 < x_j.s1)
@@ -28,8 +28,8 @@ void set_positive(__global uint2 * restrict const x, const uint n, const uint e,
 			}
 
 			// R += k.2^n
-			ulong l = ds;
-			for (size_t k = e; l != 0; ++k)
+			ulong l = (ulong)(pconst_d) << pconst_s;
+			for (size_t k = pconst_e; l != 0; ++k)
 			{
 				l += x[k].s0;
 				x[k].s0 = (uint)(l) & digit_mask;
@@ -42,7 +42,7 @@ void set_positive(__global uint2 * restrict const x, const uint n, const uint e,
 }
 
 __kernel
-void add1(__global uint2 * restrict const x, const uint e, const ulong ds)
+void add1(__global uint2 * restrict const x)
 {
 	// s0: += 1
 	// s1: 0 => k.2^n + 1 for reduce_z step
@@ -58,8 +58,8 @@ void add1(__global uint2 * restrict const x, const uint e, const ulong ds)
 		c >>= digit_bit;
 	}
 
-	ulong l = ds;
-	for (size_t k = e; l != 0; ++k)
+	ulong l = (ulong)(pconst_d) << pconst_s;
+	for (size_t k = pconst_e; l != 0; ++k)
 	{
 		x[k].s1 = (uint)(l) & digit_mask;
 		l >>= digit_bit;

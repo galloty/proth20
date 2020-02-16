@@ -80,12 +80,12 @@ static const char * const src_ocl_poly2int = \
 "}\n" \
 "\n" \
 "__kernel\n" \
-"void poly2int2(__global uint2 * restrict const x, const uint size, __global int * const err)\n" \
+"void poly2int2(__global uint2 * restrict const x, __global int * const err)\n" \
 "{\n" \
 "	if (err[1] == 0) return;\n" \
 "\n" \
 "	int f = 0;\n" \
-"	for (size_t k = 0; k < size; ++k)\n" \
+"	for (size_t k = 0; k < pconst_size; ++k)\n" \
 "	{\n" \
 "		f += x[k].s0;\n" \
 "		x[k] = (uint)(f) & digit_mask;\n" \

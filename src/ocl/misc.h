@@ -14,14 +14,14 @@ static const char * const src_ocl_misc = \
 "*/\n" \
 "\n" \
 "__kernel\n" \
-"void set_positive(__global uint2 * restrict const x, const uint n, const uint e, const ulong ds)\n" \
+"void set_positive(__global uint2 * restrict const x)\n" \
 "{\n" \
 "	// x.s0 = R, x.s1 = Y\n" \
 "	// if R < Y then add k.2^n + 1 to R.\n" \
 "\n" \
-"	for (size_t i = 0; i < n; ++i)\n" \
+"	for (size_t i = 0; i < pconst_size / 2; ++i)\n" \
 "	{\n" \
-"		const size_t j = n - 1 - i;\n" \
+"		const size_t j = pconst_size / 2 - 1 - i;\n" \
 "		const uint2 x_j = x[j];\n" \
 "		if (x_j.s0 > x_j.s1) return;\n" \
 "		if (x_j.s0 < x_j.s1)\n" \
@@ -36,8 +36,8 @@ static const char * const src_ocl_misc = \
 "			}\n" \
 "\n" \
 "			// R += k.2^n\n" \
-"			ulong l = ds;\n" \
-"			for (size_t k = e; l != 0; ++k)\n" \
+"			ulong l = (ulong)(pconst_d) << pconst_s;\n" \
+"			for (size_t k = pconst_e; l != 0; ++k)\n" \
 "			{\n" \
 "				l += x[k].s0;\n" \
 "				x[k].s0 = (uint)(l) & digit_mask;\n" \
@@ -50,7 +50,7 @@ static const char * const src_ocl_misc = \
 "}\n" \
 "\n" \
 "__kernel\n" \
-"void add1(__global uint2 * restrict const x, const uint e, const ulong ds)\n" \
+"void add1(__global uint2 * restrict const x)\n" \
 "{\n" \
 "	// s0: += 1\n" \
 "	// s1: 0 => k.2^n + 1 for reduce_z step\n" \
@@ -66,8 +66,8 @@ static const char * const src_ocl_misc = \
 "		c >>= digit_bit;\n" \
 "	}\n" \
 "\n" \
-"	ulong l = ds;\n" \
-"	for (size_t k = e; l != 0; ++k)\n" \
+"	ulong l = (ulong)(pconst_d) << pconst_s;\n" \
+"	for (size_t k = pconst_e; l != 0; ++k)\n" \
 "	{\n" \
 "		x[k].s1 = (uint)(l) & digit_mask;\n" \
 "		l >>= digit_bit;\n" \

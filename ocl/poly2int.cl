@@ -72,12 +72,12 @@ inline void poly2int1(const size_t P2I_BLK, __global uint2 * restrict const x, _
 }
 
 __kernel
-void poly2int2(__global uint2 * restrict const x, const uint size, __global int * const err)
+void poly2int2(__global uint2 * restrict const x, __global int * const err)
 {
 	if (err[1] == 0) return;
 
 	int f = 0;
-	for (size_t k = 0; k < size; ++k)
+	for (size_t k = 0; k < pconst_size; ++k)
 	{
 		f += x[k].s0;
 		x[k] = (uint)(f) & digit_mask;

@@ -100,7 +100,7 @@ static const char * const src_ocl_NTT = \
 "#define SETVAR_SUB_NTT(M) \\\n" \
 "	__global uint2 * const xo = x; \\\n" \
 "	const size_t bl_i = block_idx | chunk_idx; \\\n" \
-"	const size_t m = get_global_size(0) / (M / 4);\n" \
+"	const size_t m = (pconst_size / 4) / (M / 4);\n" \
 "\n" \
 "#define SETVAR_NTT(M) \\\n" \
 "	__global uint2 * const xo = &x[M * (block_idx & ~(m - 1))]; \\\n" \

@@ -188,7 +188,14 @@ private:
 
 		src << _engine.oclDefines() << std::endl;
 
+		const cl_int k_shift = cl_int(arith::log2(_k) - 1);
+		src << "#define\tpconst_size\t" << size << "u" << std::endl;
 		src << "#define\tpconst_norm\t(uint2)(" << cl_uint(P1 - (P1 - 1) / size) << "u, " << cl_uint(P2 - (P2 - 1) / size) << "u)" << std::endl;
+		src << "#define\tpconst_e\t" << cl_uint(_n / _digit_bit) << "u" << std::endl;
+		src << "#define\tpconst_s\t" << cl_int(_n % _digit_bit) << std::endl;
+		src << "#define\tpconst_d\t" << cl_uint(_k) << "u" << std::endl;
+		src << "#define\tpconst_d_inv\t" << cl_uint((uint64_t(1) << (32 + k_shift)) / _k) << "u" << std::endl;
+		src << "#define\tpconst_d_shift\t" << k_shift << std::endl;
 		src << std::endl;
 
 		// if xxx.cl file is not found then source is src_ocl_xxx string in src/ocl/xxx.h
@@ -211,9 +218,7 @@ private:
 		_engine.loadProgram(src.str().c_str());
 
 		_engine.allocMemory(size, constant_size);
-		const cl_int k_shift = cl_int(arith::log2(_k) - 1);
-		_engine.createKernels(cl_uint(_n / _digit_bit), cl_int(_n % _digit_bit), cl_uint(_k),
-			cl_uint((uint64_t(1) << (32 + k_shift)) / _k), k_shift, _ext512, _ext1024);
+		_engine.createKernels(_ext512, _ext1024);
 
 		// (size + 2) / 3 roots
 		cl_uint4 * const r1ir1 = new cl_uint4[size];

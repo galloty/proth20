@@ -149,42 +149,31 @@ private:
 	}
 
 private:
-	inline cl_kernel _createSweepKernel(const char * const kernelName, const cl_uint d)
+	inline cl_kernel _createSweepKernel(const char * const kernelName)
 	{
 		cl_kernel kernel = _createKernel(kernelName);
 		_setKernelArg(kernel, 0, sizeof(cl_mem), &_t);
-		_setKernelArg(kernel, 1, sizeof(cl_uint), &d);
 		return kernel;
 	}
 
 private:
-	inline cl_kernel _createReduceKernel(const char * const kernelName, const bool forward,
-		const cl_uint e, const cl_int s, const cl_uint d, const cl_uint d_inv, const cl_int d_shift)
+	inline cl_kernel _createReduceKernel(const char * const kernelName, const bool forward)
 	{
 		cl_kernel kernel = _createKernel(kernelName);
 		_setKernelArg(kernel, 0, sizeof(cl_mem), &_x);
 		_setKernelArg(kernel, 1, sizeof(cl_mem), &_y);
 		_setKernelArg(kernel, 2, sizeof(cl_mem), &_t);
 		_setKernelArg(kernel, 3, sizeof(cl_mem), forward ? &_bp : &_ibp);
-		cl_uint4 e_d_d_inv_d_shift;
-		e_d_d_inv_d_shift.s[0] = e; e_d_d_inv_d_shift.s[1] = d;
-		e_d_d_inv_d_shift.s[2] = d_inv; e_d_d_inv_d_shift.s[3] = cl_uint(d_shift);
-		_setKernelArg(kernel, 4, sizeof(cl_uint4), &e_d_d_inv_d_shift);
-		if (forward) _setKernelArg(kernel, 5, sizeof(cl_int), &s);
 		return kernel;
 	}
 
 public:
-	void createKernels(const cl_uint e, const cl_int s, const cl_uint d,
-		const cl_uint d_inv, const cl_int d_shift, const bool ext512, const bool ext1024)
+	void createKernels(const bool ext512, const bool ext1024)
 	{
 #if defined (ocl_debug)
 		std::ostringstream ss; ss << "Create ocl kernels." << std::endl;
 		pio::display(ss.str());
 #endif
-		const cl_uint n = cl_uint(_size / 2);
-		const cl_ulong ds = cl_ulong(d) << s;
-
 		_sub_ntt64_16 = _createNttKernel("sub_ntt64_16", true);
 		_sub_ntt256_4 = _createNttKernel("sub_ntt256_4", true);
 		_sub_ntt1024_1 = _createNttKernel("sub_ntt1024_1", true);
@@ -243,39 +232,32 @@ public:
 
 		_poly2int2 = _createKernel("poly2int2");
 		_setKernelArg(_poly2int2, 0, sizeof(cl_mem), &_x);
-		const cl_uint size = cl_uint(_size);
-		_setKernelArg(_poly2int2, 1, sizeof(cl_uint), &size);
-		_setKernelArg(_poly2int2, 2, sizeof(cl_mem), &_err);
+		_setKernelArg(_poly2int2, 1, sizeof(cl_mem), &_err);
 
-		_reduce_upsweep64 = _createSweepKernel("reduce_upsweep64", d);
-		_reduce_downsweep64 = _createSweepKernel("reduce_downsweep64", d);
+		_reduce_upsweep64 = _createSweepKernel("reduce_upsweep64");
+		_reduce_downsweep64 = _createSweepKernel("reduce_downsweep64");
 
-		_reduce_topsweep32 = _createSweepKernel("reduce_topsweep32", d);
-		_reduce_topsweep64 = _createSweepKernel("reduce_topsweep64", d);
-		_reduce_topsweep128 = _createSweepKernel("reduce_topsweep128", d);
-		_reduce_topsweep256 = _createSweepKernel("reduce_topsweep256", d);
-		_reduce_topsweep512 = _createSweepKernel("reduce_topsweep512", d);
-		_reduce_topsweep1024 = _createSweepKernel("reduce_topsweep1024", d);
+		_reduce_topsweep32 = _createSweepKernel("reduce_topsweep32");
+		_reduce_topsweep64 = _createSweepKernel("reduce_topsweep64");
+		_reduce_topsweep128 = _createSweepKernel("reduce_topsweep128");
+		_reduce_topsweep256 = _createSweepKernel("reduce_topsweep256");
+		_reduce_topsweep512 = _createSweepKernel("reduce_topsweep512");
+		_reduce_topsweep1024 = _createSweepKernel("reduce_topsweep1024");
 
-		_reduce_i = _createReduceKernel("reduce_i", true, e, s, d, d_inv, d_shift);
-		_reduce_o = _createReduceKernel("reduce_o", false, e, s, d, d_inv, d_shift);
+		_reduce_i = _createReduceKernel("reduce_i", true);
+		_reduce_o = _createReduceKernel("reduce_o", false);
 
 		_reduce_f = _createKernel("reduce_f");
 		_setKernelArg(_reduce_f, 0, sizeof(cl_mem), &_x);
 		_setKernelArg(_reduce_f, 1, sizeof(cl_mem), &_t);
-		_setKernelArg(_reduce_f, 2, sizeof(cl_uint), &n);
-		_setKernelArg(_reduce_f, 3, sizeof(cl_uint), &e);
-		_setKernelArg(_reduce_f, 4, sizeof(cl_int), &s);
 
 		_reduce_x = _createKernel("reduce_x");
 		_setKernelArg(_reduce_x, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_reduce_x, 1, sizeof(cl_uint), &n);
-		_setKernelArg(_reduce_x, 2, sizeof(cl_mem), &_err);
+		_setKernelArg(_reduce_x, 1, sizeof(cl_mem), &_err);
 
 		_reduce_z = _createKernel("reduce_z");
 		_setKernelArg(_reduce_z, 0, sizeof(cl_mem), &_m1);
-		_setKernelArg(_reduce_z, 1, sizeof(cl_uint), &n);
-		_setKernelArg(_reduce_z, 2, sizeof(cl_mem), &_err);
+		_setKernelArg(_reduce_z, 1, sizeof(cl_mem), &_err);
 
 		_ntt4 = _createNttKernel("ntt4", true);
 		_intt4 = _createNttKernel("intt4", false);
@@ -290,14 +272,9 @@ public:
 
 		_set_positive = _createKernel("set_positive");
 		_setKernelArg(_set_positive, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(_set_positive, 1, sizeof(cl_uint), &n);
-		_setKernelArg(_set_positive, 2, sizeof(cl_uint), &e);
-		_setKernelArg(_set_positive, 3, sizeof(cl_ulong), &ds);
 
 		_add1 = _createKernel("add1");
 		_setKernelArg(_add1, 0, sizeof(cl_mem), &_m1);
-		_setKernelArg(_add1, 1, sizeof(cl_uint), &e);
-		_setKernelArg(_add1, 2, sizeof(cl_ulong), &ds);
 
 		_swap = _createKernel("swap");
 		_copy = _createKernel("copy");
@@ -472,8 +449,8 @@ public:
 private:
 	inline void _executeUDsweepKernel(cl_kernel kernel, const cl_uint s, const cl_uint j, const size_t size)
 	{
-		_setKernelArg(kernel, 2, sizeof(cl_uint), &s);
-		_setKernelArg(kernel, 3, sizeof(cl_uint), &j);
+		_setKernelArg(kernel, 1, sizeof(cl_uint), &s);
+		_setKernelArg(kernel, 2, sizeof(cl_uint), &j);
 		_executeKernel(kernel, (size / 4) * s, RED_BLK * (size / 4));
 	}
 
@@ -484,7 +461,7 @@ public:
 private:
 	inline void _executeTopsweepKernel(cl_kernel kernel, const cl_uint j, const size_t size)
 	{
-		_setKernelArg(kernel, 2, sizeof(cl_uint), &j);
+		_setKernelArg(kernel, 1, sizeof(cl_uint), &j);
 		_executeKernel(kernel, size / 4, size / 4);
 	}
 
