@@ -54,7 +54,8 @@ static const char * const src_ocl_squareNTT_1024 = \
 "\n" \
 "\n" \
 "__kernel __attribute__((reqd_work_group_size(4096 / 4, 1, 1)))\n" \
-"void square4096(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)\n" \
+"void square4096(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1, __constmem const uint4 * restrict const ir1,\n" \
+"	__constmem const uint4 * restrict const r2, __constmem const uint4 * restrict const ir2)\n" \
 "{\n" \
 "	__local uint2 X[4096];	// 32k\n" \
 "\n" \
@@ -66,16 +67,21 @@ static const char * const src_ocl_squareNTT_1024 = \
 "	const size_t i_4 = i % 4, i4 = ((4 * i) & (size_t)~(4 * 4 - 1)) | i_4, j4 = i_4;\n" \
 "	const size_t k1024 = get_group_id(0) * 4096 | i1024;\n" \
 "\n" \
-"	_forward4i(1024, &X[i1024], 1024, &x[k1024], r2ir2[j1024].s01, r1ir1[j1024]);\n" \
-"	_forward4(256, &X[i256], r2ir2[j256].s01, r1ir1[j256]);\n" \
-"	_forward4(64, &X[i64], r2ir2[j64].s01, r1ir1[j64]);\n" \
-"	_forward4(16, &X[i16], r2ir2[j16].s01, r1ir1[j16]);\n" \
-"	_forward4(4, &X[i4], r2ir2[j4].s01, r1ir1[j4]);\n" \
+"	const uint4 r1_1024 = r1[j1024], ir1_1024 = ir1[j1024];\n" \
+"	_forward4pi(1024, &X[i1024], 1024, &x[k1024], r2[j1024], r1_1024, ir1_1024);\n" \
+"	const uint4 r1_256 = r1[j256], ir1_256 = ir1[j256];\n" \
+"	_forward4p(256, &X[i256], r2[j256], r1_256, ir1_256);\n" \
+"	const uint4 r1_64 = r1[j64], ir1_64 = ir1[j64];\n" \
+"	_forward4p(64, &X[i64], r2[j64], r1_64, ir1_64);\n" \
+"	const uint4 r1_16 = r1[j16], ir1_16 = ir1[j16];\n" \
+"	_forward4p(16, &X[i16], r2[j16], r1_16, ir1_16);\n" \
+"	const uint4 r1_4 = r1[j4], ir1_4 = ir1[j4];\n" \
+"	_forward4p(4, &X[i4], r2[j4], r1_4, ir1_4);\n" \
 "	_square4(&X[4 * i]);\n" \
-"	_backward4(4, &X[i4], r2ir2[j4].s23, r1ir1[j4]);\n" \
-"	_backward4(16, &X[i16], r2ir2[j16].s23, r1ir1[j16]);\n" \
-"	_backward4(64, &X[i64], r2ir2[j64].s23, r1ir1[j64]);\n" \
-"	_backward4(256, &X[i256], r2ir2[j256].s23, r1ir1[j256]);\n" \
-"	_backward4o(1024, &x[k1024], 1024, &X[i1024], r2ir2[j1024].s23, r1ir1[j1024]);\n" \
+"	_backward4p(4, &X[i4], ir2[j4], r1_4, ir1_4);\n" \
+"	_backward4p(16, &X[i16], ir2[j16], r1_16, ir1_16);\n" \
+"	_backward4p(64, &X[i64], ir2[j64], r1_64, ir1_64);\n" \
+"	_backward4p(256, &X[i256], ir2[j256], r1_256, ir1_256);\n" \
+"	_backward4po(1024, &x[k1024], 1024, &X[i1024], ir2[j1024], r1_1024, ir1_1024);\n" \
 "}\n" \
 "";

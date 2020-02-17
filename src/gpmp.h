@@ -115,6 +115,8 @@ private:
 
 		uint32_t get1() const { return n1; }
 		uint32_t get2() const { return n2; }
+		uint32_t get1p() const { return cl_uint((uint64_t(n1) << 32) / P1); }
+		uint32_t get2p() const { return cl_uint((uint64_t(n2) << 32) / P2); }
 
 		RNS & operator*=(const RNS & rhs) { n1 *= rhs.n1; n2 *= rhs.n2; return *this; }
 		RNS operator*(const RNS & rhs) const { RNS r = *this; r *= rhs; return r; }
@@ -181,7 +183,7 @@ private:
 	{
 		const size_t size = _size;
 		const size_t constant_max_m = 1024;
-		const size_t constant_size = 1024 + 256 + 64 + 16 + 4;	// 1364 * 2 * sizeof(cl_uint4) = 43648 bytes
+		const size_t constant_size = 1024 + 256 + 64 + 16 + 4;	// 1364 * 4 * sizeof(cl_uint4) = 88576 bytes
 
 		std::stringstream src;
 		src << "#define\tdigit_bit\t" << _digit_bit << std::endl << std::endl;
@@ -224,8 +226,10 @@ private:
 		cl_uint4 * const r1ir1 = new cl_uint4[size];
 		cl_uint2 * const r2 = new cl_uint2[size];
 		cl_uint2 * const ir2 = new cl_uint2[size];
-		cl_uint4 * const cr1ir1 = new cl_uint4[constant_size];
-		cl_uint4 * const cr2ir2 = new cl_uint4[constant_size];
+		cl_uint4 * const cr1 = new cl_uint4[constant_size];
+		cl_uint4 * const cir1 = new cl_uint4[constant_size];
+		cl_uint4 * const cr2 = new cl_uint4[constant_size];
+		cl_uint4 * const cir2 = new cl_uint4[constant_size];
 		RNS ps = RNS::prRoot(size), ips = ps.invert();
 		size_t j = 0;
 		for (size_t m = size / 4; m > 1; m /= 4)
@@ -242,8 +246,10 @@ private:
 
 				if (m <= constant_max_m)
 				{
-					cr1ir1[o + i] = set4(r1.get1(), r1.get2(), ir1.get1(), ir1.get2());
-					cr2ir2[o + i] = set4(r1sq.get1(), r1sq.get2(), ir1sq.get1(), ir1sq.get2());
+					cr1[o + i] = set4(r1.get1(), r1.get2(), r1.get1p(), r1.get2p());
+					cir1[o + i] = set4(ir1.get1(), ir1.get2(), ir1.get1p(), ir1.get2p());
+					cr2[o + i] = set4(r1sq.get1(), r1sq.get2(), r1sq.get1p(), r1sq.get2p());
+					cir2[o + i] = set4(ir1sq.get1(), ir1sq.get2(), ir1sq.get1p(), ir1sq.get2p());
 				}
 
 				r1 *= ps; ir1 *= ips;
@@ -251,12 +257,14 @@ private:
 			ps *= ps; ps *= ps; ips *= ips; ips *= ips;
 		}
 		_engine.writeMemory_r(r1ir1, r2, ir2);
-		_engine.writeMemory_cr(cr1ir1, cr2ir2);
+		_engine.writeMemory_cr(cr1, cir1, cr2, cir2);
 		delete[] r1ir1;
 		delete[] r2;
 		delete[] ir2;
-		delete[] cr1ir1;
-		delete[] cr2ir2;
+		delete[] cr1;
+		delete[] cir1;
+		delete[] cr2;
+		delete[] cir2;
 
 		cl_uint * const bp = new cl_uint[size / 2];
 		cl_uint * const ibp = new uint32_t[size / 2];

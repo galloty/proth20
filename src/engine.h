@@ -14,7 +14,7 @@ class engine : public ocl::device
 private:
 	size_t _size = 0, _constant_size = 0;
 	cl_mem _x = nullptr, _y = nullptr, _t = nullptr, _cr = nullptr, _u = nullptr, _tu = nullptr, _v = nullptr, _m1 = nullptr, _m2 = nullptr, _err = nullptr;
-	cl_mem _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr1ir1 = nullptr, _cr2ir2 = nullptr, _bp = nullptr, _ibp = nullptr;
+	cl_mem _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr1 = nullptr, _cir1 = nullptr, _cr2 = nullptr, _cir2 = nullptr, _bp = nullptr, _ibp = nullptr;
 	cl_kernel _sub_ntt64_16 = nullptr, _ntt64_16 = nullptr, _intt64_16 = nullptr;
 	cl_kernel _sub_ntt256_4 = nullptr, _ntt256_4 = nullptr, _intt256_4 = nullptr;
 	cl_kernel _sub_ntt256_8 = nullptr, _ntt256_8 = nullptr, _intt256_8 = nullptr;
@@ -81,8 +81,11 @@ public:
 		_ibp = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint) * size / 2);			// (1/b)^(i+1) mod k (division algorithm)
 
 		_constant_size = constant_size;
-		_cr1ir1 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * constant_size);	// small NTT roots: squaring
-		_cr2ir2 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * constant_size);	// small NTT roots (square): squaring
+
+		_cr1 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * constant_size);	// small NTT roots: squaring
+		_cir1 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * constant_size);	// small NTT roots (inverse): squaring
+		_cr2 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * constant_size);	// small NTT roots (square) squaring
+		_cir2 = _createBuffer(CL_MEM_READ_ONLY, sizeof(cl_uint4) * constant_size);	// small NTT roots (inverse of square): squaring
 
 		// allocated size ~ (1 * 4 + 5 * 2 + 4 * 1 + 3 * 1/2) * sizeof(cl_uint) * size = 78 * size bytes
 	}
@@ -104,7 +107,7 @@ public:
 
 		if (_constant_size != 0)
 		{
-			_releaseBuffer(_cr1ir1); _releaseBuffer(_cr2ir2);
+			_releaseBuffer(_cr1); _releaseBuffer(_cir1); _releaseBuffer(_cr2); _releaseBuffer(_cir2);
 			_constant_size = 0;
 		}
 	}
@@ -124,8 +127,10 @@ private:
 	{
 		cl_kernel kernel = _createKernel(kernelName);
 		_setKernelArg(kernel, 0, sizeof(cl_mem), &_x);
-		_setKernelArg(kernel, 1, sizeof(cl_mem), &_cr1ir1);
-		_setKernelArg(kernel, 2, sizeof(cl_mem), &_cr2ir2);
+		_setKernelArg(kernel, 1, sizeof(cl_mem), &_cr1);
+		_setKernelArg(kernel, 2, sizeof(cl_mem), &_cir1);
+		_setKernelArg(kernel, 3, sizeof(cl_mem), &_cr2);
+		_setKernelArg(kernel, 4, sizeof(cl_mem), &_cir2);
 		return kernel;
 	}
 
@@ -343,10 +348,12 @@ public:
 	}
 
 public:
-	void writeMemory_cr(const cl_uint4 * const ptr_cr1ir1, const cl_uint4 * const ptr_cr2ir2)
+	void writeMemory_cr(const cl_uint4 * const ptr_cr1, const cl_uint4 * const ptr_cir1, const cl_uint4 * const ptr_cr2, const cl_uint4 * const ptr_cir2)
 	{
-		_writeBuffer(_cr1ir1, ptr_cr1ir1, sizeof(cl_uint4) * _constant_size);
-		_writeBuffer(_cr2ir2, ptr_cr2ir2, sizeof(cl_uint4) * _constant_size);
+		_writeBuffer(_cr1, ptr_cr1, sizeof(cl_uint4) * _constant_size);
+		_writeBuffer(_cir1, ptr_cir1, sizeof(cl_uint4) * _constant_size);
+		_writeBuffer(_cr2, ptr_cr2, sizeof(cl_uint4) * _constant_size);
+		_writeBuffer(_cir2, ptr_cir2, sizeof(cl_uint4) * _constant_size);
 	}
 
 public:

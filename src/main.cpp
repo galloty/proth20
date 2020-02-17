@@ -8,6 +8,7 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #include "pio.h"
 #include "ocl.h"
 #include "proth.h"
+#include "proth_test.h"
 #include "boinc.h"
 
 #include <cstdlib>
@@ -175,21 +176,21 @@ public:
 		// engine engine1(platform, 1);
 
 		// function profiling
-		// p.profile(13, 5523860, engine0);		// DIV
-		// p.profile(10223, 31172165, engine0);	// SOB
+		// proth_test::profile(13, 5523860, engine0);		// DIV
+		// proth_test::profile(10223, 31172165, engine0);	// SOB
 
 		// bench
 		// p.bench(engine0);
-		// p.test_prime(engine0, true);
+		// proth_test::test_prime(p, engine0, true);
 
 		// full test
-		// p.test_composite(engine0);
-		// p.test_prime(engine0);
-		// p.test_gfn(engine0);
+		// proth_test::test_composite(p, engine0);
+		// proth_test::test_prime(p, engine0);
+		// proth_test::test_gfn(p, engine0);
 
 		// validation
-		// p.validation(engine0);
-		// p.validation(engine1);
+		// proth_test::validation(p, engine0);
+		// proth_test::validation(p, engine1);
 	}
 };
 

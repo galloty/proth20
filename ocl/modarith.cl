@@ -31,16 +31,12 @@ P =  15 * 2^27 + 1 = 2013265921 => R = 2290649223, h < 1.93
 #define	P2_INV 		2290649223u		// 2^62 / P2
 #define	P1_I		2113994754u		// P1_PRIM_ROOT^((P1 - 1) / 4)
 #define	P2_I		1728404513u		// P2_PRIM_ROOT^((P2 - 1) / 4)
+#define	P1_Ip		4261280761u		// (P1_I * 2^32) / P1
+#define	P2_Ip		3687262959u		// (P2_I * 2^32) / P2
 #define	InvP2_P1	913159918u		// 1 / P2 mod P1
+#define	InvP2_P1p	1840700306u		// (InvP2_P1 * 2^32) / P1
 #define	P1P2		(P1 * (ulong)(P2))
 
-
-inline uint _addmod(const uint lhs, const uint rhs, const uint d)
-{
-	const uint r = lhs + rhs;
-	const uint t = (lhs >= d - rhs) ? d : 0;
-	return r - t;
-}
 
 inline uint _rem(const ulong q, const uint d, const uint d_inv, const int d_shift)
 {
@@ -50,19 +46,34 @@ inline uint _rem(const ulong q, const uint d, const uint d_inv, const int d_shif
 	return r - t;
 }
 
-inline uint _mulMod(const uint a, const uint b, const uint p, const uint p_inv)
+inline uint addmod_d(const uint lhs, const uint rhs)
 {
-	return _rem(a * (ulong)(b), p, p_inv, 30);
+	const uint r = lhs + rhs;
+	const uint t = (r >= pconst_d) ? pconst_d : 0;
+	return r - t;
 }
 
-inline uint mulModP1(const uint a, const uint b) { return _mulMod(a, b, P1, P1_INV); }
-inline uint mulModP2(const uint a, const uint b) { return _mulMod(a, b, P2, P2_INV); }
+inline uint rem_d(const ulong q)
+{
+	return _rem(q, pconst_d, pconst_d_inv, pconst_d_shift);
+}
+
+inline uint _mulmodP1(const uint a, const uint b) { return _rem(a * (ulong)(b), P1, P1_INV, 30); }
+inline uint _mulmodP2(const uint a, const uint b) { return _rem(a * (ulong)(b), P2, P2_INV, 30); }
+
+inline uint _mulmodp(const uint lhs, const uint p, const uint c, const uint cp)
+{
+	// Shoup's modular multiplication: Faster arithmetic for number-theoretic transforms, David Harvey, J.Symb.Comp. 60 (2014) 113-119
+	const uint r = lhs * c - mul_hi(lhs, cp) * p;
+	const uint t = (r >= p) ? p : 0;
+	return r - t;
+}
 
 inline long getlong(const uint2 lhs)
 {
 	// Garner Algorithm
 	uint d = lhs.s0 - lhs.s1; const uint t = (lhs.s0 < lhs.s1) ? P1 : 0; d += t;	// mod P1
-	const uint u = mulModP1(d, InvP2_P1);		// P2 < P1
+	const uint u = _mulmodp(d, P1, InvP2_P1, InvP2_P1p);		// P2 < P1
 	const ulong r = u * (ulong)(P2) + lhs.s1;
 	const ulong s = (r > P1P2 / 2) ? P1P2 : 0;
 	return (long)(r - s);
@@ -72,6 +83,7 @@ inline uint2 addmod(const uint2 lhs, const uint2 rhs)
 {
 	const uint2 r = lhs + rhs;
 	const uint2 t = (uint2)((lhs.s0 >= P1 - rhs.s0) ? P1 : 0, (lhs.s1 >= P2 - rhs.s1) ? P2 : 0);
+	// const uint2 t = (uint2)((r.s0 >= P1) ? P1 : 0, (r.s1 >= P2) ? P2 : 0);
 	return r - t;
 }
 
@@ -84,12 +96,20 @@ inline uint2 submod(const uint2 lhs, const uint2 rhs)
 
 inline uint2 mulmod(const uint2 lhs, const uint2 rhs)
 {
-	return (uint2)(mulModP1(lhs.s0, rhs.s0), mulModP2(lhs.s1, rhs.s1));
+	return (uint2)(_mulmodP1(lhs.s0, rhs.s0), _mulmodP2(lhs.s1, rhs.s1));
+}
+
+inline uint2 mulmodp(const uint2 lhs, const uint4 rhs)
+{
+	return (uint2)(_mulmodp(lhs.s0, P1, rhs.s0, rhs.s2), _mulmodp(lhs.s1, P2, rhs.s1, rhs.s3));
 }
 
 inline uint2 sqrmod(const uint2 lhs) { return mulmod(lhs, lhs); }
 
-inline uint2 mulI(const uint2 lhs) { return mulmod(lhs, (uint2)(P1_I, P2_I)); }
+inline uint2 mulI(const uint2 lhs)
+{
+	return (uint2)(_mulmodp(lhs.s0, P1, P1_I, P1_Ip), _mulmodp(lhs.s1, P2, P2_I, P2_Ip));
+}
 
 inline void _sub_forward4i(const size_t ml, __local uint2 * restrict const X, const size_t mg, __global const uint2 * restrict const x, const uint2 r2, const uint4 r1ir1)
 {
@@ -150,6 +170,65 @@ inline void _backward4o(const size_t mg, __global uint2 * restrict const x, cons
 	barrier(CLK_LOCAL_MEM_FENCE);
 
 	const uint2 v0 = X[0 * ml], v1 = mulmod(X[1 * ml], ir2), v2 = mulmod(X[2 * ml], r1ir1.s01), v3 = mulmod(X[3 * ml], r1ir1.s23);
+	const uint2 u0 = addmod(v0, v1), u2 = addmod(v2, v3), u1 = submod(v0, v1), u3 = mulI(submod(v2, v3));
+	x[0 * mg] = addmod(u0, u2); x[2 * mg] = submod(u0, u2); x[1 * mg] = addmod(u1, u3); x[3 * mg] = submod(u1, u3);
+}
+
+inline void _forward4pi(const size_t ml, __local uint2 * restrict const X, const size_t mg, __global const uint2 * restrict const x,
+	const uint4 r2, const uint4 r1, const uint4 ir1)
+{
+	const uint2 u0 = x[0 * mg], u2 = x[2 * mg], u1 = x[1 * mg], u3 = x[3 * mg];
+	const uint2 v0 = addmod(u0, u2), v2 = submod(u0, u2), v1 = addmod(u1, u3), v3 = mulI(submod(u3, u1));
+	X[0 * ml] = addmod(v0, v1); X[1 * ml] = mulmodp(submod(v0, v1), r2);
+	X[2 * ml] = mulmodp(addmod(v2, v3), ir1); X[3 * ml] = mulmodp(submod(v2, v3), r1);
+}
+
+inline void _forward4p(const size_t m, __local uint2 * restrict const X,
+	const uint4 r2, const uint4 r1, const uint4 ir1)
+{
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	const uint2 u0 = X[0 * m], u2 = X[2 * m], u1 = X[1 * m], u3 = X[3 * m];
+	const uint2 v0 = addmod(u0, u2), v2 = submod(u0, u2), v1 = addmod(u1, u3), v3 = mulI(submod(u3, u1));
+	X[0 * m] = addmod(v0, v1); X[1 * m] = mulmodp(submod(v0, v1), r2);
+	X[2 * m] = mulmodp(addmod(v2, v3), ir1); X[3 * m] = mulmodp(submod(v2, v3), r1);
+}
+
+inline void _forward4po(const size_t mg, __global uint2 * restrict const x, const size_t ml, __local const uint2 * restrict const X,
+	const uint4 r2, const uint4 r1, const uint4 ir1)
+{
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	const uint2 u0 = X[0 * ml], u2 = X[2 * ml], u1 = X[1 * ml], u3 = X[3 * ml];
+	const uint2 v0 = addmod(u0, u2), v2 = submod(u0, u2), v1 = addmod(u1, u3), v3 = mulI(submod(u3, u1));
+	x[0 * mg] = addmod(v0, v1); x[1 * mg] = mulmodp(submod(v0, v1), r2);
+	x[2 * mg] = mulmodp(addmod(v2, v3), ir1); x[3 * mg] = mulmodp(submod(v2, v3), r1);
+}
+
+inline void _backward4pi(const size_t ml, __local uint2 * restrict const X, const size_t mg, __global const uint2 * restrict const x,
+	const uint4 ir2, const uint4 r1, const uint4 ir1)
+{
+	const uint2 v0 = x[0 * mg], v1 = mulmodp(x[1 * mg], ir2), v2 = mulmodp(x[2 * mg], r1), v3 = mulmodp(x[3 * mg], ir1);
+	const uint2 u0 = addmod(v0, v1), u2 = addmod(v2, v3), u1 = submod(v0, v1), u3 = mulI(submod(v2, v3));
+	X[0 * ml] = addmod(u0, u2); X[2 * ml] = submod(u0, u2); X[1 * ml] = addmod(u1, u3); X[3 * ml] = submod(u1, u3);
+}
+
+inline void _backward4p(const size_t m, __local uint2 * restrict const X,
+	const uint4 ir2, const uint4 r1, const uint4 ir1)
+{
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	const uint2 v0 = X[0 * m], v1 = mulmodp(X[1 * m], ir2), v2 = mulmodp(X[2 * m], r1), v3 = mulmodp(X[3 * m], ir1);
+	const uint2 u0 = addmod(v0, v1), u2 = addmod(v2, v3), u1 = submod(v0, v1), u3 = mulI(submod(v2, v3));
+	X[0 * m] = addmod(u0, u2); X[2 * m] = submod(u0, u2); X[1 * m] = addmod(u1, u3); X[3 * m] = submod(u1, u3);
+}
+
+inline void _backward4po(const size_t mg, __global uint2 * restrict const x, const size_t ml, __local const uint2 * restrict const X,
+	const uint4 ir2, const uint4 r1, const uint4 ir1)
+{
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	const uint2 v0 = X[0 * ml], v1 = mulmodp(X[1 * ml], ir2), v2 = mulmodp(X[2 * ml], r1), v3 = mulmodp(X[3 * ml], ir1);
 	const uint2 u0 = addmod(v0, v1), u2 = addmod(v2, v3), u1 = submod(v0, v1), u3 = mulI(submod(v2, v3));
 	x[0 * mg] = addmod(u0, u2); x[2 * mg] = submod(u0, u2); x[1 * mg] = addmod(u1, u3); x[3 * mg] = submod(u1, u3);
 }

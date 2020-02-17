@@ -46,7 +46,8 @@ static const char * const src_ocl_square = \
 "}\n" \
 "\n" \
 "__kernel __attribute__((reqd_work_group_size(8 / 4 * BLK8, 1, 1)))\n" \
-"void square8(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)\n" \
+"void square8(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1, __constmem const uint4 * restrict const ir1,\n" \
+"	__constmem const uint4 * restrict const r2, __constmem const uint4 * restrict const ir2)\n" \
 "{\n" \
 "	__local uint2 X[8 * BLK8];\n" \
 "\n" \
@@ -54,13 +55,15 @@ static const char * const src_ocl_square = \
 "	const size_t i_2 = i % 2, _i2 = ((4 * i) & (size_t)~(4 * 2 - 1)), i2 = _i2 | i_2, j2 = i_2, i_0 = _i2 | (2 * i_2);\n" \
 "	const size_t k2 = get_group_id(0) * 8 * BLK8 | i2;\n" \
 "\n" \
-"	_forward4i(2, &X[i2], 2, &x[k2], r2ir2[j2].s01, r1ir1[j2]);\n" \
+"	const uint4 r1_2 = r1[j2], ir1_2 = ir1[j2];\n" \
+"	_forward4pi(2, &X[i2], 2, &x[k2], r2[j2], r1_2, ir1_2);\n" \
 "	_square2(&X[i_0]);\n" \
-"	_backward4o(2, &x[k2], 2, &X[i2], r2ir2[j2].s23, r1ir1[j2]);\n" \
+"	_backward4po(2, &x[k2], 2, &X[i2], ir2[j2], r1_2, ir1_2);\n" \
 "}\n" \
 "\n" \
 "__kernel __attribute__((reqd_work_group_size(16 / 4 * BLK16, 1, 1)))\n" \
-"void square16(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)\n" \
+"void square16(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1, __constmem const uint4 * restrict const ir1,\n" \
+"	__constmem const uint4 * restrict const r2, __constmem const uint4 * restrict const ir2)\n" \
 "{\n" \
 "	__local uint2 X[16 * BLK16];\n" \
 "\n" \
@@ -68,13 +71,15 @@ static const char * const src_ocl_square = \
 "	const size_t i_4 = i % 4, i4 = ((4 * i) & (size_t)~(4 * 4 - 1)) | i_4, j4 = i_4;\n" \
 "	const size_t k4 = get_group_id(0) * 16 * BLK16 | i4;\n" \
 "\n" \
-"	_forward4i(4, &X[i4], 4, &x[k4], r2ir2[j4].s01, r1ir1[j4]);\n" \
+"	const uint4 r1_4 = r1[j4], ir1_4 = ir1[j4];\n" \
+"	_forward4pi(4, &X[i4], 4, &x[k4], r2[j4], r1_4, ir1_4);\n" \
 "	_square4(&X[4 * i]);\n" \
-"	_backward4o(4, &x[k4], 4, &X[i4], r2ir2[j4].s23, r1ir1[j4]);\n" \
+"	_backward4po(4, &x[k4], 4, &X[i4], ir2[j4], r1_4, ir1_4);\n" \
 "}\n" \
 "\n" \
 "__kernel __attribute__((reqd_work_group_size(32 / 4 * BLK32, 1, 1)))\n" \
-"void square32(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)\n" \
+"void square32(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1, __constmem const uint4 * restrict const ir1,\n" \
+"	__constmem const uint4 * restrict const r2, __constmem const uint4 * restrict const ir2)\n" \
 "{\n" \
 "	__local uint2 X[32 * BLK32];\n" \
 "\n" \
@@ -85,15 +90,18 @@ static const char * const src_ocl_square = \
 "	const size_t i_2 = i % 2, _i2 = ((4 * i) & (size_t)~(4 * 2 - 1)), i2 = _i2 | i_2, j2 = i_2, i_0 = _i2 | (2 * i_2);\n" \
 "	const size_t k8 = get_group_id(0) * 32 * BLK32 | i8;\n" \
 "\n" \
-"	_forward4i(8, &X[i8], 8, &x[k8], r2ir2[j8].s01, r1ir1[j8]);\n" \
-"	_forward4(2, &X[i2], r2ir2[j2].s01, r1ir1[j2]);\n" \
+"	const uint4 r1_8 = r1[j8], ir1_8 = ir1[j8];\n" \
+"	_forward4pi(8, &X[i8], 8, &x[k8], r2[j8], r1_8, ir1_8);\n" \
+"	const uint4 r1_2 = r1[j2], ir1_2 = ir1[j2];\n" \
+"	_forward4p(2, &X[i2], r2[j2], r1_2, ir1_2);\n" \
 "	_square2(&X[i_0]);\n" \
-"	_backward4(2, &X[i2], r2ir2[j2].s23, r1ir1[j2]);\n" \
-"	_backward4o(8, &x[k8], 8, &X[i8], r2ir2[j8].s23, r1ir1[j8]);\n" \
+"	_backward4p(2, &X[i2], ir2[j2], r1_2, ir1_2);\n" \
+"	_backward4po(8, &x[k8], 8, &X[i8], ir2[j8], r1_8, ir1_8);\n" \
 "}\n" \
 "\n" \
 "__kernel __attribute__((reqd_work_group_size(64 / 4 * BLK64, 1, 1)))\n" \
-"void square64(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)\n" \
+"void square64(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1, __constmem const uint4 * restrict const ir1,\n" \
+"	__constmem const uint4 * restrict const r2, __constmem const uint4 * restrict const ir2)\n" \
 "{\n" \
 "	__local uint2 X[64 * BLK64];\n" \
 "\n" \
@@ -102,15 +110,18 @@ static const char * const src_ocl_square = \
 "	const size_t i_4 = i % 4, i4 = ((4 * i) & (size_t)~(4 * 4 - 1)) | i_4, j4 = i_4;\n" \
 "	const size_t k16 = get_group_id(0) * 64 * BLK64 | i16;\n" \
 "\n" \
-"	_forward4i(16, &X[i16], 16, &x[k16], r2ir2[j16].s01, r1ir1[j16]);\n" \
-"	_forward4(4, &X[i4], r2ir2[j4].s01, r1ir1[j4]);\n" \
+"	const uint4 r1_16 = r1[j16], ir1_16 = ir1[j16];\n" \
+"	_forward4pi(16, &X[i16], 16, &x[k16], r2[j16], r1_16, ir1_16);\n" \
+"	const uint4 r1_4 = r1[j4], ir1_4 = ir1[j4];\n" \
+"	_forward4p(4, &X[i4], r2[j4], r1_4, ir1_4);\n" \
 "	_square4(&X[4 * i]);\n" \
-"	_backward4(4, &X[i4], r2ir2[j4].s23, r1ir1[j4]);\n" \
-"	_backward4o(16, &x[k16], 16, &X[i16], r2ir2[j16].s23, r1ir1[j16]);\n" \
+"	_backward4p(4, &X[i4], ir2[j4], r1_4, ir1_4);\n" \
+"	_backward4po(16, &x[k16], 16, &X[i16], ir2[j16], r1_16, ir1_16);\n" \
 "}\n" \
 "\n" \
 "__kernel __attribute__((reqd_work_group_size(128 / 4 * BLK128, 1, 1)))\n" \
-"void square128(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)\n" \
+"void square128(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1, __constmem const uint4 * restrict const ir1,\n" \
+"	__constmem const uint4 * restrict const r2, __constmem const uint4 * restrict const ir2)\n" \
 "{\n" \
 "	__local uint2 X[128 * BLK128];\n" \
 "\n" \
@@ -120,17 +131,21 @@ static const char * const src_ocl_square = \
 "	const size_t i_2 = i % 2, _i2 = ((4 * i) & (size_t)~(4 * 2 - 1)), i2 = _i2 | i_2, j2 = i_2, i_0 = _i2 | (2 * i_2);\n" \
 "	const size_t k32 = get_group_id(0) * 128 * BLK128 | i32;\n" \
 "\n" \
-"	_forward4i(32, &X[i32], 32, &x[k32], r2ir2[j32].s01, r1ir1[j32]);\n" \
-"	_forward4(8, &X[i8], r2ir2[j8].s01, r1ir1[j8]);\n" \
-"	_forward4(2, &X[i2], r2ir2[j2].s01, r1ir1[j2]);\n" \
+"	const uint4 r1_32 = r1[j32], ir1_32 = ir1[j32];\n" \
+"	_forward4pi(32, &X[i32], 32, &x[k32], r2[j32], r1_32, ir1_32);\n" \
+"	const uint4 r1_8 = r1[j8], ir1_8 = ir1[j8];\n" \
+"	_forward4p(8, &X[i8], r2[j8], r1_8, ir1_8);\n" \
+"	const uint4 r1_2 = r1[j2], ir1_2 = ir1[j2];\n" \
+"	_forward4p(2, &X[i2], r2[j2], r1_2, ir1_2);\n" \
 "	_square2(&X[i_0]);\n" \
-"	_backward4(2, &X[i2], r2ir2[j2].s23, r1ir1[j2]);\n" \
-"	_backward4(8, &X[i8], r2ir2[j8].s23, r1ir1[j8]);\n" \
-"	_backward4o(32, &x[k32], 32, &X[i32], r2ir2[j32].s23, r1ir1[j32]);\n" \
+"	_backward4p(2, &X[i2], ir2[j2], r1_2, ir1_2);\n" \
+"	_backward4p(8, &X[i8], ir2[j8], r1_8, ir1_8);\n" \
+"	_backward4po(32, &x[k32], 32, &X[i32], ir2[j32], r1_32, ir1_32);\n" \
 "}\n" \
 "\n" \
 "__kernel __attribute__((reqd_work_group_size(256 / 4 * BLK256, 1, 1)))\n" \
-"void square256(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)\n" \
+"void square256(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1, __constmem const uint4 * restrict const ir1,\n" \
+"	__constmem const uint4 * restrict const r2, __constmem const uint4 * restrict const ir2)\n" \
 "{\n" \
 "	__local uint2 X[256 * BLK256];\n" \
 "\n" \
@@ -140,17 +155,21 @@ static const char * const src_ocl_square = \
 "	const size_t i_4 = i % 4, i4 = ((4 * i) & (size_t)~(4 * 4 - 1)) | i_4, j4 = i_4;\n" \
 "	const size_t k64 = get_group_id(0) * 256 * BLK256 | i64;\n" \
 "\n" \
-"	_forward4i(64, &X[i64], 64, &x[k64], r2ir2[j64].s01, r1ir1[j64]);\n" \
-"	_forward4(16, &X[i16], r2ir2[j16].s01, r1ir1[j16]);\n" \
-"	_forward4(4, &X[i4], r2ir2[j4].s01, r1ir1[j4]);\n" \
+"	const uint4 r1_64 = r1[j64], ir1_64 = ir1[j64];\n" \
+"	_forward4pi(64, &X[i64], 64, &x[k64], r2[j64], r1_64, ir1_64);\n" \
+"	const uint4 r1_16 = r1[j16], ir1_16 = ir1[j16];\n" \
+"	_forward4p(16, &X[i16], r2[j16], r1_16, ir1_16);\n" \
+"	const uint4 r1_4 = r1[j4], ir1_4 = ir1[j4];\n" \
+"	_forward4p(4, &X[i4], r2[j4], r1_4, ir1_4);\n" \
 "	_square4(&X[4 * i]);\n" \
-"	_backward4(4, &X[i4], r2ir2[j4].s23, r1ir1[j4]);\n" \
-"	_backward4(16, &X[i16], r2ir2[j16].s23, r1ir1[j16]);\n" \
-"	_backward4o(64, &x[k64], 64, &X[i64], r2ir2[j64].s23, r1ir1[j64]);\n" \
+"	_backward4p(4, &X[i4], ir2[j4], r1_4, ir1_4);\n" \
+"	_backward4p(16, &X[i16], ir2[j16], r1_16, ir1_16);\n" \
+"	_backward4po(64, &x[k64], 64, &X[i64], ir2[j64], r1_64, ir1_64);\n" \
 "}\n" \
 "\n" \
 "__kernel __attribute__((reqd_work_group_size(512 / 4, 1, 1)))\n" \
-"void square512(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)\n" \
+"void square512(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1, __constmem const uint4 * restrict const ir1,\n" \
+"	__constmem const uint4 * restrict const r2, __constmem const uint4 * restrict const ir2)\n" \
 "{\n" \
 "	__local uint2 X[512];\n" \
 "\n" \
@@ -161,19 +180,24 @@ static const char * const src_ocl_square = \
 "	const size_t i_2 = i % 2, _i2 = ((4 * i) & (size_t)~(4 * 2 - 1)), i2 = _i2 | i_2, j2 = i_2, i_0 = _i2 | (2 * i_2);\n" \
 "	const size_t k128 = get_group_id(0) * 512 | i128;\n" \
 "\n" \
-"	_forward4i(128, &X[i128], 128, &x[k128], r2ir2[j128].s01, r1ir1[j128]);\n" \
-"	_forward4(32, &X[i32], r2ir2[j32].s01, r1ir1[j32]);\n" \
-"	_forward4(8, &X[i8], r2ir2[j8].s01, r1ir1[j8]);\n" \
-"	_forward4(2, &X[i2], r2ir2[j2].s01, r1ir1[j2]);\n" \
+"	const uint4 r1_128 = r1[j128], ir1_128 = ir1[j128];\n" \
+"	_forward4pi(128, &X[i128], 128, &x[k128], r2[j128], r1_128, ir1_128);\n" \
+"	const uint4 r1_32 = r1[j32], ir1_32 = ir1[j32];\n" \
+"	_forward4p(32, &X[i32], r2[j32], r1_32, ir1_32);\n" \
+"	const uint4 r1_8 = r1[j8], ir1_8 = ir1[j8];\n" \
+"	_forward4p(8, &X[i8], r2[j8], r1_8, ir1_8);\n" \
+"	const uint4 r1_2 = r1[j2], ir1_2 = ir1[j2];\n" \
+"	_forward4p(2, &X[i2], r2[j2], r1_2, ir1_2);\n" \
 "	_square2(&X[i_0]);\n" \
-"	_backward4(2, &X[i2], r2ir2[j2].s23, r1ir1[j2]);\n" \
-"	_backward4(8, &X[i8], r2ir2[j8].s23, r1ir1[j8]);\n" \
-"	_backward4(32, &X[i32], r2ir2[j32].s23, r1ir1[j32]);\n" \
-"	_backward4o(128, &x[k128], 128, &X[i128], r2ir2[j128].s23, r1ir1[j128]);\n" \
+"	_backward4p(2, &X[i2], ir2[j2], r1_2, ir1_2);\n" \
+"	_backward4p(8, &X[i8], ir2[j8], r1_8, ir1_8);\n" \
+"	_backward4p(32, &X[i32], ir2[j32], r1_32, ir1_32);\n" \
+"	_backward4po(128, &x[k128], 128, &X[i128], ir2[j128], r1_128, ir1_128);\n" \
 "}\n" \
 "\n" \
 "__kernel __attribute__((reqd_work_group_size(1024 / 4, 1, 1)))\n" \
-"void square1024(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)\n" \
+"void square1024(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1, __constmem const uint4 * restrict const ir1,\n" \
+"	__constmem const uint4 * restrict const r2, __constmem const uint4 * restrict const ir2)\n" \
 "{\n" \
 "	__local uint2 X[1024];\n" \
 "\n" \
@@ -184,15 +208,19 @@ static const char * const src_ocl_square = \
 "	const size_t i_4 = i % 4, i4 = ((4 * i) & (size_t)~(4 * 4 - 1)) | i_4, j4 = i_4;\n" \
 "	const size_t k256 = get_group_id(0) * 1024 | i256;\n" \
 "\n" \
-"	_forward4i(256, &X[i256], 256, &x[k256], r2ir2[j256].s01, r1ir1[j256]);\n" \
-"	_forward4(64, &X[i64], r2ir2[j64].s01, r1ir1[j64]);\n" \
-"	_forward4(16, &X[i16], r2ir2[j16].s01, r1ir1[j16]);\n" \
-"	_forward4(4, &X[i4], r2ir2[j4].s01, r1ir1[j4]);\n" \
+"	const uint4 r1_256 = r1[j256], ir1_256 = ir1[j256];\n" \
+"	_forward4pi(256, &X[i256], 256, &x[k256], r2[j256], r1_256, ir1_256);\n" \
+"	const uint4 r1_64 = r1[j64], ir1_64 = ir1[j64];\n" \
+"	_forward4p(64, &X[i64], r2[j64], r1_64, ir1_64);\n" \
+"	const uint4 r1_16 = r1[j16], ir1_16 = ir1[j16];\n" \
+"	_forward4p(16, &X[i16], r2[j16], r1_16, ir1_16);\n" \
+"	const uint4 r1_4 = r1[j4], ir1_4 = ir1[j4];\n" \
+"	_forward4p(4, &X[i4], r2[j4], r1_4, ir1_4);\n" \
 "	_square4(&X[4 * i]);\n" \
-"	_backward4(4, &X[i4], r2ir2[j4].s23, r1ir1[j4]);\n" \
-"	_backward4(16, &X[i16], r2ir2[j16].s23, r1ir1[j16]);\n" \
-"	_backward4(64, &X[i64], r2ir2[j64].s23, r1ir1[j64]);\n" \
-"	_backward4o(256, &x[k256], 256, &X[i256], r2ir2[j256].s23, r1ir1[j256]);\n" \
+"	_backward4p(4, &X[i4], ir2[j4], r1_4, ir1_4);\n" \
+"	_backward4p(16, &X[i16], ir2[j16], r1_16, ir1_16);\n" \
+"	_backward4p(64, &X[i64], ir2[j64], r1_64, ir1_64);\n" \
+"	_backward4po(256, &x[k256], 256, &X[i256], ir2[j256], r1_256, ir1_256);\n" \
 "}\n" \
 "\n" \
 "";

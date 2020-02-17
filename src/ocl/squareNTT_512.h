@@ -52,7 +52,8 @@ static const char * const src_ocl_squareNTT_512 = \
 "\n" \
 "\n" \
 "__kernel __attribute__((reqd_work_group_size(2048 / 4, 1, 1)))\n" \
-"void square2048(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1ir1, __constmem const uint4 * restrict const r2ir2)\n" \
+"void square2048(__global uint2 * restrict const x, __constmem const uint4 * restrict const r1, __constmem const uint4 * restrict const ir1,\n" \
+"	__constmem const uint4 * restrict const r2, __constmem const uint4 * restrict const ir2)\n" \
 "{\n" \
 "	__local uint2 X[2048];	// 16k\n" \
 "\n" \
@@ -64,16 +65,21 @@ static const char * const src_ocl_squareNTT_512 = \
 "	const size_t i_2 = i % 2, _i2 = ((4 * i) & (size_t)~(4 * 2 - 1)), i2 = _i2 | i_2, j2 = i_2, i_0 = _i2 | (2 * i_2);\n" \
 "	const size_t k512 = get_group_id(0) * 2048 | i512;\n" \
 "\n" \
-"	_forward4i(512, &X[i512], 512, &x[k512], r2ir2[j512].s01, r1ir1[j512]);\n" \
-"	_forward4(128, &X[i128], r2ir2[j128].s01, r1ir1[j128]);\n" \
-"	_forward4(32, &X[i32], r2ir2[j32].s01, r1ir1[j32]);\n" \
-"	_forward4(8, &X[i8], r2ir2[j8].s01, r1ir1[j8]);\n" \
-"	_forward4(2, &X[i2], r2ir2[j2].s01, r1ir1[j2]);\n" \
+"	const uint4 r1_512 = r1[j512], ir1_512 = ir1[j512];\n" \
+"	_forward4pi(512, &X[i512], 512, &x[k512], r2[j512], r1_512, ir1_512);\n" \
+"	const uint4 r1_128 = r1[j128], ir1_128 = ir1[j128];\n" \
+"	_forward4p(128, &X[i128], r2[j128], r1_128, ir1_128);\n" \
+"	const uint4 r1_32 = r1[j32], ir1_32 = ir1[j32];\n" \
+"	_forward4p(32, &X[i32], r2[j32], r1_32, ir1_32);\n" \
+"	const uint4 r1_8 = r1[j8], ir1_8 = ir1[j8];\n" \
+"	_forward4p(8, &X[i8], r2[j8], r1_8, ir1_8);\n" \
+"	const uint4 r1_2 = r1[j2], ir1_2 = ir1[j2];\n" \
+"	_forward4p(2, &X[i2], r2[j2], r1_2, ir1_2);\n" \
 "	_square2(&X[i_0]);\n" \
-"	_backward4(2, &X[i2], r2ir2[j2].s23, r1ir1[j2]);\n" \
-"	_backward4(8, &X[i8], r2ir2[j8].s23, r1ir1[j8]);\n" \
-"	_backward4(32, &X[i32], r2ir2[j32].s23, r1ir1[j32]);\n" \
-"	_backward4(128, &X[i128], r2ir2[j128].s23, r1ir1[j128]);\n" \
-"	_backward4o(512, &x[k512], 512, &X[i512], r2ir2[j512].s23, r1ir1[j512]);\n" \
+"	_backward4p(2, &X[i2], ir2[j2], r1_2, ir1_2);\n" \
+"	_backward4p(8, &X[i8], ir2[j8], r1_8, ir1_8);\n" \
+"	_backward4p(32, &X[i32], ir2[j32], r1_32, ir1_32);\n" \
+"	_backward4p(128, &X[i128], ir2[j128], r1_128, ir1_128);\n" \
+"	_backward4po(512, &x[k512], 512, &X[i512], ir2[j512], r1_512, ir1_512);\n" \
 "}\n" \
 "";
