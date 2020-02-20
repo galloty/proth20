@@ -175,11 +175,9 @@ private:
 			else /*if (m == 2)*/ f[n] = func(&engine::square8);
 			++n;
 
-			for (size_t i = 0; i < sol.size(); ++i)
+			for (size_t i = sol.size() - 1; i >= 1; --i)
 			{
-				const size_t ri = sol.size() - 1 - i;
-
-				const slice & s = sol[ri];
+				const slice & s = sol[i];
 				if (s.m == 1024)
 				{
 					m *= 1024;
@@ -204,6 +202,24 @@ private:
 				}
 				++n;
 			}
+
+			if (s.m == 1024)
+			{
+				if (s.chunk == 1) f[n] = func(&engine::lst_intt1024_1);
+				if (s.chunk == 2) f[n] = func(&engine::lst_intt1024_2);
+				if (s.chunk == 4) f[n] = func(&engine::lst_intt1024_4);
+			}
+			else if (s.m == 256)
+			{
+				if (s.chunk == 4) f[n] = func(&engine::lst_intt256_4);
+				if (s.chunk == 8) f[n] = func(&engine::lst_intt256_8);
+				if (s.chunk == 16) f[n] = func(&engine::lst_intt256_16);
+			}
+			else if (s.m == 64)
+			{
+				if (s.chunk == 16) f[n] = func(&engine::lst_intt64_16);
+			}
+			++n;
 
 			_n = n;
 		}

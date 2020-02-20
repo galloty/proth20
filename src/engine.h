@@ -15,13 +15,13 @@ private:
 	size_t _size = 0, _constant_size = 0;
 	cl_mem _x = nullptr, _y = nullptr, _t = nullptr, _cr = nullptr, _u = nullptr, _tu = nullptr, _v = nullptr, _m1 = nullptr, _m2 = nullptr, _err = nullptr;
 	cl_mem _r1ir1 = nullptr, _r2 = nullptr, _ir2 = nullptr, _cr1 = nullptr, _cir1 = nullptr, _cr2 = nullptr, _cir2 = nullptr, _bp = nullptr, _ibp = nullptr;
-	cl_kernel _sub_ntt64_16 = nullptr, _ntt64_16 = nullptr, _intt64_16 = nullptr;
-	cl_kernel _sub_ntt256_4 = nullptr, _ntt256_4 = nullptr, _intt256_4 = nullptr;
-	cl_kernel _sub_ntt256_8 = nullptr, _ntt256_8 = nullptr, _intt256_8 = nullptr;
-	cl_kernel _sub_ntt256_16 = nullptr, _ntt256_16 = nullptr, _intt256_16 = nullptr;
-	cl_kernel _sub_ntt1024_1 = nullptr, _ntt1024_1 = nullptr, _intt1024_1 = nullptr;
-	cl_kernel _sub_ntt1024_2 = nullptr, _ntt1024_2 = nullptr, _intt1024_2 = nullptr;
-	cl_kernel _sub_ntt1024_4 = nullptr, _ntt1024_4 = nullptr, _intt1024_4 = nullptr;
+	cl_kernel _sub_ntt64_16 = nullptr, _lst_intt64_16 = nullptr, _ntt64_16 = nullptr, _intt64_16 = nullptr;
+	cl_kernel _sub_ntt256_4 = nullptr, _lst_intt256_4 = nullptr, _ntt256_4 = nullptr, _intt256_4 = nullptr;
+	cl_kernel _sub_ntt256_8 = nullptr, _lst_intt256_8 = nullptr, _ntt256_8 = nullptr, _intt256_8 = nullptr;
+	cl_kernel _sub_ntt256_16 = nullptr, _lst_intt256_16 = nullptr, _ntt256_16 = nullptr, _intt256_16 = nullptr;
+	cl_kernel _sub_ntt1024_1 = nullptr, _lst_intt1024_1 = nullptr, _ntt1024_1 = nullptr, _intt1024_1 = nullptr;
+	cl_kernel _sub_ntt1024_2 = nullptr, _lst_intt1024_2 = nullptr, _ntt1024_2 = nullptr, _intt1024_2 = nullptr;
+	cl_kernel _sub_ntt1024_4 = nullptr, _lst_intt1024_4 = nullptr, _ntt1024_4 = nullptr, _intt1024_4 = nullptr;
 	cl_kernel _square8 = nullptr, _square16 = nullptr, _square32 = nullptr, _square64 = nullptr, _square128 = nullptr, _square256 = nullptr;
 	cl_kernel _square512 = nullptr, _square1024 = nullptr, _square2048 = nullptr, _square4096 = nullptr;
 	cl_kernel _poly2int0_4_16 = nullptr, _poly2int0_4_32 = nullptr, _poly2int0_4_64 = nullptr, _poly2int1_4 = nullptr;
@@ -182,6 +182,9 @@ public:
 		_sub_ntt64_16 = _createNttKernel("sub_ntt64_16", true);
 		_sub_ntt256_4 = _createNttKernel("sub_ntt256_4", true);
 		_sub_ntt1024_1 = _createNttKernel("sub_ntt1024_1", true);
+		_lst_intt64_16 = _createNttKernel("lst_intt64_16", false);
+		_lst_intt256_4 = _createNttKernel("lst_intt256_4", false);
+		_lst_intt1024_1 = _createNttKernel("lst_intt1024_1", false);
 		_ntt64_16 = _createNttKernel("ntt64_16", true);
 		_ntt256_4 = _createNttKernel("ntt256_4", true);
 		_ntt1024_1 = _createNttKernel("ntt1024_1", true);
@@ -193,6 +196,8 @@ public:
 		{
 			_sub_ntt256_8 = _createNttKernel("sub_ntt256_8", true);
 			_sub_ntt1024_2 = _createNttKernel("sub_ntt1024_2", true);
+			_lst_intt256_8 = _createNttKernel("lst_intt256_8", false);
+			_lst_intt1024_2 = _createNttKernel("lst_intt1024_2", false);
 			_ntt256_8 = _createNttKernel("ntt256_8", true);
 			_ntt1024_2 = _createNttKernel("ntt1024_2", true);
 			_intt256_8 = _createNttKernel("intt256_8", false);
@@ -203,6 +208,8 @@ public:
 		{
 			_sub_ntt256_16 = _createNttKernel("sub_ntt256_16", true);
 			_sub_ntt1024_4 = _createNttKernel("sub_ntt1024_4", true);
+			_lst_intt256_16 = _createNttKernel("lst_intt256_16", false);
+			_lst_intt1024_4 = _createNttKernel("lst_intt1024_4", false);
 			_ntt256_16 = _createNttKernel("ntt256_16", true);
 			_ntt1024_4 = _createNttKernel("ntt1024_4", true);
 			_intt256_16 = _createNttKernel("intt256_16", false);
@@ -294,13 +301,13 @@ public:
 		std::ostringstream ss; ss << "Release ocl kernels." << std::endl;
 		pio::display(ss.str());
 #endif
-		_releaseKernel(_sub_ntt64_16); _releaseKernel(_ntt64_16); _releaseKernel(_intt64_16);
-		_releaseKernel(_sub_ntt256_4); _releaseKernel(_ntt256_4); _releaseKernel(_intt256_4);
-		_releaseKernel(_sub_ntt256_8); _releaseKernel(_ntt256_8); _releaseKernel(_intt256_8);
-		_releaseKernel(_sub_ntt256_16); _releaseKernel(_ntt256_16); _releaseKernel(_intt256_16);
-		_releaseKernel(_sub_ntt1024_1); _releaseKernel(_ntt1024_1); _releaseKernel(_intt1024_1);
-		_releaseKernel(_sub_ntt1024_2); _releaseKernel(_ntt1024_2); _releaseKernel(_intt1024_2);
-		_releaseKernel(_sub_ntt1024_4); _releaseKernel(_ntt1024_4); _releaseKernel(_intt1024_4);
+		_releaseKernel(_sub_ntt64_16); _releaseKernel(_lst_intt64_16); _releaseKernel(_ntt64_16); _releaseKernel(_intt64_16);
+		_releaseKernel(_sub_ntt256_4); _releaseKernel(_lst_intt256_4); _releaseKernel(_ntt256_4); _releaseKernel(_intt256_4);
+		_releaseKernel(_sub_ntt256_8); _releaseKernel(_lst_intt256_8); _releaseKernel(_ntt256_8); _releaseKernel(_intt256_8);
+		_releaseKernel(_sub_ntt256_16); _releaseKernel(_lst_intt256_16); _releaseKernel(_ntt256_16); _releaseKernel(_intt256_16);
+		_releaseKernel(_sub_ntt1024_1); _releaseKernel(_lst_intt1024_1); _releaseKernel(_ntt1024_1); _releaseKernel(_intt1024_1);
+		_releaseKernel(_sub_ntt1024_2); _releaseKernel(_lst_intt1024_2); _releaseKernel(_ntt1024_2); _releaseKernel(_intt1024_2);
+		_releaseKernel(_sub_ntt1024_4); _releaseKernel(_lst_intt1024_4); _releaseKernel(_ntt1024_4); _releaseKernel(_intt1024_4);
 
 		_releaseKernel(_square8); _releaseKernel(_square16); _releaseKernel(_square32); _releaseKernel(_square64); _releaseKernel(_square128);
 		_releaseKernel(_square256); _releaseKernel(_square512); _releaseKernel(_square1024); _releaseKernel(_square2048); _releaseKernel(_square4096);
@@ -371,6 +378,14 @@ public:
 	void sub_ntt1024_1(const cl_uint, const cl_uint) { _executeKernel(_sub_ntt1024_1, _size / 4, 1024 / 4 * 1); }
 	void sub_ntt1024_2(const cl_uint, const cl_uint) { _executeKernel(_sub_ntt1024_2, _size / 4, 1024 / 4 * 2); }
 	void sub_ntt1024_4(const cl_uint, const cl_uint) { _executeKernel(_sub_ntt1024_4, _size / 4, 1024 / 4 * 4); }
+
+	void lst_intt64_16(const cl_uint, const cl_uint) { _executeKernel(_lst_intt64_16, _size / 4, 64 / 4 * 16); }
+	void lst_intt256_4(const cl_uint, const cl_uint) { _executeKernel(_lst_intt256_4, _size / 4, 256 / 4 * 4); }
+	void lst_intt256_8(const cl_uint, const cl_uint) { _executeKernel(_lst_intt256_8, _size / 4, 256 / 4 * 8); }
+	void lst_intt256_16(const cl_uint, const cl_uint) { _executeKernel(_lst_intt256_16, _size / 4, 256 / 4 * 16); }
+	void lst_intt1024_1(const cl_uint, const cl_uint) { _executeKernel(_lst_intt1024_1, _size / 4, 1024 / 4 * 1); }
+	void lst_intt1024_2(const cl_uint, const cl_uint) { _executeKernel(_lst_intt1024_2, _size / 4, 1024 / 4 * 2); }
+	void lst_intt1024_4(const cl_uint, const cl_uint) { _executeKernel(_lst_intt1024_4, _size / 4, 1024 / 4 * 4); }
 
 private:
 	inline void _executeNttKernel(cl_kernel kernel, const cl_uint m, const cl_uint rindex, const size_t size)

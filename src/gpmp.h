@@ -15,6 +15,7 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #include <cstdint>
 #include <cmath>
 #include <sstream>
+#include <vector>
 
 #include "ocl/modarith.h"
 #include "ocl/NTT.h"
@@ -74,7 +75,7 @@ private:
 	const bool _ext512, _ext1024;
 	engine & _engine;
 	plan _plan;
-	cl_uint2 * const _mem;
+	std::vector<cl_uint2> _mem;
 
 private:
 	template <uint32_t p> class Zp
@@ -223,13 +224,9 @@ private:
 		_engine.createKernels(_ext512, _ext1024);
 
 		// (size + 2) / 3 roots
-		cl_uint4 * const r1ir1 = new cl_uint4[size];
-		cl_uint2 * const r2 = new cl_uint2[size];
-		cl_uint2 * const ir2 = new cl_uint2[size];
-		cl_uint4 * const cr1 = new cl_uint4[constant_size];
-		cl_uint4 * const cir1 = new cl_uint4[constant_size];
-		cl_uint4 * const cr2 = new cl_uint4[constant_size];
-		cl_uint4 * const cir2 = new cl_uint4[constant_size];
+		std::vector<cl_uint4> r1ir1(size);
+		std::vector<cl_uint2> r2(size), ir2(size);
+		std::vector<cl_uint4> cr1(constant_size), cir1(constant_size), cr2(constant_size), cir2(constant_size);
 		RNS ps = RNS::prRoot(size), ips = ps.invert();
 		size_t j = 0;
 		for (size_t m = size / 4; m > 1; m /= 4)
@@ -256,18 +253,10 @@ private:
 			}
 			ps *= ps; ps *= ps; ips *= ips; ips *= ips;
 		}
-		_engine.writeMemory_r(r1ir1, r2, ir2);
-		_engine.writeMemory_cr(cr1, cir1, cr2, cir2);
-		delete[] r1ir1;
-		delete[] r2;
-		delete[] ir2;
-		delete[] cr1;
-		delete[] cir1;
-		delete[] cr2;
-		delete[] cir2;
+		_engine.writeMemory_r(r1ir1.data(), r2.data(), ir2.data());
+		_engine.writeMemory_cr(cr1.data(), cir1.data(), cr2.data(), cir2.data());
 
-		cl_uint * const bp = new cl_uint[size / 2];
-		cl_uint * const ibp = new uint32_t[size / 2];
+		std::vector<cl_uint> bp(size / 2), ibp(size / 2);
 		const uint32_t ib = arith::invert(uint32_t(1) << _digit_bit, _k);
 		uint32_t bp_i = 1, ibp_i = ib;
 		for (size_t i = 0; i < size / 2; ++i)
@@ -277,9 +266,7 @@ private:
 			bp_i = uint32_t((uint64_t(bp_i) << _digit_bit) % _k);
 			ibp_i = uint32_t((uint64_t(ibp_i) * ib) % _k);
 		}
-		_engine.writeMemory_bp(bp, ibp);
-		delete[] bp;
-		delete[] ibp;
+		_engine.writeMemory_bp(bp.data(), ibp.data());
 
 		_engine.clearMemory_err();
 	}
@@ -296,7 +283,7 @@ public:
 	gpmp(const uint32_t k, const uint32_t n, engine & engine, const bool isBoinc, const bool bestPlan = true, const bool profile = false) :
 		_digit_bit(digitBit(k, n)), _size(transformSize(k, n, _digit_bit)), _k(k), _n(n), _isBoinc(isBoinc),
 		_ext512(engine.getMaxWorkGroupSize() >= 512), _ext1024((engine.getMaxWorkGroupSize() >= 1024) && (engine.getLocalMemSize() >= 32768)),
-		_engine(engine), _mem(new cl_uint2[_size])
+		_engine(engine), _mem(_size)
 	{
 		const size_t size = _size;
 
@@ -359,8 +346,6 @@ public:
 	virtual ~gpmp()
 	{
 		_clearEngine();
-
-		delete[] _mem;
 	}
 
 public:
@@ -376,10 +361,10 @@ public:
 	void setPlanPoly2intFn(const size_t i) { _plan.setPoly2intFn(i); }
 
 public:
-	void display() const
+	void display()
 	{
 		const size_t size = _size / 2;
-		cl_uint2 * const x = _mem;
+		cl_uint2 * const x = _mem.data();
 		_engine.readMemory_x(x);
 		std::stringstream ss; ss << std::endl;
 		for (size_t i = 0; i < size; ++i)
@@ -459,7 +444,7 @@ public:
 		}
 
 		const size_t size = _size;
-		cl_uint2 * const mem = _mem;
+		cl_uint2 * const mem = _mem.data();
 
 		const uint32_t version = 0;
 		if (!_writeContext(cFile, reinterpret_cast<const char *>(&version), sizeof(version))) return false;
@@ -491,7 +476,7 @@ public:
 		if (cFile == nullptr) return false;
 
 		const size_t size = _size;
-		cl_uint2 * const mem = _mem;
+		cl_uint2 * const mem = _mem.data();
 		for (size_t k = 0; k < size; ++k) mem[k] = set2(0, 0);	// read size / 2, the upper part must be zero
 
 		uint32_t version = 0;
@@ -529,12 +514,12 @@ public:
 	{
 		const size_t size = _size;
 
-		cl_uint2 * const x = _mem;
+		cl_uint2 * const x = _mem.data();
 		x[0] = set2(x0, 0);
 		for (size_t i = 1; i < size; ++i) x[i] = set2(0, 0);
 		_engine.writeMemory_x(x);
 
-		cl_uint2 * const u = _mem;
+		cl_uint2 * const u = _mem.data();
 		u[0] = set2(u0, 0);
 		for (size_t i = 1; i < size; ++i) u[i] = set2(0, 0);
 		_engine.writeMemory_u(u);
@@ -545,12 +530,12 @@ public:
 	{
 		const size_t size = _size;
 
-		cl_uint2 * const x = _mem;
+		cl_uint2 * const x = _mem.data();
 		for (size_t i = 0; i < size / 2; ++i) x[i] = set2((uint32_t(1) << _digit_bit) - 1, 0);
 		for (size_t i = size / 2; i < size; ++i) x[i] = set2(0, 0);
 		_engine.writeMemory_x(x);
 
-		cl_uint2 * const u = _mem;
+		cl_uint2 * const u = _mem.data();
 		for (size_t i = 0 * size / 4; i < 1 * size / 4; ++i) u[i] = set2((uint32_t(1) << _digit_bit) - 1, 0);
 		for (size_t i = 1 * size / 4; i < 2 * size / 4; ++i) u[i] = set2(0, (uint32_t(1) << _digit_bit) - 1);
 		for (size_t i = size / 2; i < size; ++i) u[i] = set2(0, 0);
@@ -560,7 +545,7 @@ public:
 public:
 	void set_bug()
 	{
-		cl_uint2 * const x = _mem;
+		cl_uint2 * const x = _mem.data();
 		_engine.readMemory_x(x);
 		x[_size / 3].s[0] += 1;
 		_engine.writeMemory_x(x);
@@ -638,10 +623,12 @@ public:
 		cl_uint rindex = (16 + 4 + 1) * (m / 16);
 		m /= 64;
 
+		size_t n64 = 0;
 		for (; m > 256; m /= 64)
 		{
 			_engine.ntt64_16(m / 16, rindex);
 			rindex += (16 + 4 + 1) * (m / 16);
+			++n64;
 		}
 
 		size_t n4 = 0;
@@ -663,12 +650,14 @@ public:
 			_engine.intt4(m, rindex);
 		}
 
-		while (m < cl_uint(size / 4))
+		for (; n64 != 0; --n64)
 		{
 			m *= 64;
 			rindex -= (16 + 4 + 1) * (m / 16);
 			_engine.intt64_16(m / 16, rindex);
 		}
+
+		_engine.lst_intt64_16(0, 0);
 
 		_engine.poly2int_16_16();
 
@@ -685,7 +674,7 @@ public:
 		_engine.add1_m1();
 		_engine.reduce_z_m1();
 
-		cl_uint2 * const res = _mem;
+		cl_uint2 * const res = _mem.data();
 
 		_engine.readMemory_m1(res);
 

@@ -89,7 +89,7 @@ void intt4(__global uint2 * restrict const x, __global const uint4 * restrict co
 	__local uint2 X[M * CHUNK]; \
 	const size_t local_id = get_local_id(0), chunk_idx = local_id % CHUNK, threadIdx = local_id / CHUNK, block_idx = get_group_id(0) * CHUNK;
 
-#define SETVAR_SUB_NTT(M) \
+#define SETVAR_FL_NTT(M) \
 	__global uint2 * const xo = x; \
 	const size_t bl_i = block_idx | chunk_idx; \
 	const size_t m = (pconst_size / 4) / (M / 4);
@@ -101,10 +101,17 @@ void intt4(__global uint2 * restrict const x, __global const uint4 * restrict co
 
 #define SUB_NTT64(CHUNK) \
 	SETVAR(64, CHUNK); \
-	SETVAR_SUB_NTT(64); \
+	SETVAR_FL_NTT(64); \
 	SUB_FORWARD4i(16, CHUNK); \
 	FORWARD4(4, CHUNK, 16 * m); \
 	FORWARD4o(CHUNK, 16 * m + 4 * m);
+
+#define LST_INTT64(CHUNK) \
+	SETVAR(64, CHUNK); \
+	SETVAR_FL_NTT(64); \
+	BACKWARD4i(CHUNK, 16 * m + 4 * m); \
+	BACKWARD4(4, CHUNK, 16 * m); \
+	BACKWARD4o(16, CHUNK, 0);
 
 #define NTT64(CHUNK) \
 	SETVAR(64, CHUNK); \
@@ -122,11 +129,19 @@ void intt4(__global uint2 * restrict const x, __global const uint4 * restrict co
 
 #define SUB_NTT256(CHUNK) \
 	SETVAR(256, CHUNK); \
-	SETVAR_SUB_NTT(256); \
+	SETVAR_FL_NTT(256); \
 	SUB_FORWARD4i(64, CHUNK); \
 	FORWARD4(16, CHUNK, 64 * m); \
 	FORWARD4(4, CHUNK, 64 * m + 16 * m); \
 	FORWARD4o(CHUNK, 64 * m + 16 * m + 4 * m);
+
+#define LST_INTT256(CHUNK) \
+	SETVAR(256, CHUNK); \
+	SETVAR_FL_NTT(256); \
+	BACKWARD4i(CHUNK, 64 * m + 16 * m + 4 * m); \
+	BACKWARD4(4, CHUNK, 64 * m + 16 * m); \
+	BACKWARD4(16, CHUNK, 64 * m); \
+	BACKWARD4o(64, CHUNK, 0);
 
 #define NTT256(CHUNK) \
 	SETVAR(256, CHUNK); \
@@ -146,12 +161,21 @@ void intt4(__global uint2 * restrict const x, __global const uint4 * restrict co
 
 #define SUB_NTT1024(CHUNK) \
 	SETVAR(1024, CHUNK); \
-	SETVAR_SUB_NTT(1024); \
+	SETVAR_FL_NTT(1024); \
 	SUB_FORWARD4i(256, CHUNK); \
 	FORWARD4(64, CHUNK, 256 * m); \
 	FORWARD4(16, CHUNK, 256 * m + 64 * m); \
 	FORWARD4(4, CHUNK, 256 * m + 64 * m + 16 * m); \
 	FORWARD4o(CHUNK, 256 * m + 64 * m + 16 * m + 4 * m);
+
+#define LST_INTT1024(CHUNK) \
+	SETVAR(1024, CHUNK); \
+	SETVAR_FL_NTT(1024); \
+	BACKWARD4i(CHUNK, 256 * m + 64 * m + 16 * m + 4 * m); \
+	BACKWARD4(4, CHUNK, 256 * m + 64 * m + 16 * m); \
+	BACKWARD4(16, CHUNK, 256 * m + 64 * m); \
+	BACKWARD4(64, CHUNK, 256 * m); \
+	BACKWARD4o(256, CHUNK, 0);
 
 #define NTT1024(CHUNK) \
 	SETVAR(1024, CHUNK); \
@@ -179,6 +203,12 @@ void sub_ntt64_16(__global uint2 * restrict const x, __global const uint4 * rest
 }
 
 __kernel __attribute__((reqd_work_group_size(64 / 4 * 16, 1, 1)))
+void lst_intt64_16(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2)
+{
+	LST_INTT64(16);
+}
+
+__kernel __attribute__((reqd_work_group_size(64 / 4 * 16, 1, 1)))
 void ntt64_16(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
 {
 	NTT64(16);
@@ -198,6 +228,12 @@ void sub_ntt256_4(__global uint2 * restrict const x, __global const uint4 * rest
 }
 
 __kernel __attribute__((reqd_work_group_size(256 / 4 * 4, 1, 1)))
+void lst_intt256_4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2)
+{
+	LST_INTT256(4);
+}
+
+__kernel __attribute__((reqd_work_group_size(256 / 4 * 4, 1, 1)))
 void ntt256_4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
 {
 	NTT256(4);
@@ -214,6 +250,12 @@ __kernel __attribute__((reqd_work_group_size(1024 / 4 * 1, 1, 1)))
 void sub_ntt1024_1(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2)
 {
 	SUB_NTT1024(1);
+}
+
+__kernel __attribute__((reqd_work_group_size(1024 / 4 * 1, 1, 1)))
+void lst_intt1024_1(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2)
+{
+	LST_INTT1024(1);
 }
 
 __kernel __attribute__((reqd_work_group_size(1024 / 4 * 1, 1, 1)))

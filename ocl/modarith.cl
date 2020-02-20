@@ -29,14 +29,13 @@ P =  15 * 2^27 + 1 = 2013265921 => R = 2290649223, h < 1.93
 #define	P2			2013265921u		//  15 * 2^27 + 1 = 2^31 - 2^27 + 1
 #define	P1_INV		2164392967u		// 2^62 / P1
 #define	P2_INV 		2290649223u		// 2^62 / P2
-#define	P1_I		2113994754u		// P1_PRIM_ROOT^((P1 - 1) / 4)
-#define	P2_I		1728404513u		// P2_PRIM_ROOT^((P2 - 1) / 4)
+#define	P1_I		2113994754u		// P1_PRIM_ROOT = 3,  P1_PRIM_ROOT^((P1 - 1) / 4)
+#define	P2_I		1728404513u		// P2_PRIM_ROOT = 31, P2_PRIM_ROOT^((P2 - 1) / 4)
 #define	P1_Ip		4261280761u		// (P1_I * 2^32) / P1
 #define	P2_Ip		3687262959u		// (P2_I * 2^32) / P2
 #define	InvP2_P1	913159918u		// 1 / P2 mod P1
 #define	InvP2_P1p	1840700306u		// (InvP2_P1 * 2^32) / P1
 #define	P1P2		(P1 * (ulong)(P2))
-
 
 inline uint _rem(const ulong q, const uint d, const uint d_inv, const int d_shift)
 {

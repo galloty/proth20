@@ -14,6 +14,12 @@ void sub_ntt256_16(__global uint2 * restrict const x, __global const uint4 * res
 }
 
 __kernel __attribute__((reqd_work_group_size(256 / 4 * 16, 1, 1)))
+void lst_intt256_16(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2)
+{
+	LST_INTT256(16);
+}
+
+__kernel __attribute__((reqd_work_group_size(256 / 4 * 16, 1, 1)))
 void ntt256_16(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)
 {
 	NTT256(16);
@@ -30,6 +36,12 @@ __kernel __attribute__((reqd_work_group_size(1024 / 4 * 4, 1, 1)))
 void sub_ntt1024_4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2)
 {
 	SUB_NTT1024(4);
+}
+
+__kernel __attribute__((reqd_work_group_size(1024 / 4 * 4, 1, 1)))
+void lst_intt1024_4(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2)
+{
+	LST_INTT1024(4);
 }
 
 __kernel __attribute__((reqd_work_group_size(1024 / 4 * 4, 1, 1)))

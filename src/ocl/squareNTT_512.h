@@ -20,6 +20,12 @@ static const char * const src_ocl_squareNTT_512 = \
 "}\n" \
 "\n" \
 "__kernel __attribute__((reqd_work_group_size(256 / 4 * 8, 1, 1)))\n" \
+"void lst_intt256_8(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2)\n" \
+"{\n" \
+"	LST_INTT256(8);\n" \
+"}\n" \
+"\n" \
+"__kernel __attribute__((reqd_work_group_size(256 / 4 * 8, 1, 1)))\n" \
 "void ntt256_8(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2, const uint m, const uint rindex)\n" \
 "{\n" \
 "	NTT256(8);\n" \
@@ -36,6 +42,12 @@ static const char * const src_ocl_squareNTT_512 = \
 "void sub_ntt1024_2(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const r2)\n" \
 "{\n" \
 "	SUB_NTT1024(2);\n" \
+"}\n" \
+"\n" \
+"__kernel __attribute__((reqd_work_group_size(1024 / 4 * 2, 1, 1)))\n" \
+"void lst_intt1024_2(__global uint2 * restrict const x, __global const uint4 * restrict const r1ir1, __global const uint2 * restrict const ir2)\n" \
+"{\n" \
+"	LST_INTT1024(2);\n" \
 "}\n" \
 "\n" \
 "__kernel __attribute__((reqd_work_group_size(1024 / 4 * 2, 1, 1)))\n" \

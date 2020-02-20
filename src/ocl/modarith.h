@@ -37,14 +37,13 @@ static const char * const src_ocl_modarith = \
 "#define	P2			2013265921u		//  15 * 2^27 + 1 = 2^31 - 2^27 + 1\n" \
 "#define	P1_INV		2164392967u		// 2^62 / P1\n" \
 "#define	P2_INV 		2290649223u		// 2^62 / P2\n" \
-"#define	P1_I		2113994754u		// P1_PRIM_ROOT^((P1 - 1) / 4)\n" \
-"#define	P2_I		1728404513u		// P2_PRIM_ROOT^((P2 - 1) / 4)\n" \
+"#define	P1_I		2113994754u		// P1_PRIM_ROOT = 3,  P1_PRIM_ROOT^((P1 - 1) / 4)\n" \
+"#define	P2_I		1728404513u		// P2_PRIM_ROOT = 31, P2_PRIM_ROOT^((P2 - 1) / 4)\n" \
 "#define	P1_Ip		4261280761u		// (P1_I * 2^32) / P1\n" \
 "#define	P2_Ip		3687262959u		// (P2_I * 2^32) / P2\n" \
 "#define	InvP2_P1	913159918u		// 1 / P2 mod P1\n" \
 "#define	InvP2_P1p	1840700306u		// (InvP2_P1 * 2^32) / P1\n" \
 "#define	P1P2		(P1 * (ulong)(P2))\n" \
-"\n" \
 "\n" \
 "inline uint _rem(const ulong q, const uint d, const uint d_inv, const int d_shift)\n" \
 "{\n" \
@@ -116,7 +115,6 @@ static const char * const src_ocl_modarith = \
 "\n" \
 "inline uint2 mulI(const uint2 lhs)\n" \
 "{\n" \
-"	// return mulmod(lhs, (uint2)(P1_I, P2_I));\n" \
 "	return (uint2)(_mulmodp(lhs.s0, P1, P1_I, P1_Ip), _mulmodp(lhs.s1, P2, P2_I, P2_Ip));\n" \
 "}\n" \
 "\n" \

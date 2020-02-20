@@ -377,17 +377,16 @@ public:
 			size_t logSize; clGetProgramBuildInfo(_program, _device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &logSize);
 			if (logSize > 2)
 			{
-				char * buildLog = new char[logSize + 1];
-				clGetProgramBuildInfo(_program, _device, CL_PROGRAM_BUILD_LOG, logSize, buildLog, nullptr);
+				std::vector<char> buildLog(logSize + 1);
+				clGetProgramBuildInfo(_program, _device, CL_PROGRAM_BUILD_LOG, logSize, buildLog.data(), nullptr);
 				buildLog[logSize] = '\0';
-				std::ostringstream ss; ss << buildLog << std::endl;
+				std::ostringstream ss; ss << buildLog.data() << std::endl;
 				pio::print(ss.str());
 #if defined (ocl_debug)
 				std::ofstream fileOut("pgm.log"); 
-				fileOut << buildLog << std::endl;
+				fileOut << buildLog.data() << std::endl;
 				fileOut.close();
 #endif
-				delete[] buildLog;
 			}
 		}
 
@@ -395,12 +394,11 @@ public:
 
 #if defined (ocl_debug)
 		size_t binSize; clGetProgramInfo(_program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t), &binSize, nullptr);
-		char * binary = new char[binSize];
+		std::vector<char> binary(binSize);
 		clGetProgramInfo(_program, CL_PROGRAM_BINARIES, sizeof(char *), &binary, nullptr);
 		std::ofstream fileOut("pgm.txt", std::ios::binary);
-		fileOut.write(binary, binSize);
+		fileOut.write(binary.data(), binSize);
 		fileOut.close();
-		delete[] binary;
 #endif	
 	}
 
@@ -431,10 +429,9 @@ protected:
 		oclFatal(err);
 		if (clear)
 		{
-			uint8_t * const ptr = new uint8_t[size];
+			std::vector<uint8_t> ptr(size);
 			for (size_t i = 0; i < size; ++i) ptr[i] = 0x00;	// debug 0xff;
-			oclFatal(clEnqueueWriteBuffer(_queue, mem, CL_TRUE, 0, size, ptr, 0, nullptr, nullptr));
-			delete[] ptr;
+			oclFatal(clEnqueueWriteBuffer(_queue, mem, CL_TRUE, 0, size, ptr.data(), 0, nullptr, nullptr));
 		}
 		return mem;
 	}
