@@ -50,12 +50,12 @@ static const char * const src_ocl_misc = \
 "}\n" \
 "\n" \
 "__kernel\n" \
-"void add1(__global uint2 * restrict const x)\n" \
+"void add1(__global uint2 * restrict const x, const uint a)\n" \
 "{\n" \
-"	// s0: += 1\n" \
+"	// s0: += a\n" \
 "	// s1: 0 => k.2^n + 1 for reduce_z step\n" \
 "\n" \
-"	uint c = x[0].s0 + 1;\n" \
+"	uint c = x[0].s0 + a;\n" \
 "	x[0] = (uint2)(c & digit_mask, 1);\n" \
 "	c >>= digit_bit;\n" \
 "\n" \

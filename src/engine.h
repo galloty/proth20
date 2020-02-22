@@ -504,7 +504,11 @@ public:
 
 public:
 	void set_positive() { _executeKernel(_set_positive, 1); }
-	void add1_m1() { _executeKernel(_add1, 1); }
+	void add1_m1(const cl_uint a)
+	{
+		_setKernelArg(_add1, 1, sizeof(cl_uint), &a);
+		_executeKernel(_add1, 1);
+	}
 
 public:
 	void set_positive_tu()
@@ -524,6 +528,7 @@ private:
 
 public:
 	void swap_x_u() { _executeSwapKernel(&_x, &_u); }
+	void swap_x_v() { _executeSwapKernel(&_x, &_v); }
 	void swap_x_m1() { _executeSwapKernel(&_x, &_m1); }
 	void swap_x_m2() { _executeSwapKernel(&_x, &_m2); }
 
@@ -543,6 +548,7 @@ public:
 	void copy_u_x() { _executeCopyKernel(&_x, &_u); }
 	void copy_u_m1() { _executeCopyKernel(&_m1, &_u); }
 	void copy_u_tu() { _executeCopyKernel(&_tu, &_u); }
+	void copy_v_x() { _executeCopyKernel(&_x, &_v); }
 	void copy_v_u() { _executeCopyKernel(&_u, &_v); }
 	void copy_m1_u() { _executeCopyKernel(&_u, &_m1); }
 

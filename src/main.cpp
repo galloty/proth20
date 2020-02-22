@@ -76,7 +76,9 @@ private:
 	{
 		std::ostringstream ss;
 		ss << "Usage: proth20 [options]  options may be specified in any order" << std::endl;
-		ss << "  -q \"k*2^n+1\"            test expression primality" << std::endl;
+		ss << "  -q \"k*2^n+1\"            test expression (default primality)" << std::endl;
+		ss << "  -o <a>                  compute the multiplicative order of a modulo k*2^n+1" << std::endl;
+		ss << "  -f                      Fermat and Generalized Fermat factor test" << std::endl;
 		ss << "  -d <n> or --device <n>  set device number=<n> (default 0)" << std::endl;
 		ss << "  -b                      run benchmark" << std::endl;
 		ss << "  -v or -V                print the startup banner and immediately exit" << std::endl;
@@ -120,8 +122,8 @@ public:
 		ocl::platform platform;
 		platform.displayDevices();
 
-		bool bPrime = false, bBench = false;
-		uint32_t k = 0, n = 0;
+		bool bPrime = false, bBench = false, bOrder = false, bGFN = false;
+		uint32_t k = 0, n = 0, a = 0;
 		size_t d = 0;
 		// parse args
 		for (size_t i = 0, size = args.size(); i < size; ++i)
@@ -129,6 +131,7 @@ public:
 			const std::string & arg = args[i];
 
 			if (arg == "-b") bBench = true;
+			else if (arg == "-f") bGFN = true;
 			else if (arg.substr(0, 2) == "-q")
 			{
 				const std::string exp = ((arg == "-q") && (i + 1 < size)) ? args[++i] : arg.substr(2);
@@ -143,6 +146,12 @@ public:
 				if (n > 99999999) throw std::runtime_error("n > 99999999 is not supported");
 
 				bPrime = true;
+			}
+			else if (arg.substr(0, 2) == "-o")
+			{
+				const std::string dev = ((arg == "-o") && (i + 1 < size)) ? args[++i] : arg.substr(2);
+				a = std::atoi(dev.c_str());
+				bOrder = true;
 			}
 			else if (arg.substr(0, 2) == "-d")
 			{
@@ -164,7 +173,9 @@ public:
 		if (bPrime)
 		{
 			engine engine(platform, d);
-			p.check(k, n, engine);
+			if (bOrder) p.check_order(k, n, a, engine);
+			else if (bGFN) p.check_gfn(k, n, engine);
+			else p.check(k, n, engine);
 		}
 
 		if (bBoinc) boinc_finish(EXIT_SUCCESS);

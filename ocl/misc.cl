@@ -42,12 +42,12 @@ void set_positive(__global uint2 * restrict const x)
 }
 
 __kernel
-void add1(__global uint2 * restrict const x)
+void add1(__global uint2 * restrict const x, const uint a)
 {
-	// s0: += 1
+	// s0: += a
 	// s1: 0 => k.2^n + 1 for reduce_z step
 
-	uint c = x[0].s0 + 1;
+	uint c = x[0].s0 + a;
 	x[0] = (uint2)(c & digit_mask, 1);
 	c >>= digit_bit;
 

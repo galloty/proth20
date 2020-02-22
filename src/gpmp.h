@@ -564,7 +564,9 @@ public:
 public:
 	void swap_x_u() { _engine.swap_x_u(); }
 	void copy_x_u() { _engine.copy_x_u(); }
+	void swap_x_v() { _engine.swap_x_v(); }
 	void copy_x_v() { _engine.copy_x_v(); }
+	void copy_v_x() { _engine.copy_v_x(); }
 	void compare_u_v() { _engine.compare_u_v(); }
 
 public:
@@ -665,13 +667,33 @@ public:
 	}
 
 public:
+	void pow(const uint32_t e)
+	{
+		norm();
+
+		bool s = false;
+		_engine.copy_x_u();
+		setMultiplicand();
+		for (int b = 0; b < 32; ++b)
+		{
+			if (s) square();
+
+			if ((e & (uint32_t(1) << (31 - b))) != 0)
+			{
+				if (s) mul();
+				s = true;
+			}
+		}
+	}
+
+public:
 	bool isMinusOne(uint64_t & res64)
 	{
 		norm();
 
 		// res is x + 1 such that 0 <= res < k*2^n + 1
 		_engine.copy_x_m1();
-		_engine.add1_m1();
+		_engine.add1_m1(1);
 		_engine.reduce_z_m1();
 
 		cl_uint2 * const res = _mem.data();
@@ -679,10 +701,7 @@ public:
 		_engine.readMemory_m1(res);
 
 		bool isPrime = true;
-		for (size_t i = 0, n = _size / 2; i < n; ++i)
-		{
-			isPrime &= (res[i].s[0] == 0);
-		}
+		for (size_t i = 0, n = _size / 2; i < n; ++i) isPrime &= (res[i].s[0] == 0);
 
 		uint64_t r = 0, b = 1;
 		for (size_t i = 0; b != 0; ++i)
@@ -693,6 +712,28 @@ public:
 
 		res64 = r;
 		return isPrime;
+	}
+
+public:
+	bool isOne()
+	{
+		norm();
+
+		_engine.copy_x_m1();
+		_engine.add1_m1(0);
+		_engine.reduce_z_m1();
+
+		cl_uint2 * const res = _mem.data();
+
+		_engine.readMemory_m1(res);
+
+		bool isOne = (res[0].s[0] == 1);
+		if (isOne)
+		{
+			for (size_t i = 1, n = _size / 2; i < n; ++i) isOne &= (res[i].s[0] == 0);
+		}
+
+		return isOne;
 	}
 
 public:

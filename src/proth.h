@@ -79,16 +79,16 @@ public:
 	{
 		// X = a^k, left-to-right algorithm
 		bool s = false;
-		X.init(1, a);					// x = 1, u = a
-		X.setMultiplicand();			// x = 1, tu = NTT(u)
+		X.init(a, a);					// x = a, u = a
+		X.setMultiplicand();			// x = a, tu = NTT(u)
 		for (int b = 0; b < 32; ++b)
 		{
 			if (s) X.square();			// x = iNTT(NTT(x)^2)
 
 			if ((k & (uint32_t(1) << (31 - b))) != 0)
 			{
+				if (s) X.mul();			// x = iNTT(NTT(x).tu)
 				s = true;
-				X.mul();				// x = iNTT(NTT(x).tu)
 			}
 
 			if (_quit) return false;
@@ -153,6 +153,7 @@ public:
 		{
 			i0 = 0;
 			chrono.previousTime = 0;
+			// X = a^k
 			if (!apowk(X, a, k)) return false;
 			checkError(X);	// Sync GPU before benchmark
 		}
@@ -166,7 +167,7 @@ public:
 
 		if (_isBoinc) boinc_fraction_done(double(i0) / double(n));
 
-		// X = X^(2^(n - 1))
+		// X = X^{2^{n - 1}}
 		for (uint32_t i = i0 + 1; i < n; ++i)
 		{
 			X.square();
@@ -197,10 +198,7 @@ public:
 			// Robert Gerbicz error checking algorithm
 			// u is d(t) and v is u(0). They must be set before the loop
 			// if (i == n - 1) X.set_bug();	// test
-			if ((i & (L - 1)) == 0)
-			{
-				X.Gerbicz_step();
-			}
+			if ((i & (L - 1)) == 0) X.Gerbicz_step();
 
 			if (i % 1024 == 0)
 			{
@@ -304,6 +302,129 @@ public:
 	}
 
 public:
+	bool check_order(const uint32_t k, const uint32_t n, const uint32_t a, engine & engine)
+	{
+		gpmp X(k, n, engine, false);
+
+		chronometer chrono;
+		uint32_t i0;
+		const bool found = false;	// TODO: X.restoreContext(i0, chrono.previousTime);
+
+		std::ostringstream sst; sst << "Multiplicative order of " << a << ": " << std::endl;
+		sst << (found ? "Resuming from a checkpoint " : "Testing ");
+		sst << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^" << arith::log2(X.getSize())
+			<< " x " << X.getDigitBit() << " bits, plan: " << X.getPlanString() << std::endl;
+		pio::print(sst.str());
+
+		chrono.resetTime();
+
+		if (!found)
+		{
+			i0 = 0;
+			chrono.previousTime = 0;
+			// X = a
+			X.init(a, 0);
+		}
+
+		const uint32_t benchCnt = benchCount(n);
+		uint32_t benchIter = benchCnt;
+		chrono.resetBenchTime();
+		chrono.resetRecordTime();
+
+		uint32_t m = n;
+		if (m > 30)
+		{
+			for (uint32_t i = i0; i < m - 20; ++i)
+			{
+				X.square();
+
+				if (--benchIter == 0)
+				{
+					const double elapsedTime = chrono.getBenchTime();
+					const double mulTime = elapsedTime / benchCnt, estimatedTime = mulTime * (n - i);
+					std::ostringstream ssb; ssb << std::setprecision(3) << " " << i * 100.0 / n << "% done, "
+						<< timer::formatTime(estimatedTime) << " remaining, " <<  mulTime * 1e3 << " ms/mul.";
+					ssb << "        \r";
+					pio::display(ssb.str());
+					chrono.resetBenchTime();
+					benchIter = benchCnt;
+				}
+
+				if (i % 1024 == 0)
+				{
+					const double elapsedTime = chrono.getRecordTime();
+					if (elapsedTime > 600)
+					{
+						checkError(X);
+						//X.saveContext(i, chrono.getElapsedTime());
+						chrono.resetRecordTime();
+					}
+				}
+
+				if (_quit)
+				{
+					checkError(X);
+					//X.saveContext(i, chrono.getElapsedTime());
+					return false;
+				}
+			}
+
+			m = 20;
+		}
+
+		X.copy_x_v();
+		// X = a^{2^n}
+		for (uint32_t i = 0; i < m; ++i) X.square();
+		X.swap_x_v();
+
+		// X = a^{k.2^{n - m}}, V = a^{2^n}
+		X.pow(k);
+
+		if ((m != n) && X.isOne()) throw std::runtime_error("Multiplicative order computation failed!");
+
+		std::vector<std::pair<uint32_t, uint32_t>> fac_e, fac;
+		arith::factor(k, fac);
+
+		uint32_t e = n - m;
+		while (!X.isOne())
+		{
+			X.square();
+			++e;
+		}
+		if (e != 0) fac_e.push_back(std::make_pair(2, e));
+
+		for (const auto & f : fac)
+		{
+			const uint32_t pi = f.first, ei = f.second;
+
+			uint64_t E = k;
+			for (uint32_t i = 0; i < ei; ++i) E /= pi;
+
+			X.copy_v_x();
+			if (E > 1) X.pow(E);
+
+			uint32_t e = 0;
+			while (!X.isOne())
+			{
+				X.pow(pi);
+				++e;
+			}
+			if (e != 0) fac_e.push_back(std::make_pair(pi, e));
+		}
+
+		const std::string runtime = timer::formatTime(chrono.getElapsedTime());
+
+		std::ostringstream ssr; ssr << "p = " << k << " * 2^" << n << " + 1, ord_p(" << a << ") =";
+		for (const auto & f : fac_e) ssr << " " << f.first << "^" << f.second;
+		ssr << ", time = " << runtime << std::endl;
+
+		pio::display(std::string("\r") + ssr.str());
+		pio::result(ssr.str());
+
+		return true;
+	}
+
+public:
 	bool check_gfn(const uint32_t k, const uint32_t n, engine & engine)
 	{
 		gpmp X(k, n, engine, false);
@@ -324,11 +445,9 @@ public:
 		{
 			i0 = 0;
 			chrono.previousTime = 0;
-			X.init(2, 2);
-			X.copy_x_v();
+			// X = 2
+			X.init(2, 0);
 		}
-
-		const uint32_t L = 1 << (arith::log2(n) / 2);
 
 		const uint32_t benchCnt = benchCount(n);
 		uint32_t benchIter = benchCnt;
@@ -337,8 +456,8 @@ public:
 
 		uint32_t fermat_m = 0;
 
-		// X = X^(2^(n - 1))
-		for (uint32_t i = i0 + 1; i < n; ++i)
+		// X = X^{2^n}
+		for (uint32_t i = i0 + 1; i <= n; ++i)
 		{
 			X.square();
 
@@ -352,14 +471,6 @@ public:
 				pio::display(ssb.str());
 				chrono.resetBenchTime();
 				benchIter = benchCnt;
-			}
-
-			// Robert Gerbicz error checking algorithm
-			// u is d(t) and v is u(0). They must be set before the loop
-			// if (i == n - 1) X.set_bug();	// test
-			if ((i & (L - 1)) == 0)
-			{
-				X.Gerbicz_step();
 			}
 
 			if (i + 50 >= n)
@@ -382,7 +493,7 @@ public:
 					if (elapsedTime > 600)
 					{
 						checkError(X);
-						X.saveContext(i, chrono.getElapsedTime());
+						//X.saveContext(i, chrono.getElapsedTime());
 						chrono.resetRecordTime();
 					}
 				}
@@ -390,35 +501,22 @@ public:
 				if (_quit)
 				{
 					checkError(X);
-					X.saveContext(i, chrono.getElapsedTime());
+					//X.saveContext(i, chrono.getElapsedTime());
 					return false;
 				}
 			}
 		}
 
-		for (uint32_t i = n; true; ++i)
-		{
-			X.square();
-
-			if ((i & (L - 1)) == 0)
-			{
-				X.Gerbicz_check(L);
-				checkError(X);
-				break;
-			}
-		}
+		X.pow(k);
+		bool isOne = X.isOne();
+		checkError(X);
+		if (!isOne) throw std::runtime_error("GFN divisibility test failed!");
 
 		const std::string runtime = timer::formatTime(chrono.getElapsedTime());
 
 		std::ostringstream ssr; ssr << k << " * 2^" << n << " + 1 ";
-		if (fermat_m != 0)
-		{
-			ssr << "divides F(" << fermat_m << ")";
-		}
-		else 
-		{
-			ssr << "doesn't divide any Fermat number";
-		}
+		if (fermat_m != 0) ssr << "divides F(" << fermat_m << ")";
+		else ssr << "doesn't divide any Fermat number";
 		ssr << ", time = " << runtime << std::endl;
 
 		pio::display(std::string("\r") + ssr.str());
@@ -439,14 +537,14 @@ public:
 	void bench(engine & engine)
 	{
 		std::vector<number>	benchList;
-		benchList.push_back(number(7649,     1553995));		// PPSE
-		benchList.push_back(number(595,      2833406));		// PPS
-		benchList.push_back(number(13,       5523860));		// DIV
-		benchList.push_back(number(6679881,  6679881));		// Cullen
-		benchList.push_back(number(3,       10829346));		// 321
-		benchList.push_back(number(99739,   14019102));		// ESP
-		benchList.push_back(number(168451,  19375200));		// PSP
-		benchList.push_back(number(10223,   31172165));		// SOB
+		benchList.push_back(number(7649u,     1553995u));		// PPSE
+		benchList.push_back(number(595u,      2833406u));		// PPS
+		benchList.push_back(number(13u,       5523860u));		// DIV
+		benchList.push_back(number(6679881u,  6679881u));		// Cullen
+		benchList.push_back(number(3u,       10829346u));		// 321
+		benchList.push_back(number(99739u,   14019102u));		// ESP
+		benchList.push_back(number(168451u,  19375200u));		// PSP
+		benchList.push_back(number(10223u,   31172165u));		// SOB
 
 		for (const auto & b : benchList) if (!check(b.k, b.n, engine, true)) return;
 	}
