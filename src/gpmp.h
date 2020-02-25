@@ -477,7 +477,7 @@ public:
 	}
 
 public:
-	bool restoreContext(uint32_t & i, double & elapsedTime, const char * const ext)
+	bool restoreContext(uint32_t & i, double & elapsedTime, const char * const ext, const bool restore_uv = true)
 	{
 		FILE * const cFile = pio::open(_filename(ext).c_str(), "rb");
 		if (cFile == nullptr) return false;
@@ -507,10 +507,13 @@ public:
 
 		if (!_readContext(cFile, reinterpret_cast<char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
 		_engine.writeMemory_x(mem);
-		if (!_readContext(cFile, reinterpret_cast<char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
-		_engine.writeMemory_u(mem);
-		if (!_readContext(cFile, reinterpret_cast<char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
-		_engine.writeMemory_v(mem);
+		if (restore_uv)
+		{
+			if (!_readContext(cFile, reinterpret_cast<char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
+			_engine.writeMemory_u(mem);
+			if (!_readContext(cFile, reinterpret_cast<char *>(mem), sizeof(cl_uint2) * size / 2)) return false;
+			_engine.writeMemory_v(mem);
+		}
 
 		std::fclose(cFile);
 		return true;

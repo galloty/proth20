@@ -40,6 +40,8 @@ protected:
 private:
 	bool _isBoinc = false;
 
+	static const uint32_t ord2_max = 30;
+
 private:
 	static constexpr uint32_t benchCount(const uint32_t n) { return (n < 100000) ? 50000 : 50000000 / (n / 1000); }
 
@@ -304,14 +306,15 @@ public:
 public:
 	bool check_order(const uint32_t k, const uint32_t n, const uint32_t a, engine & engine)
 	{
+		std::ostringstream sst; sst << "Multiplicative order of " << a << ": " << std::endl;
+		pio::print(sst.str());
+
 		gpmp X(k, n, engine, false);
 
 		const std::string ext = std::string("o_") + std::to_string(a);
 		chronometer chrono;
 		uint32_t i0;
 		const bool found = X.restoreContext(i0, chrono.previousTime, ext.c_str());
-		std::ostringstream sst; sst << "Multiplicative order of " << a << ": " << std::endl;
-		pio::print(sst.str());
 		printStatus(X, found, k, n);
 
 		chrono.resetTime();
@@ -329,55 +332,49 @@ public:
 		chrono.resetBenchTime();
 		chrono.resetRecordTime();
 
-		uint32_t m = n;
-		if (m > 30)
+		for (uint32_t i = i0 + 1; i <= n - ord2_max; ++i)
 		{
-			for (uint32_t i = i0 + 1; i <= m - 20; ++i)
+			X.square();
+
+			if (--benchIter == 0)
 			{
-				X.square();
+				printProgress(chrono, i, n, benchCnt);
+				benchIter = benchCnt;
+			}
 
-				if (--benchIter == 0)
-				{
-					printProgress(chrono, i, n, benchCnt);
-					benchIter = benchCnt;
-				}
-
-				if (i % 1024 == 0)
-				{
-					const double elapsedTime = chrono.getRecordTime();
-					if (elapsedTime > 600)
-					{
-						checkError(X);
-						X.saveContext(i, chrono.getElapsedTime(), ext.c_str());
-						chrono.resetRecordTime();
-					}
-				}
-
-				if (_quit)
+			if (i % 1024 == 0)
+			{
+				const double elapsedTime = chrono.getRecordTime();
+				if (elapsedTime > 600)
 				{
 					checkError(X);
 					X.saveContext(i, chrono.getElapsedTime(), ext.c_str());
-					return false;
+					chrono.resetRecordTime();
 				}
 			}
 
-			m = 20;
+			if (_quit)
+			{
+				checkError(X);
+				X.saveContext(i, chrono.getElapsedTime(), ext.c_str());
+				return false;
+			}
 		}
 
 		X.copy_x_v();
 		// X = a^{2^n}
-		for (uint32_t i = 0; i < m; ++i) X.square();
+		for (uint32_t i = 0; i < ord2_max; ++i) X.square();
 		X.swap_x_v();
 
-		// X = a^{k.2^{n - m}}, V = a^{2^n}
+		// X = a^{k.2^{n - ord2_max}}, V = a^{2^n}
 		X.pow(k);
 
-		if ((m != n) && X.isOne()) throw std::runtime_error("Multiplicative order computation failed!");
+		if (X.isOne()) throw std::runtime_error("Multiplicative order computation failed!");
 
 		std::vector<std::pair<uint32_t, uint32_t>> fac_e, fac;
 		arith::factor(k, fac);
 
-		uint32_t e = n - m;
+		uint32_t e = n - ord2_max;
 		while (!X.isOne())
 		{
 			X.square();
@@ -420,17 +417,14 @@ public:
 		return true;
 	}
 
-public:
-	bool check_gfn(const uint32_t k, const uint32_t n, engine & engine)
+private:
+	bool _check_gfn(gpmp & X, const uint32_t k, const uint32_t n, const uint32_t a)
 	{
-		gpmp X(k, n, engine, false);
-
+		const std::string ext = std::string("f_") + std::to_string(a);
 		chronometer chrono;
 		uint32_t i0;
-		const bool found = false;	// TODO: X.restoreContext(i0, chrono.previousTime);
-		std::ostringstream sst; sst << "GFN divisibility: " << std::endl;
-		pio::print(sst.str());
-		printStatus(X, found, k, n);
+		const bool found = X.restoreContext(i0, chrono.previousTime, ext.c_str());
+		if (a == 2) printStatus(X, found, k, n);
 
 		chrono.resetTime();
 
@@ -438,8 +432,8 @@ public:
 		{
 			i0 = 0;
 			chrono.previousTime = 0;
-			// X = 2
-			X.init(2, 0);
+			// X = a
+			X.init(a, 0);
 		}
 
 		const uint32_t benchCnt = benchCount(n);
@@ -447,7 +441,7 @@ public:
 		chrono.resetBenchTime();
 		chrono.resetRecordTime();
 
-		uint32_t fermat_m = 0;
+		uint32_t m = 0;
 
 		// X = X^{2^n}
 		for (uint32_t i = i0 + 1; i <= n; ++i)
@@ -460,15 +454,21 @@ public:
 				benchIter = benchCnt;
 			}
 
-			if (i + 50 >= n)
+			if (i + ord2_max >= n)
 			{
-				if (fermat_m == 0)
+				if (i + ord2_max == n)
+				{
+					checkError(X);
+					X.saveContext(i, chrono.getElapsedTime(), ext.c_str());
+				}
+
+				if (m == 0)
 				{
 					uint64_t res64;
 					if (X.isMinusOne(res64))
 					{
 						checkError(X);
-						fermat_m = i;
+						m = i;
 					}
 				}
 			}
@@ -480,7 +480,7 @@ public:
 					if (elapsedTime > 600)
 					{
 						checkError(X);
-						//X.saveContext(i, chrono.getElapsedTime());
+						X.saveContext(i, chrono.getElapsedTime(), ext.c_str());
 						chrono.resetRecordTime();
 					}
 				}
@@ -488,7 +488,7 @@ public:
 				if (_quit)
 				{
 					checkError(X);
-					//X.saveContext(i, chrono.getElapsedTime());
+					X.saveContext(i, chrono.getElapsedTime(), ext.c_str());
 					return false;
 				}
 			}
@@ -502,12 +502,101 @@ public:
 		const std::string runtime = timer::formatTime(chrono.getElapsedTime());
 
 		std::ostringstream ssr; ssr << k << " * 2^" << n << " + 1 ";
-		if (fermat_m != 0) ssr << "divides F(" << fermat_m << ")";
-		else ssr << "doesn't divide any Fermat number";
+		if (a == 2)
+		{
+			if (m != 0) ssr << "divides F_" << m;
+			else ssr << "doesn't divide any Fermat number";
+		}
+		else
+		{
+			if (m != 0) ssr << "divides F_" << m << "(" << a << ")";
+			else ssr << "doesn't divide any F_m(" << a << ")";
+
+		}
 		ssr << ", time = " << runtime << std::endl;
 
 		pio::display(std::string("\r") + ssr.str());
 		pio::result(ssr.str());
+		return true;
+	}
+
+private:
+	bool _check_gfn(gpmp & X, const uint32_t k, const uint32_t n, const uint32_t a1, const uint32_t e1, const uint32_t a2, const uint32_t e2)
+	{
+		const std::string ext1 = std::string("f_") + std::to_string(a1);
+		const std::string ext2 = std::string("f_") + std::to_string(a2);
+
+		bool ok = true;
+		uint32_t i0; double time;
+		ok &= X.restoreContext(i0, time, ext1.c_str(), false);
+		ok &= (i0 + ord2_max == n);
+		if (e1 > 1) X.pow(e1);
+		if (a2 > 1)
+		{
+			X.copy_x_u();
+			ok &= X.restoreContext(i0, time, ext2.c_str(), false);
+			ok &= (i0 + ord2_max == n);
+			if (!ok) throw std::runtime_error("GFN divisibility test failed!");
+			if (e2 > 1) X.pow(e2);
+			X.setMultiplicand();
+			X.mul();
+		}
+
+		uint32_t m = 0;
+
+		// X = X^{2^n}
+		for (uint32_t i = n - ord2_max + 1; i <= n; ++i)
+		{
+			X.square();
+
+			if (m == 0)
+			{
+				uint64_t res64;
+				if (X.isMinusOne(res64))
+				{
+					checkError(X);
+					m = i;
+				}
+			}
+		}
+
+		X.pow(k);
+		bool isOne = X.isOne();
+		checkError(X);
+		if (!isOne) throw std::runtime_error("GFN divisibility test failed!");
+
+		uint32_t a = 1;
+		for (uint32_t i = 0; i < e1; ++i) a *= a1;
+		for (uint32_t i = 0; i < e2; ++i) a *= a2;
+
+		std::ostringstream ssr; ssr << k << " * 2^" << n << " + 1 ";
+		if (m != 0) ssr << "divides F_" << m << "(" << a << ")";
+		else ssr << "doesn't divide any F_m(" << a << ")";
+		ssr << std::endl;
+
+		pio::display(std::string("\r") + ssr.str());
+		pio::result(ssr.str());
+		return true;
+	}
+
+public:
+	bool check_gfn(const uint32_t k, const uint32_t n, engine & engine)
+	{
+		std::ostringstream sst; sst << "GFN divisibility: " << std::endl;
+		pio::print(sst.str());
+
+		gpmp X(k, n, engine, false);
+
+		if (!_check_gfn(X, k, n, 2)) return false;
+		if (!_check_gfn(X, k, n, 3)) return false;
+		if (!_check_gfn(X, k, n, 5)) return false;
+		if (!_check_gfn(X, k, n, 7)) return false;
+		if (!_check_gfn(X, k, n, 11)) return false;
+
+		if (!_check_gfn(X, k, n, 2, 1, 3, 1)) return false;	// 6
+		if (!_check_gfn(X, k, n, 2, 3, 1, 1)) return false;	// 8
+		if (!_check_gfn(X, k, n, 2, 1, 5, 1)) return false;	// 10
+		if (!_check_gfn(X, k, n, 2, 2, 3, 1)) return false;	// 12
 
 		return true;
 	}
