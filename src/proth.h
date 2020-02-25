@@ -74,6 +74,26 @@ protected:
 		}
 	}
 
+private:
+	static void printStatus(gpmp & X, const bool found, const uint32_t k, const uint32_t n)
+	{
+		std::ostringstream ss; ss << (found ? "Resuming from a checkpoint " : "Testing ");
+		ss << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^" << arith::log2(X.getSize())
+			<< " x " << X.getDigitBit() << " bits, plan: " << X.getPlanString() << std::endl;
+		pio::print(ss.str());
+	}
+
+private:
+	static void printProgress(chronometer & chrono, const uint32_t i, const uint32_t n, const uint32_t benchCnt)
+	{
+		const double elapsedTime = chrono.getBenchTime();
+		const double mulTime = elapsedTime / benchCnt, estimatedTime = mulTime * (n - i);
+		std::ostringstream ss; ss << std::setprecision(3) << " " << i * 100.0 / n << "% done, "
+			<< timer::formatTime(estimatedTime) << " remaining, " <<  mulTime * 1e3 << " ms/mul.        \r";
+		pio::display(ss.str());
+		chrono.resetBenchTime();
+	}
+
 public:
 	bool apowk(gpmp & X, const uint32_t a, const uint32_t k) const
 	{
@@ -120,7 +140,7 @@ public:
 	}
 
 public:
-	bool check(const uint32_t k, const uint32_t n, engine & engine, const bool bench = false, const bool checkRes = false, const uint64_t r64 = 0)
+	bool check(const uint32_t k, const uint32_t n, engine & engine, const bool checkRes = false, const uint64_t r64 = 0)
 	{
 		uint32_t a = 0;
 		if (!arith::proth_prime_quad_nonres(k, n, 3, a))
@@ -140,12 +160,8 @@ public:
 
 		chronometer chrono;
 		uint32_t i0;
-		const bool found = X.restoreContext(i0, chrono.previousTime);
-
-		std::ostringstream sst; sst << (found ? "Resuming from a checkpoint " : "Testing ");
-		sst << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^" << arith::log2(X.getSize())
-			<< " x " << X.getDigitBit() << " bits, plan: " << X.getPlanString() << std::endl;
-		pio::print(sst.str());
+		const bool found = X.restoreContext(i0, chrono.previousTime, "p");
+		printStatus(X, found, k, n);
 
 		chrono.resetTime();
 
@@ -155,7 +171,7 @@ public:
 			chrono.previousTime = 0;
 			// X = a^k
 			if (!apowk(X, a, k)) return false;
-			checkError(X);	// Sync GPU before benchmark
+			checkError(X);
 		}
 
 		const uint32_t L = 1 << (arith::log2(n) / 2);
@@ -175,23 +191,7 @@ public:
 			if (--benchIter == 0)
 			{
 				if (_isBoinc) boinc_fraction_done(double(i) / double(n));
-				else
-				{
-					if (bench) checkError(X);	// Sync GPU
-					const double elapsedTime = chrono.getBenchTime();
-					const double mulTime = elapsedTime / benchCnt, estimatedTime = mulTime * (n - i);
-					std::ostringstream ssb; ssb << std::setprecision(3) << " " << i * 100.0 / n << "% done, "
-						<< timer::formatTime(estimatedTime) << " remaining, " <<  mulTime * 1e3 << " ms/mul.";
-					if (bench)
-					{
-						ssb << std::endl;
-						pio::display(ssb.str());
-						return true;
-					}
-					ssb << "        \r";
-					pio::display(ssb.str());
-					chrono.resetBenchTime();
-				}
+				else printProgress(chrono, i, n, benchCnt);
 				benchIter = benchCnt;
 			}
 
@@ -210,7 +210,7 @@ public:
 					if (quit || (status.suspended != 0))
 					{
 						checkError(X);
-						X.saveContext(i, chrono.getElapsedTime());
+						X.saveContext(i, chrono.getElapsedTime(), "p");
 					}
 					if (quit) return false;
 						
@@ -233,7 +233,7 @@ public:
 					if (boinc_time_to_checkpoint() != 0)
 					{
 						checkError(X);
-						X.saveContext(i, chrono.getElapsedTime());
+						X.saveContext(i, chrono.getElapsedTime(), "p");
 						boinc_checkpoint_completed();
 					}
 				}
@@ -243,7 +243,7 @@ public:
 					if (elapsedTime > 600)
 					{
 						checkError(X);
-						X.saveContext(i, chrono.getElapsedTime());
+						X.saveContext(i, chrono.getElapsedTime(), "p");
 						chrono.resetRecordTime();
 					}
 				}
@@ -252,7 +252,7 @@ public:
 			if (_quit)
 			{
 				checkError(X);
-				X.saveContext(i, chrono.getElapsedTime());
+				X.saveContext(i, chrono.getElapsedTime(), "p");
 				return false;
 			}
 		}
@@ -306,15 +306,13 @@ public:
 	{
 		gpmp X(k, n, engine, false);
 
+		const std::string ext = std::string("o_") + std::to_string(a);
 		chronometer chrono;
 		uint32_t i0;
-		const bool found = false;	// TODO: X.restoreContext(i0, chrono.previousTime);
-
+		const bool found = X.restoreContext(i0, chrono.previousTime, ext.c_str());
 		std::ostringstream sst; sst << "Multiplicative order of " << a << ": " << std::endl;
-		sst << (found ? "Resuming from a checkpoint " : "Testing ");
-		sst << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^" << arith::log2(X.getSize())
-			<< " x " << X.getDigitBit() << " bits, plan: " << X.getPlanString() << std::endl;
 		pio::print(sst.str());
+		printStatus(X, found, k, n);
 
 		chrono.resetTime();
 
@@ -334,19 +332,13 @@ public:
 		uint32_t m = n;
 		if (m > 30)
 		{
-			for (uint32_t i = i0; i < m - 20; ++i)
+			for (uint32_t i = i0 + 1; i <= m - 20; ++i)
 			{
 				X.square();
 
 				if (--benchIter == 0)
 				{
-					const double elapsedTime = chrono.getBenchTime();
-					const double mulTime = elapsedTime / benchCnt, estimatedTime = mulTime * (n - i);
-					std::ostringstream ssb; ssb << std::setprecision(3) << " " << i * 100.0 / n << "% done, "
-						<< timer::formatTime(estimatedTime) << " remaining, " <<  mulTime * 1e3 << " ms/mul.";
-					ssb << "        \r";
-					pio::display(ssb.str());
-					chrono.resetBenchTime();
+					printProgress(chrono, i, n, benchCnt);
 					benchIter = benchCnt;
 				}
 
@@ -356,7 +348,7 @@ public:
 					if (elapsedTime > 600)
 					{
 						checkError(X);
-						//X.saveContext(i, chrono.getElapsedTime());
+						X.saveContext(i, chrono.getElapsedTime(), ext.c_str());
 						chrono.resetRecordTime();
 					}
 				}
@@ -364,7 +356,7 @@ public:
 				if (_quit)
 				{
 					checkError(X);
-					//X.saveContext(i, chrono.getElapsedTime());
+					X.saveContext(i, chrono.getElapsedTime(), ext.c_str());
 					return false;
 				}
 			}
@@ -414,8 +406,12 @@ public:
 
 		const std::string runtime = timer::formatTime(chrono.getElapsedTime());
 
-		std::ostringstream ssr; ssr << "p = " << k << " * 2^" << n << " + 1, ord_p(" << a << ") =";
-		for (const auto & f : fac_e) ssr << " " << f.first << "^" << f.second;
+		std::ostringstream ssr; ssr << "p = " << k << " * 2^" << n << " + 1, ord_p(" << a << ") = " << fac_e[0].first << "^" << fac_e[0].second;
+		for (size_t i = 1; i < fac_e.size(); ++i)
+		{
+			ssr << " * " << fac_e[i].first;
+			if (fac_e[i].second > 1) ssr << "^" << fac_e[i].second;
+		}
 		ssr << ", time = " << runtime << std::endl;
 
 		pio::display(std::string("\r") + ssr.str());
@@ -432,12 +428,9 @@ public:
 		chronometer chrono;
 		uint32_t i0;
 		const bool found = false;	// TODO: X.restoreContext(i0, chrono.previousTime);
-
 		std::ostringstream sst; sst << "GFN divisibility: " << std::endl;
-		sst << (found ? "Resuming from a checkpoint " : "Testing ");
-		sst << k << " * 2^" << n << " + 1, " << X.getDigits() << " digits, size = 2^" << arith::log2(X.getSize())
-			<< " x " << X.getDigitBit() << " bits, plan: " << X.getPlanString() << std::endl;
 		pio::print(sst.str());
+		printStatus(X, found, k, n);
 
 		chrono.resetTime();
 
@@ -463,13 +456,7 @@ public:
 
 			if (--benchIter == 0)
 			{
-				const double elapsedTime = chrono.getBenchTime();
-				const double mulTime = elapsedTime / benchCnt, estimatedTime = mulTime * (n - i);
-				std::ostringstream ssb; ssb << std::setprecision(3) << " " << i * 100.0 / n << "% done, "
-					<< timer::formatTime(estimatedTime) << " remaining, " <<  mulTime * 1e3 << " ms/mul.";
-				ssb << "        \r";
-				pio::display(ssb.str());
-				chrono.resetBenchTime();
+				printProgress(chrono, i, n, benchCnt);
 				benchIter = benchCnt;
 			}
 
@@ -523,30 +510,6 @@ public:
 		pio::result(ssr.str());
 
 		return true;
-	}
-
-protected:
-	struct number
-	{
-		uint32_t k, n;
-		uint64_t res64;
-		number(const uint32_t k, const uint32_t n, const uint64_t res64 = 0) : k(k), n(n), res64(res64) {}
-	};
-
-public:
-	void bench(engine & engine)
-	{
-		std::vector<number>	benchList;
-		benchList.push_back(number(7649u,     1553995u));		// PPSE
-		benchList.push_back(number(595u,      2833406u));		// PPS
-		benchList.push_back(number(13u,       5523860u));		// DIV
-		benchList.push_back(number(6679881u,  6679881u));		// Cullen
-		benchList.push_back(number(3u,       10829346u));		// 321
-		benchList.push_back(number(99739u,   14019102u));		// ESP
-		benchList.push_back(number(168451u,  19375200u));		// PSP
-		benchList.push_back(number(10223u,   31172165u));		// SOB
-
-		for (const auto & b : benchList) if (!check(b.k, b.n, engine, true)) return;
 	}
 
 	friend class proth_test;

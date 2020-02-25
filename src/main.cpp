@@ -80,7 +80,6 @@ private:
 		ss << "  -o <a>                  compute the multiplicative order of a modulo k*2^n+1" << std::endl;
 		ss << "  -f                      Fermat and Generalized Fermat factor test" << std::endl;
 		ss << "  -d <n> or --device <n>  set device number=<n> (default 0)" << std::endl;
-		ss << "  -b                      run benchmark" << std::endl;
 		ss << "  -v or -V                print the startup banner and immediately exit" << std::endl;
 		ss << "  -boinc                  operate as a BOINC client app" << std::endl;
 		ss << std::endl;
@@ -122,7 +121,7 @@ public:
 		ocl::platform platform;
 		platform.displayDevices();
 
-		bool bPrime = false, bBench = false, bOrder = false, bGFN = false;
+		bool bPrime = false, bOrder = false, bGFN = false;
 		uint32_t k = 0, n = 0, a = 0;
 		size_t d = 0;
 		// parse args
@@ -130,8 +129,7 @@ public:
 		{
 			const std::string & arg = args[i];
 
-			if (arg == "-b") bBench = true;
-			else if (arg == "-f") bGFN = true;
+			if (arg == "-f") bGFN = true;
 			else if (arg.substr(0, 2) == "-q")
 			{
 				const std::string exp = ((arg == "-q") && (i + 1 < size)) ? args[++i] : arg.substr(2);
@@ -151,6 +149,7 @@ public:
 			{
 				const std::string dev = ((arg == "-o") && (i + 1 < size)) ? args[++i] : arg.substr(2);
 				a = std::atoi(dev.c_str());
+				if (a < 2) throw std::runtime_error("-o: invalid integer a");
 				bOrder = true;
 			}
 			else if (arg.substr(0, 2) == "-d")
@@ -163,12 +162,6 @@ public:
 
 		proth & p = proth::getInstance();
 		p.setBoinc(bBoinc);
-
-		if (bBench)
-		{
-			engine engine(platform, d);
-			p.bench(engine);
-		}
 
 		if (bPrime)
 		{
@@ -190,13 +183,10 @@ public:
 		// proth_test::profile(13, 5523860, engine0);		// DIV
 		// proth_test::profile(10223, 31172165, engine0);	// SOB
 
-		// bench
-		// p.bench(engine0);
-		// proth_test::test_prime(p, engine0, true);
-
-		// full test
+		// test
 		// proth_test::test_composite(p, engine0);
 		// proth_test::test_prime(p, engine0);
+		// proth_test::test_order(p, engine0);
 		// proth_test::test_gfn(p, engine0);
 
 		// validation

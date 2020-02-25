@@ -424,6 +424,7 @@ private:
 		return false;
 	}
 
+private:
 	static bool _readContext(FILE * const cFile, char * const ptr, const size_t size)
 	{
 		const size_t ret = std::fread(ptr , sizeof(char), size, cFile);
@@ -432,10 +433,16 @@ private:
 		return false;
 	}
 
-public:
-	bool saveContext(const uint32_t i, const double elapsedTime)
+private:
+	static std::string _filename(const char * const ext)
 	{
-		FILE * const cFile = pio::open("proth.ctx", "wb");
+		return std::string("proth_") + std::string(ext) + std::string(".ctx");
+	}
+
+public:
+	bool saveContext(const uint32_t i, const double elapsedTime, const char * const ext)
+	{
+		FILE * const cFile = pio::open(_filename(ext).c_str(), "wb");
 		if (cFile == nullptr)
 		{
 			std::ostringstream ss; ss << "cannot write 'proth.ctx' file " << std::endl;
@@ -470,9 +477,9 @@ public:
 	}
 
 public:
-	bool restoreContext(uint32_t & i, double & elapsedTime)
+	bool restoreContext(uint32_t & i, double & elapsedTime, const char * const ext)
 	{
-		FILE * const cFile = pio::open("proth.ctx", "rb");
+		FILE * const cFile = pio::open(_filename(ext).c_str(), "rb");
 		if (cFile == nullptr) return false;
 
 		const size_t size = _size;
