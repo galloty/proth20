@@ -88,9 +88,23 @@ struct arith
 		return true;
 	}
 
-	static void factor(const uint32_t k, std::vector<std::pair<uint32_t, uint32_t>> & fac) 
+	static void factor(const uint32_t n, std::vector<std::pair<uint32_t, uint32_t>> & fac) 
 	{
-		uint32_t m = k;
+		uint32_t m = n;
+
+		if (m % 2 == 0)
+		{
+			uint32_t e = 0;
+			do
+			{
+				m /= 2;
+				++e;	
+			}
+			while (m % 2 == 0);
+
+			fac.push_back(std::make_pair(2, e));
+			if (m == 1) return;
+		}
 
 		for (uint32_t p = 3; p < 65536; p += 2)
 		{

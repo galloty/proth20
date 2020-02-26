@@ -561,6 +561,6 @@ private:
 	}
 
 public:
-	void compare_u_v() { _executeCompareKernel(&_u, &_v); }
+	void compare_x_v() { _executeCompareKernel(&_x, &_v); }
 	void compare_m1_m2() { _executeCompareKernel(&_m1, &_m2); }
 };

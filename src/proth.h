@@ -15,6 +15,7 @@ Please give feedback to the authors if improvement is realized. It is distribute
 
 #include <thread>
 #include <chrono>
+#include <algorithm>
 
 class proth
 {
@@ -69,12 +70,15 @@ private:
 protected:
 	static void checkError(gpmp & X)
 	{
-		int err = X.getError();
+		const int err = X.getError();
 		if (err != 0)
 		{
 			throw std::runtime_error("GPU error detected!");
 		}
 	}
+
+private:
+	static void gfnDivError() { throw std::runtime_error("GFN divisibility test failed!"); }
 
 private:
 	static void printStatus(gpmp & X, const bool found, const uint32_t k, const uint32_t n)
@@ -136,7 +140,7 @@ public:
 		}
 		X.norm();
 		X.copy_x_u();
-		X.compare_u_v();
+		X.compare_x_v();
 
 		return true;
 	}
@@ -418,7 +422,16 @@ public:
 	}
 
 private:
-	bool _check_gfn(gpmp & X, const uint32_t k, const uint32_t n, const uint32_t a)
+	static void gfn_fermat_valid(gpmp & X, const uint32_t k)
+	{
+		X.pow(k);
+		const bool isOne = X.isOne();
+		checkError(X);
+		if (!isOne) gfnDivError();
+	}
+
+private:
+	bool check_gfn_prime(gpmp & X, const uint32_t k, const uint32_t n, const uint32_t a) const
 	{
 		const std::string ext = std::string("f_") + std::to_string(a);
 		chronometer chrono;
@@ -458,11 +471,12 @@ private:
 			{
 				if (i + ord2_max == n)
 				{
+					uint64_t res64;
+					if (X.isMinusOne(res64)) gfnDivError();
 					checkError(X);
 					X.saveContext(i, chrono.getElapsedTime(), ext.c_str());
 				}
-
-				if (m == 0)
+				else if (m == 0)
 				{
 					uint64_t res64;
 					if (X.isMinusOne(res64))
@@ -494,10 +508,7 @@ private:
 			}
 		}
 
-		X.pow(k);
-		bool isOne = X.isOne();
-		checkError(X);
-		if (!isOne) throw std::runtime_error("GFN divisibility test failed!");
+		gfn_fermat_valid(X, k);
 
 		const std::string runtime = timer::formatTime(chrono.getElapsedTime());
 
@@ -521,27 +532,43 @@ private:
 	}
 
 private:
-	bool _check_gfn(gpmp & X, const uint32_t k, const uint32_t n, const uint32_t a1, const uint32_t e1, const uint32_t a2, const uint32_t e2)
+	static bool read_prime(gpmp & X, uint32_t & i0, const uint32_t a)
 	{
-		const std::string ext1 = std::string("f_") + std::to_string(a1);
-		const std::string ext2 = std::string("f_") + std::to_string(a2);
+		const std::string ext = std::string("f_") + std::to_string(a);
+		double time;
+		return X.restoreContext(i0, time, ext.c_str(), false);
+	}
 
+private:
+	static bool read_composite(gpmp & X, const uint32_t n, const std::vector<std::pair<uint32_t, uint32_t>> & fac)
+	{
 		bool ok = true;
-		uint32_t i0; double time;
-		ok &= X.restoreContext(i0, time, ext1.c_str(), false);
+		uint32_t i0;
+		ok &= read_prime(X, i0, fac[0].first);
 		ok &= (i0 + ord2_max == n);
-		if (e1 > 1) X.pow(e1);
-		if (a2 > 1)
+		if (fac[0].second > 1) X.pow(fac[0].second);
+		if (fac.size() > 1)
 		{
 			X.copy_x_u();
-			ok &= X.restoreContext(i0, time, ext2.c_str(), false);
+			uint32_t i0;
+			ok &= read_prime(X, i0, fac[1].first);
 			ok &= (i0 + ord2_max == n);
-			if (!ok) throw std::runtime_error("GFN divisibility test failed!");
-			if (e2 > 1) X.pow(e2);
+			if (fac[1].second > 1) X.pow(fac[1].second);
 			X.setMultiplicand();
 			X.mul();
 		}
+		uint64_t res64;
+		ok &= !X.isMinusOne(res64);
+		return ok;
+	}
 
+private:
+	static bool check_gfn_composite(gpmp & X, const uint32_t k, const uint32_t n, const uint32_t a)
+	{
+		std::vector<std::pair<uint32_t, uint32_t>> fac;
+		arith::factor(a, fac);
+		if (!read_composite(X, n, fac)) gfnDivError();
+	
 		uint32_t m = 0;
 
 		// X = X^{2^n}
@@ -560,18 +587,62 @@ private:
 			}
 		}
 
-		X.pow(k);
-		bool isOne = X.isOne();
-		checkError(X);
-		if (!isOne) throw std::runtime_error("GFN divisibility test failed!");
-
-		uint32_t a = 1;
-		for (uint32_t i = 0; i < e1; ++i) a *= a1;
-		for (uint32_t i = 0; i < e2; ++i) a *= a2;
+		gfn_fermat_valid(X, k);
 
 		std::ostringstream ssr; ssr << k << " * 2^" << n << " + 1 ";
 		if (m != 0) ssr << "divides F_" << m << "(" << a << ")";
 		else ssr << "doesn't divide any F_m(" << a << ")";
+		ssr << std::endl;
+
+		pio::display(std::string("\r") + ssr.str());
+		pio::result(ssr.str());
+		return true;
+	}
+
+private:
+	static bool check_xgfn(gpmp & X, const uint32_t k, const uint32_t n, const uint32_t a, const uint32_t b)
+	{
+		std::vector<std::pair<uint32_t, uint32_t>> faca, facb;
+		arith::factor(a, faca); arith::factor(b, facb);
+		if (!read_composite(X, n, faca)) gfnDivError();
+		X.copy_x_v();
+		if (!read_composite(X, n, facb)) gfnDivError();
+
+		checkError(X);
+		X.compare_x_v();
+		if (X.getError() == 0) gfnDivError();
+		X.resetError();
+
+		uint32_t m = 0;
+
+		// X = X^{2^n}
+		for (uint32_t i = n - ord2_max + 1; i <= n; ++i)
+		{
+			X.square();
+			X.norm();
+			X.swap_x_v();
+			X.square();
+			X.norm();
+			X.swap_x_v();
+
+			if (m == 0)
+			{
+				checkError(X);
+				// a^{2^n} + b^{2^n} = 0 (mod p) <=>
+				// a^{2^{n + 1}} = b^{2^{n + 1} (mod p) and a^{2^n} != b^{2^n} (mod p)
+				X.compare_x_v();
+				if (X.getError() == 0) m = i - 1;
+				X.resetError();
+			}
+		}
+
+		gfn_fermat_valid(X, k);
+		X.swap_x_v();
+		gfn_fermat_valid(X, k);
+
+		std::ostringstream ssr; ssr << k << " * 2^" << n << " + 1 ";
+		if (m != 0) ssr << "divides F_" << m << "(" << a << ", " << b << ")";
+		else ssr << "doesn't divide any F_m(" << a << ", " << b << ")";
 		ssr << std::endl;
 
 		pio::display(std::string("\r") + ssr.str());
@@ -587,16 +658,23 @@ public:
 
 		gpmp X(k, n, engine, false);
 
-		if (!_check_gfn(X, k, n, 2)) return false;
-		if (!_check_gfn(X, k, n, 3)) return false;
-		if (!_check_gfn(X, k, n, 5)) return false;
-		if (!_check_gfn(X, k, n, 7)) return false;
-		if (!_check_gfn(X, k, n, 11)) return false;
+		for (uint32_t b = 2; b <= 12; ++b)
+		{
+			if ((b == 4) || (b == 9)) continue;
+			if ((b != 2) && (b % 2 == 0)) { if (!check_gfn_composite(X, k, n, b)) return false; }
+			else if (!check_gfn_prime(X, k, n, b)) return false;
+		}
 
-		if (!_check_gfn(X, k, n, 2, 1, 3, 1)) return false;	// 6
-		if (!_check_gfn(X, k, n, 2, 3, 1, 1)) return false;	// 8
-		if (!_check_gfn(X, k, n, 2, 1, 5, 1)) return false;	// 10
-		if (!_check_gfn(X, k, n, 2, 2, 3, 1)) return false;	// 12
+		for (uint32_t a = 3; a <= 12; ++a)
+		{
+			for (uint32_t b = 2; b < a; ++b)
+			{
+				if ((std::__gcd(a, b) == 1) && ((a != 9) || (b != 4)))
+				{
+					if (!check_xgfn(X, k, n, a, b)) return false;
+				}
+			}
+		}
 
 		return true;
 	}

@@ -415,6 +415,12 @@ public:
 		return int(err);
 	}
 
+public:
+	void resetError()
+	{
+		_engine.clearMemory_err();
+	}
+
 private:
 	static bool _writeContext(FILE * const cFile, const char * const ptr, const size_t size)
 	{
@@ -577,7 +583,7 @@ public:
 	void swap_x_v() { _engine.swap_x_v(); }
 	void copy_x_v() { _engine.copy_x_v(); }
 	void copy_v_x() { _engine.copy_v_x(); }
-	void compare_u_v() { _engine.compare_u_v(); }
+	void compare_x_v() { _engine.compare_x_v(); }
 
 public:
 	void square()

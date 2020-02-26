@@ -62,24 +62,24 @@ public:
 	static void test_prime(proth & p, engine & engine)
 	{
 		std::vector<number> primeList;
-		primeList.push_back(number(1035u, 301u));
-		primeList.push_back(number(955u, 636u));
-		primeList.push_back(number(969u, 1307u));
-		primeList.push_back(number(1139u, 2641u));
-		primeList.push_back(number(1035u, 5336u));
-		primeList.push_back(number(965u, 10705u));
-		primeList.push_back(number(1027u, 21468u));			// size = 2^11
-		primeList.push_back(number(1109u, 42921u));			// size = 2^12
-		primeList.push_back(number(1085u, 85959u));			// size = 2^13  64-bit 32-bit
-		primeList.push_back(number(1015u, 171214u));		// size = 2^14, 0.070  0.070  256_16 sq_64 p2i_16_16
-		primeList.push_back(number(1197u, 343384u));		// size = 2^15, 0.100  0.095  256_16 sq_128 p2i_8_32
-		primeList.push_back(number(1089u, 685641u));		// size = 2^16, 0.160  0.158  256_8 sq_256 p2i_8_64
-		primeList.push_back(number(1005u, 1375758u));		// size = 2^17, 0.275  0.270  256_8 sq_512 p2i_8_64
-		primeList.push_back(number(1089u, 2746155u));		// size = 2^18, 0.510  0.500  256_8 sq_1024 p2i_8_64
-		primeList.push_back(number(45u, 5308037u));			// size = 2^19, 0.978  0.955   256_8 sq_2048 p2i_8_32
-		primeList.push_back(number(6679881u, 6679881u));	// size = 2^20, 1.94   1.87   256_8 256_8 sq_16 p2i_8_32
-		primeList.push_back(number(3u, 10829346u));			// size = 2^21, 3.90   3.76   256_16 256_8 sq_32 p2i_8_32
-		primeList.push_back(number(10223u, 31172165u));		// size = 2^22, 7.95   7.60   256_16 256_8 sq_64 p2i_8_32
+		primeList.push_back(number(1035, 301));
+		primeList.push_back(number(955, 636));
+		primeList.push_back(number(969, 1307));
+		primeList.push_back(number(1139, 2641));
+		primeList.push_back(number(1035, 5336));
+		primeList.push_back(number(965, 10705));
+		primeList.push_back(number(1027, 21468));		// size = 2^11
+		primeList.push_back(number(1109, 42921));		// size = 2^12
+		primeList.push_back(number(1085, 85959));		// size = 2^13  64-bit 32-bit
+		primeList.push_back(number(1015, 171214));		// size = 2^14, 0.070  0.070  256_16 sq_64 p2i_16_16
+		primeList.push_back(number(1197, 343384));		// size = 2^15, 0.100  0.095  256_16 sq_128 p2i_8_32
+		primeList.push_back(number(1089, 685641));		// size = 2^16, 0.160  0.158  256_8 sq_256 p2i_8_64
+		primeList.push_back(number(1005, 1375758));		// size = 2^17, 0.275  0.270  256_8 sq_512 p2i_8_64
+		primeList.push_back(number(1089, 2746155));		// size = 2^18, 0.510  0.500  256_8 sq_1024 p2i_8_64
+		primeList.push_back(number(45, 5308037));		// size = 2^19, 0.978  0.955   256_8 sq_2048 p2i_8_32
+		primeList.push_back(number(6679881, 6679881));	// size = 2^20, 1.94   1.87   256_8 256_8 sq_16 p2i_8_32
+		primeList.push_back(number(3, 10829346));		// size = 2^21, 3.90   3.76   256_16 256_8 sq_32 p2i_8_32
+		primeList.push_back(number(10223, 31172165));	// size = 2^22, 7.95   7.60   256_16 256_8 sq_64 p2i_8_32
 
 		for (const auto & pr : primeList) if (!p.check(pr.k, pr.n, engine, true)) return;
 	}
@@ -88,18 +88,18 @@ public:
 	static void test_composite(proth & p, engine & engine)
 	{
 		std::vector<number> compositeList;
-		compositeList.push_back(number(536870911u,    298u, 0x35461D17F60DA78Aull));
-		compositeList.push_back(number(536870905u,    626u, 0x06543644B033FF0Cull));
-		compositeList.push_back(number(536870411u,   1307u, 0x7747B2D2351394EFull));
-		compositeList.push_back(number(536850911u,   2631u, 0x3A08775B698EEB34ull));
-		compositeList.push_back(number(536870911u,   5336u, 0xDA3B38B4E68F0445ull));
-		compositeList.push_back(number(536770911u,  10705u, 0x030EECBE0A5E77A6ull));
-		compositeList.push_back(number(526870911u,  21432u, 0xD86853C587F1D537ull));
-		compositeList.push_back(number(436870911u,  42921u, 0x098AD2BD01F485BCull));
-		compositeList.push_back(number(535970911u,  85942u, 0x2D19C7E7E7553AD6ull));
-		compositeList.push_back(number(536860911u, 171213u, 0x99EFB220EE2289A0ull));
-		compositeList.push_back(number(536870911u, 343386u, 0x5D6A1D483910E48Full));
-		compositeList.push_back(number(536870911u, 685618u, 0x84C7E4E7F1344902ull));
+		compositeList.push_back(number(536870911,    298, 0x35461D17F60DA78Aull));
+		compositeList.push_back(number(536870905,    626, 0x06543644B033FF0Cull));
+		compositeList.push_back(number(536870411,   1307, 0x7747B2D2351394EFull));
+		compositeList.push_back(number(536850911,   2631, 0x3A08775B698EEB34ull));
+		compositeList.push_back(number(536870911,   5336, 0xDA3B38B4E68F0445ull));
+		compositeList.push_back(number(536770911,  10705, 0x030EECBE0A5E77A6ull));
+		compositeList.push_back(number(526870911,  21432, 0xD86853C587F1D537ull));
+		compositeList.push_back(number(436870911,  42921, 0x098AD2BD01F485BCull));
+		compositeList.push_back(number(535970911,  85942, 0x2D19C7E7E7553AD6ull));
+		compositeList.push_back(number(536860911, 171213, 0x99EFB220EE2289A0ull));
+		compositeList.push_back(number(536870911, 343386, 0x5D6A1D483910E48Full));
+		compositeList.push_back(number(536870911, 685618, 0x84C7E4E7F1344902ull));
 
 		// check residues
 		for (const auto & c : compositeList) if (!p.check(c.k, c.n, engine, true, c.res64)) return;
@@ -109,12 +109,14 @@ public:
 	static void test_order(proth & p, engine & engine)
 	{
 		std::vector<number> orderList;
-		orderList.push_back(number(385u, 7598u));			// 2^7596 * 5 * 11
-		orderList.push_back(number(387u, 23127u));			// 2^23126 * 3^2
-		orderList.push_back(number(357u, 35567u));			// 2^35564
-		orderList.push_back(number(357u, 54392u));			// 2^54390 * 17
-		orderList.push_back(number(315u, 99512u));			// 2^99511 * 3^2 * 5 * 7
+		orderList.push_back(number(385, 7598));		// 2^7596 * 5 * 11
+		orderList.push_back(number(387, 23127));	// 2^23126 * 3^2
+		orderList.push_back(number(357, 35567));	// 2^35564
+		orderList.push_back(number(357, 54392));	// 2^54390 * 17
+		orderList.push_back(number(315, 99512));	// 2^99511 * 3^2 * 5 * 7
 
+		if (!p.check_order(3, 201, 8, engine)) return;
+		if (!p.check_order(3, 209, 8, engine)) return;
 		for (const auto & o : orderList) if (!p.check_order(o.k, o.n, 2, engine)) return;
 	}
 
@@ -122,13 +124,15 @@ public:
 	static void test_gfn(proth & p, engine & engine)
 	{
 		std::vector<number> gfnDivList;
-		gfnDivList.push_back(number(332436749u, 9865u));
-		gfnDivList.push_back(number(5u, 23473u));
-		gfnDivList.push_back(number(1199u, 44201u));
-		gfnDivList.push_back(number(165u, 49095u));
-		gfnDivList.push_back(number(189u, 90061u));
-		gfnDivList.push_back(number(3u, 213321u));
-		gfnDivList.push_back(number(3u, 382449u));
+		gfnDivList.push_back(number(3, 201));
+		gfnDivList.push_back(number(3, 209));
+		gfnDivList.push_back(number(332436749, 9865));
+		gfnDivList.push_back(number(5, 23473));
+		gfnDivList.push_back(number(1199, 44201));
+		gfnDivList.push_back(number(165, 49095));
+		gfnDivList.push_back(number(189, 90061));
+		gfnDivList.push_back(number(3, 213321));
+		gfnDivList.push_back(number(3, 382449));
 
 		for (const auto & d : gfnDivList) if (!p.check_gfn(d.k, d.n, engine)) return;
 	}
