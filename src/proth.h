@@ -418,6 +418,15 @@ public:
 		pio::display(std::string("\r") + ssr.str());
 		pio::result(ssr.str());
 
+		std::ostringstream sso; sso << k << "\t" << n << "\t" << a << "\t" << fac_e[0].first << "^" << fac_e[0].second;
+		for (size_t i = 1; i < fac_e.size(); ++i)
+		{
+			sso << "\t" << fac_e[i].first;
+			if (fac_e[i].second > 1) ssr << "^" << fac_e[i].second;
+		}
+		sso << std::endl;
+		pio::oresult(sso.str());
+
 		return true;
 	}
 
@@ -428,6 +437,16 @@ private:
 		const bool isOne = X.isOne();
 		checkError(X);
 		if (!isOne) gfnDivError();
+	}
+
+private:
+	static void gfn_result(const uint32_t a, const uint32_t b, const uint32_t m, const uint32_t k, const uint32_t n)
+	{
+		if (m != 0)
+		{
+			std::ostringstream ss; ss << a << "\t" << b << "\t" << m << "\t" << k << "\t" << n << std::endl;
+			pio::fresult(ss.str());
+		}
 	}
 
 private:
@@ -528,6 +547,7 @@ private:
 
 		pio::display(std::string("\r") + ssr.str());
 		pio::result(ssr.str());
+		gfn_result(a, 1, m, k, n);
 		return true;
 	}
 
@@ -596,6 +616,7 @@ private:
 
 		pio::display(std::string("\r") + ssr.str());
 		pio::result(ssr.str());
+		gfn_result(a, 1, m, k, n);
 		return true;
 	}
 
@@ -640,13 +661,16 @@ private:
 		X.swap_x_v();
 		gfn_fermat_valid(X, k);
 
-		std::ostringstream ssr; ssr << k << " * 2^" << n << " + 1 ";
-		if (m != 0) ssr << "divides F_" << m << "(" << a << ", " << b << ")";
-		else ssr << "doesn't divide any F_m(" << a << ", " << b << ")";
-		ssr << std::endl;
+		if (m != 0)
+		{
+			std::ostringstream ssr; ssr << k << " * 2^" << n << " + 1 ";
+			ssr << "divides F_" << m << "(" << a << ", " << b << ")";
+			ssr << std::endl;
 
-		pio::display(std::string("\r") + ssr.str());
-		pio::result(ssr.str());
+			pio::display(std::string("\r") + ssr.str());
+			pio::result(ssr.str());
+			gfn_result(a, b, m, k, n);
+		}
 		return true;
 	}
 

@@ -60,7 +60,7 @@ private:
 	}
 
 private:
-	// result: normal: 'presult.txt' file, boinc: 'out' file
+	// result: normal: 'presults.txt' file, boinc: 'out' file
 	bool _result(const std::string & str) const
 	{
 		if (_isBoinc)
@@ -75,6 +75,34 @@ private:
 		if (!resFile.is_open()) return false;
 		resFile << str;
 		resFile.close();
+		return true;
+	}
+
+private:
+	// oresult: normal: 'porder.txt' file, boinc: -
+	bool _oresult(const std::string & str) const
+	{
+		if (!_isBoinc)
+		{
+			std::ofstream resFile("porder.txt", std::ios::app);
+			if (!resFile.is_open()) return false;
+			resFile << str;
+			resFile.close();
+		}
+		return true;
+	}
+
+private:
+	// fresult: normal: 'pgfn.txt' file, boinc: -
+	bool _fresult(const std::string & str) const
+	{
+		if (!_isBoinc)
+		{
+			std::ofstream resFile("pgfn.txt", std::ios::app);
+			if (!resFile.is_open()) return false;
+			resFile << str;
+			resFile.close();
+		}
 		return true;
 	}
 
@@ -95,6 +123,8 @@ public:
 	static void display(const std::string & str) { getInstance()._display(str); }
 	static void error(const std::string & str, const bool fatal = false) { getInstance()._error(str, fatal); }
 	static bool result(const std::string & str) { return getInstance()._result(str); }
+	static bool oresult(const std::string & str) { return getInstance()._oresult(str); }
+	static bool fresult(const std::string & str) { return getInstance()._fresult(str); }
 
 	static FILE * open(const char * const filename, const char * const mode) { return getInstance()._open(filename, mode); }
 };
