@@ -72,7 +72,7 @@ private:
 	const size_t _size;
 	const uint32_t _k, _n;
 	const bool _isBoinc;
-	const bool _ext512, _ext1024;
+	bool _ext512, _ext1024;
 	engine & _engine;
 	plan _plan;
 	std::vector<cl_uint2> _mem;
@@ -136,7 +136,7 @@ private:
 		
 		// if .cl file exists then generate header file
 		std::ofstream hFile(headerFileName, std::ios::binary);	// binary: don't convert line endings to `CRLF` 
-		if (!hFile.is_open()) throw std::runtime_error("cannot write openCL header file.");
+		if (!hFile.is_open()) throw std::runtime_error("cannot write openCL header file");
 
 		hFile << "/*" << std::endl;
 		hFile << "Copyright 2020, Yves Gallot" << std::endl << std::endl;
@@ -285,15 +285,18 @@ public:
 		_ext512(engine.getMaxWorkGroupSize() >= 512), _ext1024((engine.getMaxWorkGroupSize() >= 1024) && (engine.getLocalMemSize() >= 32768)),
 		_engine(engine), _mem(_size)
 	{
+		if (engine.getMaxWorkGroupSize() < 256) throw std::runtime_error("The maximum work-group size must be equal to or greater than 256");
+
 		const size_t size = _size;
 
 		const double max_digit = double((uint32_t(1) << _digit_bit) - 1);
 		if ((size / 2) * max_digit * max_digit >= P1P2 / 2)
 		{
-			std::stringstream ss; ss << getDigits() << "-digit numbers are not supported.";
+			std::stringstream ss; ss << getDigits() << "-digit numbers are not supported";
 			throw std::runtime_error(ss.str());
 		}
 
+reset:
 		_plan.init(size, _ext512, _ext1024);
 
 		size_t bestSq_i = 0, bestP2i_i = 0;
@@ -307,13 +310,28 @@ public:
 			{
 				initProfiling();
 				_plan.setSquareSeq(size, i);
-				for (size_t j = 0; j < 16; ++j) square();
-				const cl_ulong time = engine.getProfileTime();
-				if (time < bestSqTime)
+				try
 				{
-					bestSqTime = time;
-					bestSq_i = i;
+					for (size_t j = 0; j < 16; ++j) square();
+					const cl_ulong time = engine.getProfileTime();
+					if (time < bestSqTime)
+					{
+						bestSqTime = time;
+						bestSq_i = i;
+					}
 				}
+				catch (const std::runtime_error & e)
+				{
+					if (_ext512 == false) throw e;
+					// try to fix runtime error
+					std::ostringstream ss; ss << "warning: " << e.what() << ", trying to fix it..." << std::endl;
+					pio::error(ss.str(), true);
+					_ext512 = _ext1024 = false;
+					engine.resetProfiles();
+					_clearEngine();
+					goto reset;
+				}
+
 				engine.resetProfiles();
 			}
 			_plan.setSquareSeq(size, bestSq_i);

@@ -32,6 +32,7 @@ namespace ocl
 
 // #define ocl_debug		1
 #define ocl_fast_exec		1
+#define ocl_device_type		CL_DEVICE_TYPE_GPU	// CL_DEVICE_TYPE_ALL
 
 class oclObject
 {
@@ -107,7 +108,7 @@ protected:
 	{
 		if (!oclError(res))
 		{
-			std::ostringstream ss; ss << "opencl error: " << errorString(res) << ".";
+			std::ostringstream ss; ss << "opencl error: " << errorString(res);
 			throw std::runtime_error(ss.str());
 		}
 	}
@@ -141,7 +142,7 @@ public:
 
 			cl_uint num_devices;
 			cl_device_id devices[64];
-			if (oclError(clGetDeviceIDs(platforms[p], CL_DEVICE_TYPE_GPU, 64, devices, &num_devices)))
+			if (oclError(clGetDeviceIDs(platforms[p], ocl_device_type, 64, devices, &num_devices)))
 			{
 				for (cl_uint d = 0; d < num_devices; ++d)
 				{

@@ -64,7 +64,7 @@ private:
 	static std::string header(const bool nl = false)
 	{
 		std::ostringstream ss;
-		ss << "proth20 0.4.0" << std::endl;
+		ss << "proth20 0.9.0" << std::endl;
 		ss << "Copyright (c) 2020, Yves Gallot" << std::endl;
 		ss << "proth20 is free source code, under the MIT license." << std::endl;
 		if (nl) ss << std::endl;
@@ -178,6 +178,8 @@ public:
 		// engine engine0(platform, 0);
 		// test Intel GPU
 		// engine engine1(platform, 1);
+		// test CPU
+		// engine engine2(platform, 2);
 
 		// function profiling
 		// proth_test::profile(13, 5523860, engine0);		// DIV
@@ -207,7 +209,7 @@ int main(int argc, char * argv[])
 	}
 	catch (const std::runtime_error & e)
 	{
-		std::ostringstream ss; ss << std::endl << "error: " << e.what() << std::endl;
+		std::ostringstream ss; ss << std::endl << "error: " << e.what() << "." << std::endl;
 		pio::error(ss.str(), true);
 		return EXIT_FAILURE;
 	}

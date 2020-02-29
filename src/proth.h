@@ -17,6 +17,8 @@ Please give feedback to the authors if improvement is realized. It is distribute
 #include <chrono>
 #include <algorithm>
 
+// #define quick_bench	1
+
 class proth
 {
 private:
@@ -44,7 +46,15 @@ private:
 	static const uint32_t ord2_max = 30;
 
 private:
-	static constexpr uint32_t benchCount(const uint32_t n) { return (n < 100000) ? 50000 : 50000000 / (n / 1000); }
+	static constexpr uint32_t benchCount(const uint32_t n)
+	{
+#ifdef quick_bench
+		const uint32_t c = 1;
+#else
+		const uint32_t c = 5;
+#endif
+		return (n < 100000) ? (c * 10000) : (c * 10000000 / (n / 1000));
+	}
 
 private:
 	static std::string res64String(const uint64_t res64)
@@ -73,12 +83,12 @@ protected:
 		const int err = X.getError();
 		if (err != 0)
 		{
-			throw std::runtime_error("GPU error detected!");
+			throw std::runtime_error("GPU error detected");
 		}
 	}
 
 private:
-	static void gfnDivError() { throw std::runtime_error("GFN divisibility test failed!"); }
+	static void gfnDivError() { throw std::runtime_error("GFN divisibility test failed"); }
 
 private:
 	static void printStatus(gpmp & X, const bool found, const uint32_t k, const uint32_t n)
@@ -177,7 +187,7 @@ public:
 			chrono.previousTime = 0;
 			// X = a^k
 			if (!apowk(X, a, k)) return false;
-			checkError(X);
+			checkError(X);	// Sync GPU
 		}
 
 		const uint32_t L = 1 << (arith::log2(n) / 2);
@@ -196,9 +206,16 @@ public:
 
 			if (--benchIter == 0)
 			{
+#ifdef quick_bench
+				checkError(X);	// Sync GPU
+#endif
 				if (_isBoinc) boinc_fraction_done(double(i) / double(n));
 				else printProgress(chrono, i, n, benchCnt);
 				benchIter = benchCnt;
+#ifdef quick_bench
+				std::cout << std::endl;
+				return _quit ? false : true;
+#endif
 			}
 
 			// Robert Gerbicz error checking algorithm
@@ -373,7 +390,7 @@ public:
 		// X = a^{k.2^{n - ord2_max}}, V = a^{2^n}
 		X.pow(k);
 
-		if (X.isOne()) throw std::runtime_error("Multiplicative order computation failed!");
+		if (X.isOne()) throw std::runtime_error("Multiplicative order computation failed");
 
 		std::vector<std::pair<uint32_t, uint32_t>> fac_e, fac;
 		arith::factor(k, fac);

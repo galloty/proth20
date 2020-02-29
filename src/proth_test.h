@@ -115,8 +115,8 @@ public:
 		orderList.push_back(number(357, 54392));	// 2^54390 * 17
 		orderList.push_back(number(315, 99512));	// 2^99511 * 3^2 * 5 * 7
 
-		if (!p.check_order(3, 201, 8, engine)) return;
-		if (!p.check_order(3, 209, 8, engine)) return;
+		if (!p.check_order(3, 201, 8, engine)) return;		// 2^199
+		if (!p.check_order(915, 438, 7, engine)) return;	// 2^438 * 3 * 5* 61
 		for (const auto & o : orderList) if (!p.check_order(o.k, o.n, 2, engine)) return;
 	}
 
