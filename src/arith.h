@@ -13,6 +13,8 @@ struct arith
 {
 	static constexpr int log2(const size_t n) { return (n > 1) ? 1 + log2(n >> 1) : 0; }
 
+	static constexpr uint32_t gcd(const uint32_t n, const uint32_t m) { return (m == 0) ? n : gcd(m, n % m); }
+
 	static constexpr uint32_t invert(const uint32_t n, const uint32_t m)
 	{
 		int64_t s0 = 1, s1 = 0, d0 = n % m, d1 = m;

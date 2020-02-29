@@ -15,7 +15,6 @@ Please give feedback to the authors if improvement is realized. It is distribute
 
 #include <thread>
 #include <chrono>
-#include <algorithm>
 
 // #define quick_bench	1
 
@@ -710,7 +709,7 @@ public:
 		{
 			for (uint32_t b = 2; b < a; ++b)
 			{
-				if ((std::__gcd(a, b) == 1) && ((a != 9) || (b != 4)))
+				if ((arith::gcd(a, b) == 1) && ((a != 9) || (b != 4)))
 				{
 					if (!check_xgfn(X, k, n, a, b)) return false;
 				}
