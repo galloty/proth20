@@ -1,0 +1,31 @@
+CC = g++ -m64 -std=c++17
+RM = rm -rf
+CFLAGS = -Wall -Wextra -fexceptions -DBOINC
+CLFLAGS = -O2
+
+BIN_DIR = bin
+SRC_DIR = src
+
+OCl_INC = -I Khronos
+OCL_LIB = -lOpenCL
+
+BOINC_DIR = ../boinc
+BOINC_INC = -I $(BOINC_DIR)/api -I $(BOINC_DIR)/lib -I $(BOINC_DIR)
+BOINC_LIB = $(BOINC_DIR)/lib_linux64/libboinc_api.a $(BOINC_DIR)/lib_linux64/libboinc.a
+
+EXEC = $(BIN_DIR)/proth20
+
+OBJS = src/main.o
+
+build: $(EXEC)
+
+clean:
+	$(RM) $(EXEC)
+
+$(EXEC): clean $(OBJS)
+	$(CC) $(OBJS) $(CLFLAGS) $(OCL_LIB) $(BOINC_LIB) -lpthread -static-libstdc++ -static-libgcc -o $@
+	$(RM) $(OBJS)
+
+.cpp.o:
+	$(CC) $(CFLAGS) $(CLFLAGS) $(OCl_INC) $(BOINC_INC) -c $< -o $@
+
