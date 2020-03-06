@@ -40,7 +40,7 @@ private:
 	// print: console: cout, boinc: stderr
 	void _print(const std::string & str) const
 	{
-		if (_isBoinc) { std::fprintf(stderr, str.c_str()); std::fflush(stderr); }
+		if (_isBoinc) { std::fprintf(stderr, "%s", str.c_str()); std::fflush(stderr); }
 		else { std::cout << str; }
 	}
 
@@ -55,7 +55,7 @@ private:
 	// error: normal: cerr, boinc: stderr
 	void _error(const std::string & str, const bool fatal) const
 	{
-		if (_isBoinc) { std::fprintf(stderr, str.c_str()); std::fflush(stderr); if (fatal) boinc_finish(EXIT_FAILURE); }
+		if (_isBoinc) { std::fprintf(stderr, "%s", str.c_str()); std::fflush(stderr); if (fatal) boinc_finish(EXIT_FAILURE); }
 		else { std::cerr << str; }
 	}
 
@@ -67,7 +67,7 @@ private:
 		{
 			FILE * const out_file = _open("out", "w");
 			if (out_file == nullptr) throw std::runtime_error("Cannot write results to out file");
-			std::fprintf(out_file, str.c_str());
+			std::fprintf(out_file, "%s", str.c_str());
 			std::fclose(out_file);
 			return true;
 		}

@@ -1,0 +1,27 @@
+CC = g++ -m64 -std=c++17
+RM = rm -rf
+CFLAGS = -Wall -Wextra -fexceptions
+CLFLAGS = -O2
+
+BIN_DIR = bin
+SRC_DIR = src
+
+OCl_INC = -I Khronos
+OCL_LIB = -lOpenCL
+
+EXEC = $(BIN_DIR)/proth20
+
+OBJS = src/main.o
+
+build: $(EXEC)
+
+clean:
+	$(RM) $(EXEC)
+
+$(EXEC): clean $(OBJS)
+	$(CC) $(OBJS) $(CLFLAGS) $(OCL_LIB) -o $@
+	$(RM) $(OBJS)
+
+.cpp.o:
+	$(CC) $(CFLAGS) $(CLFLAGS) $(OCl_INC) -c $< -o $@
+

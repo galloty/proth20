@@ -10,8 +10,9 @@ SRC_DIR = src
 OCl_INC = -I Khronos
 OCL_LIB = C:/Windows/System32/OpenCL.dll
 
-BOINC_INC = -I ../boinc/api -I ../boinc/lib -I ../boinc/win_build
-BOINC_LIB = ../boinc/lib64/libboinc_api.a ../boinc/lib64/libboinc.a
+BOINC_DIR = ../boinc
+BOINC_INC = -I $(BOINC_DIR)/api -I $(BOINC_DIR)/lib -I $(BOINC_DIR)/win_build
+BOINC_LIB = $(BOINC_DIR)/lib_win64/libboinc_api.a $(BOINC_DIR)/lib_win64/libboinc.a
 
 EXEC_RELEASE = $(BIN_DIR)\proth20.exe
 EXEC_DEBUG = $(BIN_DIR)\proth20d.exe
