@@ -44,7 +44,7 @@ private:
 public:
 	application()
 	{
-#if defined (_WIN32)
+#if defined (_WIN32)	
 		SetConsoleCtrlHandler(HandlerRoutine, TRUE);
 #else
 		signal(SIGTERM, quit);
@@ -63,8 +63,32 @@ public:
 private:
 	static std::string header(const bool nl = false)
 	{
+		const char * const sysver =
+#if defined(_WIN64)
+			"win64";
+#elif defined(_WIN32)
+			"win32";
+#elif defined(__linux__)
+#ifdef __x86_64
+			"linux64";
+#else
+			"linux32";
+#endif
+#elif defined(__APPLE__)
+			"macOS";
+#else
+			"unknown";
+#endif
+
+		std::ostringstream ssc;
+#if defined(__GNUC__)
+		ssc << " gcc-" << __GNUC__ << "." << __GNUC_MINOR__ << "." << __GNUC_PATCHLEVEL__;
+#elif defined(__clang__)
+		ssc << " clang-" << __clang_major__ << "." << __clang_minor__ << "." << __clang_patchlevel__;
+#endif
+
 		std::ostringstream ss;
-		ss << "proth20 0.9.0" << std::endl;
+		ss << "proth20 0.9.0 " << sysver << ssc.str() << std::endl;
 		ss << "Copyright (c) 2020, Yves Gallot" << std::endl;
 		ss << "proth20 is free source code, under the MIT license." << std::endl;
 		if (nl) ss << std::endl;
@@ -81,7 +105,9 @@ private:
 		ss << "  -f                      Fermat and Generalized Fermat factor test" << std::endl;
 		ss << "  -d <n> or --device <n>  set device number=<n> (default 0)" << std::endl;
 		ss << "  -v or -V                print the startup banner and immediately exit" << std::endl;
+#ifdef BOINC
 		ss << "  -boinc                  operate as a BOINC client app" << std::endl;
+#endif
 		ss << std::endl;
 		return ss.str();
 	}
@@ -90,7 +116,9 @@ public:
 	void run(const std::vector<std::string> & args)
 	{
 		bool bBoinc = false;
+#ifdef BOINC
 		for (const std::string & arg : args) if (arg == "-boinc") bBoinc = true;
+#endif
 		pio::getInstance().setBoinc(bBoinc);
 
 		if (bBoinc)

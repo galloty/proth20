@@ -438,7 +438,7 @@ public:
 		for (size_t i = 1; i < fac_e.size(); ++i)
 		{
 			sso << "\t" << fac_e[i].first;
-			if (fac_e[i].second > 1) ssr << "^" << fac_e[i].second;
+			if (fac_e[i].second > 1) sso << "^" << fac_e[i].second;
 		}
 		sso << std::endl;
 		pio::oresult(sso.str());
