@@ -88,7 +88,7 @@ private:
 #endif
 
 		std::ostringstream ss;
-		ss << "proth20 0.9.0 " << sysver << ssc.str() << std::endl;
+		ss << "proth20 0.9.1 " << sysver << ssc.str() << std::endl;
 		ss << "Copyright (c) 2020, Yves Gallot" << std::endl;
 		ss << "proth20 is free source code, under the MIT license." << std::endl;
 		if (nl) ss << std::endl;

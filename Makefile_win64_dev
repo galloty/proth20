@@ -17,7 +17,7 @@ BOINC_LIB = $(BOINC_DIR)/lib_win64/libboinc_api.a $(BOINC_DIR)/lib_win64/libboin
 EXEC_RELEASE = $(BIN_DIR)\proth20.exe
 EXEC_DEBUG = $(BIN_DIR)\proth20d.exe
 
-OBJS = src\main.o
+OBJS = $(SRC_DIR)\main.o
 
 build: $(EXEC_RELEASE)
 

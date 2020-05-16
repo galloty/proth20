@@ -126,6 +126,7 @@ public:
 		std::vector<number> gfnDivList;
 		gfnDivList.push_back(number(3, 201));
 		gfnDivList.push_back(number(3, 209));
+		gfnDivList.push_back(number(9, 1494));
 		gfnDivList.push_back(number(332436749, 9865));
 		gfnDivList.push_back(number(5, 23473));
 		gfnDivList.push_back(number(1199, 44201));

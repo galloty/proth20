@@ -116,11 +116,11 @@ public:
 		bool s = false;
 		X.init(a, a);					// x = a, u = a
 		X.setMultiplicand();			// x = a, tu = NTT(u)
-		for (int b = 0; b < 32; ++b)
+		for (int b = 31; b >= 0; --b)
 		{
 			if (s) X.square();			// x = iNTT(NTT(x)^2)
 
-			if ((k & (uint32_t(1) << (31 - b))) != 0)
+			if ((k & (uint32_t(1) << b)) != 0)
 			{
 				if (s) X.mul();			// x = iNTT(NTT(x).tu)
 				s = true;
@@ -133,7 +133,7 @@ public:
 
 		// X = a^k, right-to-left algorithm
 		X.init(1, a);					// x = 1, u = a
-		for (uint32_t b = 1; b <= uint32_t(k); b *= 2)
+		for (uint32_t b = 1; b <= k; b *= 2)
 		{
 			if ((k & b) != 0)
 			{
@@ -589,7 +589,6 @@ private:
 			uint32_t i0;
 			ok &= read_prime(X, i0, fac[1].first);
 			ok &= (i0 + ord2_max == n);
-			if (fac[1].second > 1) X.pow(fac[1].second);
 			X.setMultiplicand();
 			X.mul();
 		}

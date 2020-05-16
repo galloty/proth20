@@ -11,7 +11,7 @@ OCL_LIB = -Wl,-enable-stdcall-fixup C:/Windows/SysWOW64/OpenCL.dll
 
 EXEC = $(BIN_DIR)\proth20.exe
 
-OBJS = src\main.o
+OBJS = $(SRC_DIR)\main.o
 
 build: $(EXEC)
 

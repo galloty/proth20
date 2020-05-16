@@ -5,6 +5,10 @@ proth20 is free source code, under the MIT license (see LICENSE). You can redist
 Please give feedback to the authors if improvement is realized. It is distributed in the hope that it will be useful.
 */
 
+#pragma once
+
+#include <cstdint>
+
 static const char * const src_ocl_squareNTT_1024 = \
 "/*\n" \
 "Copyright 2020, Yves Gallot\n" \

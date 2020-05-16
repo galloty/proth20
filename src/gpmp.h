@@ -144,6 +144,9 @@ private:
 		hFile << "Please give feedback to the authors if improvement is realized. It is distributed in the hope that it will be useful." << std::endl;
 		hFile << "*/" << std::endl << std::endl;
 
+		hFile << "#pragma once" << std::endl << std::endl;
+		hFile << "#include <cstdint>" << std::endl << std::endl;
+
 		hFile << "static const char * const " << varName << " = \\" << std::endl;
 
 		std::string line;
@@ -202,12 +205,12 @@ private:
 		src << std::endl;
 
 		// if xxx.cl file is not found then source is src_ocl_xxx string in src/ocl/xxx.h
-		if (!readOpenCL("ocl/modarith.cl", "src/ocl/modarith.h", "src_ocl_modarith", src)) src << src_ocl_modarith;	
-		if (!readOpenCL("ocl/NTT.cl", "src/ocl/NTT.h", "src_ocl_NTT", src)) src << src_ocl_NTT;	
-		if (!readOpenCL("ocl/square.cl", "src/ocl/square.h", "src_ocl_square", src)) src << src_ocl_square;	
-		if (!readOpenCL("ocl/poly2int.cl", "src/ocl/poly2int.h", "src_ocl_poly2int", src)) src << src_ocl_poly2int;	
-		if (!readOpenCL("ocl/reduce.cl", "src/ocl/reduce.h", "src_ocl_reduce", src)) src << src_ocl_reduce;	
-		if (!readOpenCL("ocl/misc.cl", "src/ocl/misc.h", "src_ocl_misc", src)) src << src_ocl_misc;	
+		if (!readOpenCL("ocl/modarith.cl", "src/ocl/modarith.h", "src_ocl_modarith", src)) src << src_ocl_modarith;
+		if (!readOpenCL("ocl/NTT.cl", "src/ocl/NTT.h", "src_ocl_NTT", src)) src << src_ocl_NTT;
+		if (!readOpenCL("ocl/square.cl", "src/ocl/square.h", "src_ocl_square", src)) src << src_ocl_square;
+		if (!readOpenCL("ocl/poly2int.cl", "src/ocl/poly2int.h", "src_ocl_poly2int", src)) src << src_ocl_poly2int;
+		if (!readOpenCL("ocl/reduce.cl", "src/ocl/reduce.h", "src_ocl_reduce", src)) src << src_ocl_reduce;
+		if (!readOpenCL("ocl/misc.cl", "src/ocl/misc.h", "src_ocl_misc", src)) src << src_ocl_misc;
 
 		if (_ext512)
 		{
@@ -218,7 +221,7 @@ private:
 			if (!readOpenCL("ocl/squareNTT_1024.cl", "src/ocl/squareNTT_1024.h", "src_ocl_squareNTT_1024", src)) src << src_ocl_squareNTT_1024;	
 		}
 
-		_engine.loadProgram(src.str().c_str());
+		_engine.loadProgram(src.str());
 
 		_engine.allocMemory(size, constant_size);
 		_engine.createKernels(_ext512, _ext1024);
@@ -384,11 +387,11 @@ public:
 		const size_t size = _size / 2;
 		cl_uint2 * const x = _mem.data();
 		_engine.readMemory_x(x);
-		std::stringstream ss; ss << std::endl;
+		std::stringstream ss; ss << std::endl << "size = " << size << " ; ";
 		for (size_t i = 0; i < size; ++i)
 		{
 			if (x[i].s[0] != 0) ss << " " << i << ":0 " << x[i].s[0];
-			if (x[i].s[1] != 0) ss << " " << i << ":0 " << x[i].s[1];
+			if (x[i].s[1] != 0) ss << " " << i << ":1 " << x[i].s[1];
 		}
 		ss << std::endl;
 		pio::display(ss.str());
@@ -649,9 +652,7 @@ public:
 	{
 		const size_t size = _size;
 
-		// if R - Y < 0 then the result a * (R - Y) < 0 => error
-		// if R < Y then add k.2^n + 1 to R. We have 0 < R - Y + k.2^n + 1 <= k.2^n
-		_engine.set_positive();
+		norm();
 
 		_engine.sub_ntt64_16(0, 0);
 

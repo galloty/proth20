@@ -15,7 +15,7 @@ BOINC_LIB = $(BOINC_DIR)/lib_linux64/libboinc_api.a $(BOINC_DIR)/lib_linux64/lib
 
 EXEC = $(BIN_DIR)/proth20
 
-OBJS = src/main.o
+OBJS = $(SRC_DIR)/main.o
 
 build: $(EXEC)
 

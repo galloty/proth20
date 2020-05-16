@@ -11,7 +11,7 @@ OCL_LIB = -lOpenCL
 
 EXEC = $(BIN_DIR)/proth20
 
-OBJS = src/main.o
+OBJS = $(SRC_DIR)/main.o
 
 build: $(EXEC)
 
@@ -19,7 +19,7 @@ clean:
 	$(RM) $(EXEC)
 
 $(EXEC): clean $(OBJS)
-	$(CC) $(OBJS) $(CLFLAGS) $(OCL_LIB) -o $@
+	$(CC) $(OBJS) $(CLFLAGS) $(OCL_LIB) -static-libstdc++ -static-libgcc -o $@
 	$(RM) $(OBJS)
 
 .cpp.o:
